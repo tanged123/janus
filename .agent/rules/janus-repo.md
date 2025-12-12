@@ -29,6 +29,9 @@ trigger: always_on
 *   `include/janus/linalg/`: Linear algebra extensions.
 *   `tests/`: Test suite.
 
+### 4. Read the Overview! 
+*   Always make sure to read through the docs before doing anything! Get context from design_overview.md!
+
 ## workflow
 *   Build: `./scripts/build.sh`
 *   Test: `./scripts/test.sh`

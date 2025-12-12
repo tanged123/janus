@@ -41,6 +41,9 @@
 # debug information files
 *.dwo
 
+# logs
+logs/
+
 # Build Directories
 build/
 bin/

@@ -44,6 +44,13 @@ We provide shorthand scripts to streamline the workflow:
     ./scripts/test.sh
     ```
 
+3. **CI / Clean Verification**: Runs the full build and test pipeline inside the reproducible Nix environment (what CI does).
+
+    ```bash
+    ./scripts/ci.sh
+    ```
+    
+    Logs are saved to `logs/ci.log` and `logs/tests.log`.
 ### Formatting
 
 We use **treefmt** to enforce code style for C++, CMake, and Nix files.
