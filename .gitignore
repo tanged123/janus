@@ -37,5 +37,21 @@
 *.out
 *.app
 
+
 # debug information files
 *.dwo
+
+# Build Directories
+build/
+bin/
+lib/
+cmake-build-*/
+
+# Temporary Files
+*.swp
+*.swo
+*~
+.DS_Store
+*.log
+*.tmp
+.cache/
