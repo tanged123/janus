@@ -12,7 +12,6 @@
 ### Prerequisites
 
 * **Nix**: This project uses Nix Flakes to provide a reproducible development environment.
-* **Direnv** (Optional but recommended): For automatic shell environment loading.
 
 ### Dev Shell
 
@@ -20,12 +19,6 @@ Enter the development environment:
 
 ```bash
 ./scripts/dev.sh
-```
-
-Or if you use **direnv**:
-
-```bash
-direnv allow
 ```
 
 ### Build & Test
@@ -65,9 +58,16 @@ nix fmt
 janus/
 ├── docs/               # Documentation
 ├── include/janus/      # Core Library Headers
-│   ├── core/           # Concepts & Types
-│   ├── math/           # Math Dispatcher
-│   └── linalg/         # Linear Algebra
+│   ├── core/           # Concepts & Types (JanusScalar, etc.)
+│   ├── math/           # Math & Numerics Layer
+│   │   ├── Arithmetic.hpp   # Core arithmetic (pow, exp, log...)
+│   │   ├── Trig.hpp         # Trigonometry (sin, cos, atan2...)
+│   │   ├── Logic.hpp        # Branching (where) & sigmoids
+│   │   ├── Linalg.hpp       # Linear Algebra (solve, norm)
+│   │   ├── DiffOps.hpp      # Calculus (gradient, trapz)
+│   │   └── Interpolate.hpp  # Interpolation utilities
+│   └── linalg/         # Matrix extensions (future)
+├── scripts/            # Build & Test Scripts (ci.sh, etc.)
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
 ```
