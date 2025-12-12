@@ -14,4 +14,4 @@ jobs:
         nix_path: nixpkgs=channel:nixos-unstable
 
     - name: Build & Test (Flake Check)
-      run: nix develop --command bash -c "mkdir build && cd build && cmake .. && make && ctest --output-on-failure"
+      run: ./scripts/ci.sh
