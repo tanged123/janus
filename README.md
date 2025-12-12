@@ -19,31 +19,29 @@
 Enter the development environment:
 
 ```bash
-nix develop
-# OR if using direnv
+./scripts/dev.sh
+```
+
+Or if you use **direnv**:
+
+```bash
 direnv allow
 ```
 
 ### Build & Test
 
-From the repo root:
+We provide shorthand scripts to streamline the workflow:
 
-1. **Configure**:
+1. **Build**: Configures and compiles the project.
 
     ```bash
-    cmake -B build -G Ninja
+    ./scripts/build.sh
     ```
 
-2. **Build**:
+2. **Test**: Rebuilds (if necessary) and runs the test suite.
 
     ```bash
-    ninja -C build
-    ```
-
-3. **Run Tests**:
-
-    ```bash
-    ctest --test-dir build --output-on-failure
+    ./scripts/test.sh
     ```
 
 ### Formatting
