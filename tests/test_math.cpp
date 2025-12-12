@@ -1,17 +1,16 @@
 #include <gtest/gtest.h>
+#include <janus/core/JanusTypes.hpp>
 #include <janus/math/Arithmetic.hpp>
 #include <janus/math/Trig.hpp>
-#include <janus/core/JanusTypes.hpp> 
 
 // Test Arithmetic Functions
-template <typename Scalar>
-void test_arithmetic() {
+template <typename Scalar> void test_arithmetic() {
     Scalar val = -4.0;
     auto res_abs = janus::abs(val);
-    
+
     val = 16.0;
     auto res_sqrt = janus::sqrt(val);
-    
+
     Scalar base = 2.0;
     Scalar exp = 3.0;
     auto res_pow = janus::pow(base, exp);
@@ -28,12 +27,11 @@ void test_arithmetic() {
 }
 
 // Test Trigonometry Functions
-template <typename Scalar>
-void test_trig() {
+template <typename Scalar> void test_trig() {
     Scalar val = 0.0;
     auto res_sin = janus::sin(val);
     auto res_cos = janus::cos(val);
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(res_sin, 0.0);
         EXPECT_DOUBLE_EQ(res_cos, 1.0);
