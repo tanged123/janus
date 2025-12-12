@@ -1,3 +1,78 @@
 #pragma once
+#include "janus/core/JanusConcepts.hpp"
+#include <Eigen/Dense>
+#include <casadi/casadi.hpp>
 
-namespace janus {}
+namespace janus {
+
+// --- Conversion Helpers ---
+
+// Convert Eigen<MX> to CasADi MX (dense)
+template <typename Derived>
+casadi::MX to_mx(const Eigen::MatrixBase<Derived>& e) {
+    if (e.size() == 0) return casadi::MX(e.rows(), e.cols());
+    
+    // Create an MX of correct shape
+    casadi::MX m(e.rows(), e.cols());
+    // Fill it element-wise
+    for(Eigen::Index i=0; i<e.rows(); ++i) {
+        for(Eigen::Index j=0; j<e.cols(); ++j) {
+            m(static_cast<int>(i), static_cast<int>(j)) = e(i, j);
+        }
+    }
+    return m;
+}
+
+// Convert CasADi MX to Eigen<MX>
+inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const casadi::MX& m) {
+    Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> e(m.size1(), m.size2());
+    for(int i=0; i<m.size1(); ++i) {
+        for(int j=0; j<m.size2(); ++j) {
+            e(i, j) = m(i, j);
+        }
+    }
+    return e;
+}
+
+
+// --- solve(A, b) ---
+// Solves Ax = b
+template <typename DerivedA, typename DerivedB>
+auto solve(const Eigen::MatrixBase<DerivedA>& A, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        // Numeric: Use reliable QR solver
+        return A.colPivHouseholderQr().solve(b).eval();
+    } else {
+        // Symbolic: Use casadi::solve
+        casadi::MX A_mx = to_mx(A);
+        casadi::MX b_mx = to_mx(b);
+        // casadi::solve(A, b) returns MX
+        casadi::MX x_mx = casadi::MX::solve(A_mx, b_mx);
+        return to_eigen(x_mx);
+    }
+}
+
+// --- norm(x) ---
+// Returns L2 norm
+template <typename Derived>
+auto norm(const Eigen::MatrixBase<Derived>& x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        return x.norm();
+    } else {
+        return norm_2(to_mx(x));
+    }
+}
+
+// --- outer(x, y) ---
+// Outer product: x * y^T
+template <typename DerivedX, typename DerivedY>
+auto outer(const Eigen::MatrixBase<DerivedX>& x, const Eigen::MatrixBase<DerivedY>& y) {
+    // Eigen's outer product works efficiently for both numeric and symbolic scalars
+    // because MX * MX (scalar mult) creates a standard multiplication node.
+    return x * y.transpose();
+}
+
+} // namespace janus
