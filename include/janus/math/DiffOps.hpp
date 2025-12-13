@@ -74,24 +74,59 @@ auto jacobian(const Expr &expression, const Vars &...variables) {
     }
 }
 
-// Overload for vector of variables (expr, {vars})
-inline auto jacobian(const casadi::MX &expression, const std::vector<casadi::MX> &variables) {
-    casadi::MX v_cat = casadi::MX::vertcat(variables);
-    return casadi::MX::jacobian(expression, v_cat);
+// Helper to separate implementation
+namespace detail {
+    inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg>& args) {
+        std::vector<casadi::MX> ret;
+        ret.reserve(args.size());
+        for (const auto& arg : args) ret.push_back(arg.get());
+        return ret;
+    }
 }
 
+// Overload for vector of variables (expr, {vars})
+// Supports mixed types via SymbolicArg
+// REMOVED due to ambiguity with ({expr}, {var}). use {expr} instead.
+// inline auto jacobian(const SymbolicArg& expression, const std::vector<SymbolicArg>& variables) {
+//     casadi::MX v_cat = casadi::MX::vertcat(detail::to_mx_vector(variables));
+//     return casadi::MX::jacobian(expression, v_cat);
+// }
+
 // Overload for vector of expressions and variables ({exprs}, {vars})
-// This matches janus::Function({inputs}, {outputs}) syntax
-inline auto jacobian(const std::vector<casadi::MX> &expressions,
-                     const std::vector<casadi::MX> &variables) {
-    casadi::MX expr_cat = casadi::MX::vertcat(expressions);
-    casadi::MX var_cat = casadi::MX::vertcat(variables);
+// Supports mixed types via SymbolicArg
+inline auto jacobian(const std::vector<SymbolicArg>& expressions, const std::vector<SymbolicArg>& variables) {
+    casadi::MX expr_cat = casadi::MX::vertcat(detail::to_mx_vector(expressions));
+    casadi::MX var_cat = casadi::MX::vertcat(detail::to_mx_vector(variables));
     return casadi::MX::jacobian(expr_cat, var_cat);
 }
 
-// Overload for single variable
-inline auto jacobian(const casadi::MX &expression, const casadi::MX &variable) {
-    return casadi::MX::jacobian(expression, variable);
-}
+// Single arg overloading often causes ambiguity with initializer lists.
+// We prefer explicit vectors or explicit single args.
+// But to resolve ambiguity between jacobian({e}, {v}) matching both (Arg, vector) and (vector, vector),
+// we remove the (Arg, vector) overload if it's ambiguous.
+//
+// Actually, {x} can construct SymbolicArg OR vector<SymbolicArg>.
+// Only (vector, vector) is truly needed if we say everything is a list.
+// But legacy `jacobian(y, x)` (without braces) needs single arg support.
+//
+// Solution: Main overload is (vector, vector).
+// Add (SymbolicArg, vector) ?
+// 
+// Let's rely on explicit types or make {x} prefer vector.
+//
+// Best fix: Remove (Arg, vector) overload and force users to use {x} for single args in the first position?
+// Or keep it but simple args.
+//
+// Ambiguity comes because {drag_sym} can be SymbolicArg(drag_sym) OR vector{SymbolicArg(drag_sym)}.
+//
+// We will REMOVE the (SymbolicArg, vector) overload and require {expr} syntax for clarity and consistency.
+// And we keep (SymbolicArg, SymbolicArg) for simple cases.
+
+// Overload for single variable to single variable (no braces)
+// REMOVED: Usage jacobian(y, x) is ambiguous with jacobian({y}, {x}) if constructing from single element.
+// Please use janus::jacobian({y}, {x}) for consistency.
+// inline auto jacobian(const SymbolicArg& expression, const SymbolicArg& variable) {
+//    return casadi::MX::jacobian(expression, variable);
+// }
 
 } // namespace janus

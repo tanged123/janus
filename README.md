@@ -43,7 +43,19 @@ We provide shorthand scripts to streamline the workflow:
     ./scripts/ci.sh
     ```
     
-    Logs are saved to `logs/ci.log` and `logs/tests.log`.
+4. **Examples**: Runs the example simulations (`drag_coefficient`, `energy_intro`, `numeric_intro`).
+
+    ```bash
+    ./scripts/examples.sh
+    ```
+
+5. **Full Verification**: Runs everything (Build + Test + Examples). This is the recommended pre-push check.
+
+    ```bash
+    ./scripts/verify.sh
+    ```
+    
+    Logs are saved to `logs/ci.log`, `logs/tests.log`, `logs/examples.log`, and `logs/verify.log`.
 ### Formatting
 
 We use **treefmt** to enforce code style for C++, CMake, and Nix files.
@@ -88,11 +100,14 @@ int main() {
 
 For more details, see the [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) or check `examples/drag_coefficient.cpp`.
 
+For high-performance numeric simulations, see the [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
+
 ## Project Structure
 
 ```plaintext
 janus/
 ├── docs/               # Documentation
+├── examples/           # Example Implementations (numeric & symbolic)
 ├── include/janus/      # Core Library Headers
 │   ├── core/           # Concepts, Types & Function Wrapper
 │   ├── math/           # Math & Numerics Layer
@@ -101,9 +116,11 @@ janus/
 │   │   ├── Logic.hpp        # Branching (where) & sigmoids
 │   │   ├── Linalg.hpp       # Linear Algebra (solve, norm)
 │   │   ├── DiffOps.hpp      # Calculus (gradient, trapz)
-│   │   └── Interpolate.hpp  # Interpolation utilities
+│   │   ├── Interpolate.hpp  # Interpolation utilities
+│   │   ├── Spacing.hpp      # Grid generation (linspace)
+│   │   └── Rotations.hpp    # 2D Rotations (DCM)
 │   └── linalg/         # Matrix extensions (future)
-├── scripts/            # Build & Test Scripts (ci.sh, etc.)
+├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
 ```
