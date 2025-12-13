@@ -34,13 +34,159 @@ T where(const BooleanType_t<T>& cond, const T& if_true, const T& if_false) {
 // --- where (Vector/Matrix) ---
 // For Eigen types: uses .select()
 // For CasADi: handled by scalar overload (as MX is natively a matrix)
-template <typename Derived>
-auto where(const Eigen::ArrayBase<Derived>& cond, 
-           const Eigen::MatrixBase<Derived>& if_true, 
-           const Eigen::MatrixBase<Derived>& if_false) {
-    return cond.select(if_true, if_false);
+// --- where (Vector/Matrix) ---
+template <typename DerivedCond, typename DerivedTrue, typename DerivedFalse>
+auto where(const Eigen::ArrayBase<DerivedCond>& cond, 
+           const Eigen::MatrixBase<DerivedTrue>& if_true, 
+           const Eigen::MatrixBase<DerivedFalse>& if_false) {
+    using Scalar = typename DerivedTrue::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        // Manual element-wise select for generic types/CasADi
+        // Assuming if_true and if_false have same dimensions as cond
+        Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> res(if_true.rows(), if_true.cols());
+        for (Eigen::Index i = 0; i < if_true.rows(); ++i) {
+            for (Eigen::Index j = 0; j < if_true.cols(); ++j) {
+                // cond(i,j) might be an expression, evaluate it.
+                res(i,j) = janus::where(cond.derived().coeff(i,j), if_true(i,j), if_false(i,j));
+            }
+        }
+        return res;
+    } else {
+        return cond.select(if_true, if_false);
+    }
 }
 
+// --- Min ---
+template <JanusScalar T>
+T min(const T &a, const T &b) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::min(a, b);
+    } else {
+        return fmin(a, b);
+    }
+}
+
+template <typename Derived>
+auto min(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         Eigen::Matrix<Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime> res(a.rows(), a.cols());
+         for (Eigen::Index i = 0; i < a.rows(); ++i) {
+             for (Eigen::Index j = 0; j < a.cols(); ++j) {
+                 res(i,j) = janus::min(a(i,j), b(i,j));
+             }
+         }
+         return res;
+    } else {
+        return a.cwiseMin(b);
+    }
+}
+
+// --- Max ---
+template <JanusScalar T>
+T max(const T &a, const T &b) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::max(a, b);
+    } else {
+        return fmax(a, b);
+    }
+}
+
+template <typename Derived>
+auto max(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         Eigen::Matrix<Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime> res(a.rows(), a.cols());
+         for (Eigen::Index i = 0; i < a.rows(); ++i) {
+             for (Eigen::Index j = 0; j < a.cols(); ++j) {
+                 res(i,j) = janus::max(a(i,j), b(i,j));
+             }
+         }
+         return res;
+    } else {
+        return a.cwiseMax(b);
+    }
+}
+
+// --- Clamp ---
+template <JanusScalar T>
+T clamp(const T &val, const T &low, const T &high) {
+    return janus::min(janus::max(val, low), high);
+}
+
+template <typename Derived, typename Scalar>
+auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scalar &high) {
+    return val.cwiseMax(low).cwiseMin(high);
+}
+
+
+
+// --- Less Than (lt) ---
+// Returns expressions suitable for 'where' condition
+template <typename DerivedA, typename DerivedB>
+auto lt(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x < y; });
+    } else {
+        return (a.array() < b.array());
+    }
+}
+
+// --- Greater Than (gt) ---
+template <typename DerivedA, typename DerivedB>
+auto gt(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x > y; });
+    } else {
+        return (a.array() > b.array());
+    }
+}
+
+// --- Less Than or Equal (le) ---
+template <typename DerivedA, typename DerivedB>
+auto le(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x <= y; });
+    } else {
+        return (a.array() <= b.array());
+    }
+}
+
+// --- Greater Than or Equal (ge) ---
+template <typename DerivedA, typename DerivedB>
+auto ge(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x >= y; });
+    } else {
+        return (a.array() >= b.array());
+    }
+}
+
+// --- Equal (eq) ---
+template <typename DerivedA, typename DerivedB>
+auto eq(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x == y; });
+    } else {
+        return (a.array() == b.array());
+    }
+}
+
+// --- Not Equal (neq) ---
+template <typename DerivedA, typename DerivedB>
+auto neq(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+         return a.binaryExpr(b, [](const auto& x, const auto& y) { return x != y; });
+    } else {
+        return (a.array() != b.array());
+    }
+}
 
 // --- sigmoid_blend ---
 // Smoothly blends between val_low and val_high based on x

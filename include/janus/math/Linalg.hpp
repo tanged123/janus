@@ -75,4 +75,48 @@ auto outer(const Eigen::MatrixBase<DerivedX>& x, const Eigen::MatrixBase<Derived
     return x * y.transpose();
 }
 
+// --- Dot Product ---
+template <typename DerivedA, typename DerivedB>
+auto dot(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    return a.dot(b);
+}
+
+// --- Cross Product ---
+template <typename DerivedA, typename DerivedB>
+auto cross(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+    // Manual implementation to support Dynamic vectors (Eigen::cross requires fixed size 3)
+    using Scalar = typename DerivedA::Scalar;
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1> res(3);
+    res(0) = a(1)*b(2) - a(2)*b(1);
+    res(1) = a(2)*b(0) - a(0)*b(2);
+    res(2) = a(0)*b(1) - a(1)*b(0);
+    return res;
+}
+
+// --- Inverse ---
+template <typename Derived>
+auto inv(const Eigen::MatrixBase<Derived>& A) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        return A.inverse().eval();
+    } else {
+        casadi::MX A_mx = to_mx(A);
+        casadi::MX inv_mx = inv(A_mx);
+        return to_eigen(inv_mx);
+    }
+}
+
+// --- Determinant ---
+template <typename Derived>
+auto det(const Eigen::MatrixBase<Derived>& A) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        return A.determinant();
+    } else {
+        casadi::MX A_mx = to_mx(A);
+        return det(A_mx);
+    }
+}
+
+
 } // namespace janus

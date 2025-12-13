@@ -21,3 +21,6 @@ target_link_libraries(janus INTERFACE Eigen3::Eigen casadi)
 # --- Testing ---
 enable_testing()
 add_subdirectory(tests)
+
+# --- Examples ---
+add_subdirectory(examples)

@@ -1,0 +1,2 @@
+add_executable(drag_coefficient drag_coefficient.cpp)
+target_link_libraries(drag_coefficient PRIVATE janus)
