@@ -28,6 +28,7 @@ This work expands the Janus framework to fully support symbolic computation and 
 *   `include/janus/core/Function.hpp`: **NEW** `janus::Function` class.
 *   `include/janus/core/JanusTypes.hpp`: `janus::sym` helpers.
 *   `examples/drag_coefficient.cpp`: Updated to use new API.
+*   `examples/energy_intro.cpp`: **NEW** Implementation of README usage example.
 *   `tests/core/test_function.cpp`: **NEW** Tests for Function wrapper.
 *   `tests/math/test_*.cpp`: Modularized tests.
 

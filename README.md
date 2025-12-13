@@ -52,13 +52,49 @@ We use **treefmt** to enforce code style for C++, CMake, and Nix files.
 nix fmt
 ```
 
+## Usage Example
+
+Write physics models once using `janus` math functions, and execute them in both numeric and symbolic modes.
+
+```cpp
+#include <janus/janus.hpp>
+
+// 1. Define a generic physics model
+template <typename Scalar>
+Scalar compute_energy(const Scalar& v, const Scalar& m) {
+    // Use janus:: math functions for dual-backend support
+    return 0.5 * m * janus::pow(v, 2.0);
+}
+
+int main() {
+    // 2. Numeric Mode (Fast Standard Execution)
+    double v = 10.0, m = 2.0;
+    double E = compute_energy(v, m); // Returns 100.0
+
+    // 3. Symbolic Mode (Graph Generation & Derivatives)
+    auto v_sym = janus::sym("v");
+    auto m_sym = janus::sym("m");
+    auto E_sym = compute_energy(v_sym, m_sym);
+
+    // Automatic Differentiation (Compute dE/dv)
+    auto dE_dv = janus::jacobian({E_sym}, {v_sym}); 
+    
+    // Create Callable Function (wraps CasADi)
+    janus::Function f_grad({v_sym, m_sym}, {dE_dv});
+    
+    auto result = f_grad(10.0, 2.0); // Evaluate derivatives numerically
+}
+```
+
+For more details, see the [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) or check `examples/drag_coefficient.cpp`.
+
 ## Project Structure
 
 ```plaintext
 janus/
 ├── docs/               # Documentation
 ├── include/janus/      # Core Library Headers
-│   ├── core/           # Concepts & Types (JanusScalar, etc.)
+│   ├── core/           # Concepts, Types & Function Wrapper
 │   ├── math/           # Math & Numerics Layer
 │   │   ├── Arithmetic.hpp   # Core arithmetic (pow, exp, log...)
 │   │   ├── Trig.hpp         # Trigonometry (sin, cos, atan2...)
