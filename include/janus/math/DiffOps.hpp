@@ -100,33 +100,4 @@ inline auto jacobian(const std::vector<SymbolicArg>& expressions, const std::vec
     return casadi::MX::jacobian(expr_cat, var_cat);
 }
 
-// Single arg overloading often causes ambiguity with initializer lists.
-// We prefer explicit vectors or explicit single args.
-// But to resolve ambiguity between jacobian({e}, {v}) matching both (Arg, vector) and (vector, vector),
-// we remove the (Arg, vector) overload if it's ambiguous.
-//
-// Actually, {x} can construct SymbolicArg OR vector<SymbolicArg>.
-// Only (vector, vector) is truly needed if we say everything is a list.
-// But legacy `jacobian(y, x)` (without braces) needs single arg support.
-//
-// Solution: Main overload is (vector, vector).
-// Add (SymbolicArg, vector) ?
-// 
-// Let's rely on explicit types or make {x} prefer vector.
-//
-// Best fix: Remove (Arg, vector) overload and force users to use {x} for single args in the first position?
-// Or keep it but simple args.
-//
-// Ambiguity comes because {drag_sym} can be SymbolicArg(drag_sym) OR vector{SymbolicArg(drag_sym)}.
-//
-// We will REMOVE the (SymbolicArg, vector) overload and require {expr} syntax for clarity and consistency.
-// And we keep (SymbolicArg, SymbolicArg) for simple cases.
-
-// Overload for single variable to single variable (no braces)
-// REMOVED: Usage jacobian(y, x) is ambiguous with jacobian({y}, {x}) if constructing from single element.
-// Please use janus::jacobian({y}, {x}) for consistency.
-// inline auto jacobian(const SymbolicArg& expression, const SymbolicArg& variable) {
-//    return casadi::MX::jacobian(expression, variable);
-// }
-
 } // namespace janus

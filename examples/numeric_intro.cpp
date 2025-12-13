@@ -26,8 +26,8 @@ void step_physics(janus::JanusMatrix<Scalar>& state, const Scalar& dt) {
     // Bounce Logic
     // usage: where(condition, if_true, if_false)
     // When y < 0, reverse velocity with damping
-    vy = janus::where(y < 0.0, Scalar(-0.8) * vy, vy);
-    y = janus::where(y < 0.0, Scalar(0.0), y);
+    vy = janus::where(y < 0.0, -0.8 * vy, vy);
+    y = janus::where(y < 0.0, 0.0, y);
     
     // Write back
     state(0) = y;
