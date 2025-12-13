@@ -6,6 +6,10 @@ target_link_libraries(test_core PRIVATE janus GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(test_core)
 
+add_executable(test_function core/test_function.cpp)
+target_link_libraries(test_function PRIVATE janus GTest::gtest_main)
+gtest_discover_tests(test_function)
+
 add_executable(test_math 
     math/test_arithmetic.cpp
     math/test_trig.cpp

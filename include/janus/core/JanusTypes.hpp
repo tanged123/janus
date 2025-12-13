@@ -4,6 +4,7 @@
 
 namespace janus {
 
+// --- Matrix Types ---
 /**
  * Universal Matrix Template
  *
@@ -20,5 +21,14 @@ using NumericMatrix = JanusMatrix<NumericScalar>; // Equivalent to Eigen::Matrix
 // Symbolic Backend
 using SymbolicScalar = casadi::MX;
 using SymbolicMatrix = JanusMatrix<SymbolicScalar>;
+
+// --- Symbolic Variable Creation ---
+inline SymbolicScalar sym(const std::string& name) {
+    return casadi::MX::sym(name);
+}
+
+inline SymbolicScalar sym(const std::string& name, int rows, int cols = 1) {
+    return casadi::MX::sym(name, rows, cols);
+}
 
 } // namespace janus

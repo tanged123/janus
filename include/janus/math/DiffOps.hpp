@@ -52,4 +52,44 @@ auto gradient_1d(const Eigen::MatrixBase<DerivedY>& y, const Eigen::MatrixBase<D
     return grad;
 }
 
+// --- Jacobian (Symbolic) ---
+// Computes Jacobian of an expression with respect to variables.
+// Helper to abstract away CasADi vertcat details.
+// Usage: auto J = janus::jacobian(expr, v1, v2); or janus::jacobian(expr, vector_of_vars);
+template <typename Expr, typename... Vars>
+auto jacobian(const Expr& expression, const Vars&... variables) {
+    if constexpr (std::is_same_v<Expr, casadi::MX>) {
+        // Collect pack into a vector of MX
+        std::vector<casadi::MX> vars;
+        (vars.push_back(variables), ...);
+        
+        casadi::MX v_cat = casadi::MX::vertcat(vars);
+        return casadi::MX::jacobian(expression, v_cat);
+    } else {
+        // Fallback or static_assert for non-symbolic types
+        // Ideally we would support numeric autodiff here later
+        static_assert(std::is_same_v<Expr, casadi::MX>, "Automatic Jacobian only supported for Symbolic types currently.");
+        return Expr(0);
+    }
+}
+
+// Overload for vector of variables (expr, {vars})
+inline auto jacobian(const casadi::MX& expression, const std::vector<casadi::MX>& variables) {
+    casadi::MX v_cat = casadi::MX::vertcat(variables);
+    return casadi::MX::jacobian(expression, v_cat);
+}
+
+// Overload for vector of expressions and variables ({exprs}, {vars})
+// This matches janus::Function({inputs}, {outputs}) syntax
+inline auto jacobian(const std::vector<casadi::MX>& expressions, const std::vector<casadi::MX>& variables) {
+    casadi::MX expr_cat = casadi::MX::vertcat(expressions);
+    casadi::MX var_cat = casadi::MX::vertcat(variables);
+    return casadi::MX::jacobian(expr_cat, var_cat);
+}
+
+// Overload for single variable
+inline auto jacobian(const casadi::MX& expression, const casadi::MX& variable) {
+    return casadi::MX::jacobian(expression, variable);
+}
+
 } // namespace janus

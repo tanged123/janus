@@ -28,8 +28,8 @@ int main() {
     std::cout << "Numeric Drag: " << drag_numeric << " N" << std::endl;
     
     // Symbolic Mode
-    janus::SymbolicScalar v_sym = casadi::MX::sym("v");
-    janus::SymbolicScalar Cl_sym = casadi::MX::sym("Cl");
+    auto v_sym = janus::sym("v");
+    auto Cl_sym = janus::sym("Cl");
     
     // Constants for symbolic evaluation
     janus::SymbolicScalar rho_s = rho;
@@ -41,13 +41,37 @@ int main() {
     auto drag_sym = compute_drag(rho_s, v_sym, S_s, Cd0_s, k_s, Cl_sym, Cl0_s);
     
     // Create function: f(v, Cl) -> drag
-    std::vector<janus::SymbolicScalar> inputs = {v_sym, Cl_sym};
-    std::vector<janus::SymbolicScalar> outputs = {drag_sym};
-    casadi::Function drag_fun("drag_fun", inputs, outputs);
+    janus::Function drag_fun({v_sym, Cl_sym}, {drag_sym});
     
     // Evaluate symbolic function at numeric point
-    auto res = drag_fun(std::vector<casadi::DM>{v, Cl});
+    auto res = drag_fun(v, Cl);
     std::cout << "Symbolic Drag (evaluated): " << res[0] << " N" << std::endl;
+
+    // --- Automatic Differentiation ---
+    std::cout << "\nComputing Jacobian (Automatic Differentiation)..." << std::endl;
     
+    // Concatenate inputs into a single vector for Jacobian computation
+    // J = d(drag)/d[v, Cl]
+    janus::SymbolicScalar J_sym = janus::jacobian({drag_sym}, {v_sym, Cl_sym});
+    
+    // Create Jacobian function: f(v, Cl) -> [dDrag/dv, dDrag/dCl]
+    janus::Function J_fun({v_sym, Cl_sym}, {J_sym});
+    
+    // Evaluate Jacobian at operating point
+    auto J_res = J_fun(v, Cl);
+    std::cout << "Jacobian [dDrag/dv, dDrag/dCl]: " << J_res[0] << std::endl;
+    
+    // Verification (Analytic/Numeric check)
+    // Drag = 0.5 * rho * v^2 * S * (Cd0 + k * (Cl - Cl0)^2)
+    // dDrag/dv = rho * v * S * Cd
+    // dDrag/dCl = q * S * (2 * k * (Cl - Cl0))
+    // Let's verify manually
+    double Cd = Cd0 + k * std::pow(Cl - Cl0, 2.0);
+    double q = 0.5 * rho * std::pow(v, 2.0);
+    double dDrag_dv = rho * v * S * Cd;
+    double dDrag_dCl = q * S * (2.0 * k * (Cl - Cl0));
+    
+    std::cout << "Analytic Check: [" << dDrag_dv << ", " << dDrag_dCl << "]" << std::endl;
+
     return 0;
 }
