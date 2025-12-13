@@ -1,5 +1,5 @@
-#include <janus/janus.hpp>
 #include <iostream>
+#include <janus/janus.hpp>
 #include <vector>
 
 // Physics model: Drag Coefficient
@@ -7,8 +7,8 @@
 // Drag = 0.5 * rho * v^2 * S * Cd
 
 template <typename Scalar>
-Scalar compute_drag(const Scalar& rho, const Scalar& v, const Scalar& S, 
-                    const Scalar& Cd0, const Scalar& k, const Scalar& Cl, const Scalar& Cl0) {
+Scalar compute_drag(const Scalar &rho, const Scalar &v, const Scalar &S, const Scalar &Cd0,
+                    const Scalar &k, const Scalar &Cl, const Scalar &Cl0) {
     auto q = 0.5 * rho * janus::pow(v, 2.0);
     auto Cd = Cd0 + k * janus::pow(Cl - Cl0, 2.0);
     return q * S * Cd;
@@ -23,14 +23,14 @@ int main() {
     double k = 0.04;
     double Cl = 0.5;
     double Cl0 = 0.1;
-    
+
     double drag_numeric = compute_drag(rho, v, S, Cd0, k, Cl, Cl0);
     std::cout << "Numeric Drag: " << drag_numeric << " N" << std::endl;
-    
+
     // Symbolic Mode
     auto v_sym = janus::sym("v");
     auto Cl_sym = janus::sym("Cl");
-    
+
     // Constants for symbolic evaluation
     janus::SymbolicScalar rho_s = rho;
     janus::SymbolicScalar S_s = S;
@@ -39,28 +39,28 @@ int main() {
     janus::SymbolicScalar Cl0_s = Cl0;
 
     auto drag_sym = compute_drag(rho_s, v_sym, S_s, Cd0_s, k_s, Cl_sym, Cl0_s);
-    
+
     // Create function: f(v, Cl) -> drag
     janus::Function drag_fun({v_sym, Cl_sym}, {drag_sym});
-    
+
     // Evaluate symbolic function at numeric point
     auto res = drag_fun(v, Cl);
     std::cout << "Symbolic Drag (evaluated): " << res[0] << " N" << std::endl;
 
     // --- Automatic Differentiation ---
     std::cout << "\nComputing Jacobian (Automatic Differentiation)..." << std::endl;
-    
+
     // Concatenate inputs into a single vector for Jacobian computation
     // J = d(drag)/d[v, Cl]
     janus::SymbolicScalar J_sym = janus::jacobian({drag_sym}, {v_sym, Cl_sym});
-    
+
     // Create Jacobian function: f(v, Cl) -> [dDrag/dv, dDrag/dCl]
     janus::Function J_fun({v_sym, Cl_sym}, {J_sym});
-    
+
     // Evaluate Jacobian at operating point
     auto J_res = J_fun(v, Cl);
     std::cout << "Jacobian [dDrag/dv, dDrag/dCl]: " << J_res[0] << std::endl;
-    
+
     // Verification (Analytic/Numeric check)
     // Drag = 0.5 * rho * v^2 * S * (Cd0 + k * (Cl - Cl0)^2)
     // dDrag/dv = rho * v * S * Cd
@@ -70,7 +70,7 @@ int main() {
     double q = 0.5 * rho * std::pow(v, 2.0);
     double dDrag_dv = rho * v * S * Cd;
     double dDrag_dCl = q * S * (2.0 * k * (Cl - Cl0));
-    
+
     std::cout << "Analytic Check: [" << dDrag_dv << ", " << dDrag_dCl << "]" << std::endl;
 
     return 0;

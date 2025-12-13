@@ -8,15 +8,15 @@ namespace janus {
 // --- Conversion Helpers ---
 
 // Convert Eigen<MX> to CasADi MX (dense)
-template <typename Derived>
-casadi::MX to_mx(const Eigen::MatrixBase<Derived>& e) {
-    if (e.size() == 0) return casadi::MX(e.rows(), e.cols());
-    
+template <typename Derived> casadi::MX to_mx(const Eigen::MatrixBase<Derived> &e) {
+    if (e.size() == 0)
+        return casadi::MX(e.rows(), e.cols());
+
     // Create an MX of correct shape
     casadi::MX m(e.rows(), e.cols());
     // Fill it element-wise
-    for(Eigen::Index i=0; i<e.rows(); ++i) {
-        for(Eigen::Index j=0; j<e.cols(); ++j) {
+    for (Eigen::Index i = 0; i < e.rows(); ++i) {
+        for (Eigen::Index j = 0; j < e.cols(); ++j) {
             m(static_cast<int>(i), static_cast<int>(j)) = e(i, j);
         }
     }
@@ -24,23 +24,22 @@ casadi::MX to_mx(const Eigen::MatrixBase<Derived>& e) {
 }
 
 // Convert CasADi MX to Eigen<MX>
-inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const casadi::MX& m) {
+inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const casadi::MX &m) {
     Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> e(m.size1(), m.size2());
-    for(int i=0; i<m.size1(); ++i) {
-        for(int j=0; j<m.size2(); ++j) {
+    for (int i = 0; i < m.size1(); ++i) {
+        for (int j = 0; j < m.size2(); ++j) {
             e(i, j) = m(i, j);
         }
     }
     return e;
 }
 
-
 // --- solve(A, b) ---
 // Solves Ax = b
 template <typename DerivedA, typename DerivedB>
-auto solve(const Eigen::MatrixBase<DerivedA>& A, const Eigen::MatrixBase<DerivedB>& b) {
+auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    
+
     if constexpr (std::is_floating_point_v<Scalar>) {
         // Numeric: Use reliable QR solver
         return A.colPivHouseholderQr().solve(b).eval();
@@ -56,8 +55,7 @@ auto solve(const Eigen::MatrixBase<DerivedA>& A, const Eigen::MatrixBase<Derived
 
 // --- norm(x) ---
 // Returns L2 norm
-template <typename Derived>
-auto norm(const Eigen::MatrixBase<Derived>& x) {
+template <typename Derived> auto norm(const Eigen::MatrixBase<Derived> &x) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {
         return x.norm();
@@ -69,7 +67,7 @@ auto norm(const Eigen::MatrixBase<Derived>& x) {
 // --- outer(x, y) ---
 // Outer product: x * y^T
 template <typename DerivedX, typename DerivedY>
-auto outer(const Eigen::MatrixBase<DerivedX>& x, const Eigen::MatrixBase<DerivedY>& y) {
+auto outer(const Eigen::MatrixBase<DerivedX> &x, const Eigen::MatrixBase<DerivedY> &y) {
     // Eigen's outer product works efficiently for both numeric and symbolic scalars
     // because MX * MX (scalar mult) creates a standard multiplication node.
     return x * y.transpose();
@@ -77,25 +75,24 @@ auto outer(const Eigen::MatrixBase<DerivedX>& x, const Eigen::MatrixBase<Derived
 
 // --- Dot Product ---
 template <typename DerivedA, typename DerivedB>
-auto dot(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+auto dot(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     return a.dot(b);
 }
 
 // --- Cross Product ---
 template <typename DerivedA, typename DerivedB>
-auto cross(const Eigen::MatrixBase<DerivedA>& a, const Eigen::MatrixBase<DerivedB>& b) {
+auto cross(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     // Manual implementation to support Dynamic vectors (Eigen::cross requires fixed size 3)
     using Scalar = typename DerivedA::Scalar;
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1> res(3);
-    res(0) = a(1)*b(2) - a(2)*b(1);
-    res(1) = a(2)*b(0) - a(0)*b(2);
-    res(2) = a(0)*b(1) - a(1)*b(0);
+    res(0) = a(1) * b(2) - a(2) * b(1);
+    res(1) = a(2) * b(0) - a(0) * b(2);
+    res(2) = a(0) * b(1) - a(1) * b(0);
     return res;
 }
 
 // --- Inverse ---
-template <typename Derived>
-auto inv(const Eigen::MatrixBase<Derived>& A) {
+template <typename Derived> auto inv(const Eigen::MatrixBase<Derived> &A) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {
         return A.inverse().eval();
@@ -107,8 +104,7 @@ auto inv(const Eigen::MatrixBase<Derived>& A) {
 }
 
 // --- Determinant ---
-template <typename Derived>
-auto det(const Eigen::MatrixBase<Derived>& A) {
+template <typename Derived> auto det(const Eigen::MatrixBase<Derived> &A) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {
         return A.determinant();
@@ -117,6 +113,5 @@ auto det(const Eigen::MatrixBase<Derived>& A) {
         return det(A_mx);
     }
 }
-
 
 } // namespace janus

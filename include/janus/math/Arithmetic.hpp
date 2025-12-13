@@ -40,8 +40,8 @@ template <JanusScalar T> T pow(const T &base, const T &exponent) {
     }
 }
 
-template <JanusScalar T> 
-requires (!std::is_same_v<T, double>)
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
 T pow(const T &base, double exponent) {
     if constexpr (std::is_floating_point_v<T>) {
         return std::pow(base, static_cast<T>(exponent));
@@ -174,7 +174,8 @@ auto fmod(const Eigen::MatrixBase<Derived> &x, const Scalar &y) {
         // Actually, CasADi MX supports fmod.
     } else {
         // For Eigen double, use binaryExpr
-        return x.binaryExpr(Eigen::MatrixBase<Derived>::Constant(x.rows(), x.cols(), y), [](double a, double b) { return std::fmod(a,b); });
+        return x.binaryExpr(Eigen::MatrixBase<Derived>::Constant(x.rows(), x.cols(), y),
+                            [](double a, double b) { return std::fmod(a, b); });
     }
 }
 

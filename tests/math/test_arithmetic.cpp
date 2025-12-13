@@ -1,10 +1,9 @@
-#include <gtest/gtest.h>
-#include <janus/math/Arithmetic.hpp>
-#include <janus/core/JanusTypes.hpp>
 #include "../utils/TestUtils.hpp"
+#include <gtest/gtest.h>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
 
-template <typename Scalar>
-void test_arithmetic_ops() {
+template <typename Scalar> void test_arithmetic_ops() {
     Scalar val = -4.0;
     auto res_abs = janus::abs(val);
 
@@ -31,7 +30,7 @@ void test_arithmetic_ops() {
 
     Scalar v_mod_a = 5.3;
     Scalar v_mod_b = 2.0;
-    auto res_mod = janus::fmod(v_mod_a, v_mod_b); 
+    auto res_mod = janus::fmod(v_mod_a, v_mod_b);
 
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(res_abs, 4.0);
@@ -47,7 +46,7 @@ void test_arithmetic_ops() {
         EXPECT_DOUBLE_EQ(res_ceil, 3.0);
         EXPECT_DOUBLE_EQ(res_sign_neg, -1.0);
         EXPECT_DOUBLE_EQ(res_sign_pos, 1.0);
-        
+
         EXPECT_NEAR(res_mod, 1.3, 1e-9);
     } else {
         EXPECT_FALSE(res_abs.is_empty());
@@ -68,15 +67,11 @@ void test_arithmetic_ops() {
         EXPECT_DOUBLE_EQ(eval_scalar(res_ceil), 3.0);
         EXPECT_DOUBLE_EQ(eval_scalar(res_sign_neg), -1.0);
         EXPECT_DOUBLE_EQ(eval_scalar(res_sign_pos), 1.0);
-        
+
         EXPECT_NEAR(eval_scalar(res_mod), 1.3, 1e-9);
     }
 }
 
-TEST(ArithmeticTests, Numeric) {
-    test_arithmetic_ops<double>();
-}
+TEST(ArithmeticTests, Numeric) { test_arithmetic_ops<double>(); }
 
-TEST(ArithmeticTests, Symbolic) {
-    test_arithmetic_ops<janus::SymbolicScalar>();
-}
+TEST(ArithmeticTests, Symbolic) { test_arithmetic_ops<janus::SymbolicScalar>(); }
