@@ -76,13 +76,14 @@ auto jacobian(const Expr &expression, const Vars &...variables) {
 
 // Helper to separate implementation
 namespace detail {
-    inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg>& args) {
-        std::vector<casadi::MX> ret;
-        ret.reserve(args.size());
-        for (const auto& arg : args) ret.push_back(arg.get());
-        return ret;
-    }
+inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg> &args) {
+    std::vector<casadi::MX> ret;
+    ret.reserve(args.size());
+    for (const auto &arg : args)
+        ret.push_back(arg.get());
+    return ret;
 }
+} // namespace detail
 
 // Overload for vector of variables (expr, {vars})
 // Supports mixed types via SymbolicArg
@@ -94,7 +95,8 @@ namespace detail {
 
 // Overload for vector of expressions and variables ({exprs}, {vars})
 // Supports mixed types via SymbolicArg
-inline auto jacobian(const std::vector<SymbolicArg>& expressions, const std::vector<SymbolicArg>& variables) {
+inline auto jacobian(const std::vector<SymbolicArg> &expressions,
+                     const std::vector<SymbolicArg> &variables) {
     casadi::MX expr_cat = casadi::MX::vertcat(detail::to_mx_vector(expressions));
     casadi::MX var_cat = casadi::MX::vertcat(detail::to_mx_vector(variables));
     return casadi::MX::jacobian(expr_cat, var_cat);

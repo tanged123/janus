@@ -15,48 +15,45 @@ namespace janus {
  */
 class Function {
   public:
-    Function(const std::string& name, 
-             const std::vector<SymbolicArg>& inputs, 
-             const std::vector<SymbolicArg>& outputs)
+    Function(const std::string &name, const std::vector<SymbolicArg> &inputs,
+             const std::vector<SymbolicArg> &outputs)
         : fn_(name, convert_args(inputs), convert_args(outputs)) {}
 
     /**
      * @brief Constructor with auto-generated name
      */
-    Function(const std::vector<SymbolicArg>& inputs, 
-             const std::vector<SymbolicArg>& outputs)
+    Function(const std::vector<SymbolicArg> &inputs, const std::vector<SymbolicArg> &outputs)
         : fn_(generate_unique_name(), convert_args(inputs), convert_args(outputs)) {}
 
-private:
+  private:
     static std::string generate_unique_name() {
         static std::atomic<uint64_t> counter{0};
         return "janus_fn_" + std::to_string(counter.fetch_add(1));
     }
 
-    static std::vector<SymbolicScalar> convert_args(const std::vector<SymbolicArg>& args) {
+    static std::vector<SymbolicScalar> convert_args(const std::vector<SymbolicArg> &args) {
         std::vector<SymbolicScalar> ret;
         ret.reserve(args.size());
-        for (const auto& arg : args) {
+        for (const auto &arg : args) {
             ret.push_back(arg.get()); // or implicit cast
         }
         return ret;
     }
 
-public:
+  public:
     /**
      * @brief Evaluate function with arbitrary arguments (scalars or Eigen matrices)
      */
-    template <typename... Args>
-    std::vector<Eigen::MatrixXd> operator()(Args&&... args) const {
+    template <typename... Args> std::vector<Eigen::MatrixXd> operator()(Args &&...args) const {
         std::vector<casadi::DM> dm_args;
         dm_args.reserve(sizeof...(args));
         (dm_args.push_back(to_dm(std::forward<Args>(args))), ...);
-        
+
         auto res_dm = fn_(dm_args);
         return to_eigen_vector(res_dm);
     }
 
-private:
+  private:
     // Helper: Convert scalar (double/int) to DM
     template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<std::decay_t<T>>>>
     casadi::DM to_dm(T val) const {
@@ -64,11 +61,10 @@ private:
     }
 
     // Helper: Convert Eigen Matrix to DM
-    template <typename Derived>
-    casadi::DM to_dm(const Eigen::MatrixBase<Derived>& val) const {
+    template <typename Derived> casadi::DM to_dm(const Eigen::MatrixBase<Derived> &val) const {
         casadi::DM m(val.rows(), val.cols());
-        for(Eigen::Index i=0; i<val.rows(); ++i) {
-            for(Eigen::Index j=0; j<val.cols(); ++j) {
+        for (Eigen::Index i = 0; i < val.rows(); ++i) {
+            for (Eigen::Index j = 0; j < val.cols(); ++j) {
                 m(i, j) = val(i, j);
             }
         }
@@ -80,8 +76,8 @@ private:
      * @brief Evaluate function with vector of arguments (non-const lvalue)
      * Resolves ambiguity with variadic template
      */
-    std::vector<Eigen::MatrixXd> operator()(std::vector<double>& args) const {
-        return operator()(const_cast<const std::vector<double>&>(args));
+    std::vector<Eigen::MatrixXd> operator()(std::vector<double> &args) const {
+        return operator()(const_cast<const std::vector<double> &>(args));
     }
 
     /**

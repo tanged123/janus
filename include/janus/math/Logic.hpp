@@ -55,8 +55,7 @@ auto where(const Eigen::ArrayBase<DerivedCond> &cond, const Eigen::MatrixBase<De
 
 // --- Min ---
 // Relaxed for mixed types
-template <JanusScalar T1, JanusScalar T2>
-auto min(const T1 &a, const T2 &b) {
+template <JanusScalar T1, JanusScalar T2> auto min(const T1 &a, const T2 &b) {
     if constexpr (std::is_floating_point_v<T1> && std::is_floating_point_v<T2>) {
         return std::min(a, b);
     } else {
@@ -86,8 +85,7 @@ auto min(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &
 
 // --- Max ---
 // Relaxed for mixed types
-template <JanusScalar T1, JanusScalar T2>
-auto max(const T1 &a, const T2 &b) {
+template <JanusScalar T1, JanusScalar T2> auto max(const T1 &a, const T2 &b) {
     if constexpr (std::is_floating_point_v<T1> && std::is_floating_point_v<T2>) {
         return std::max(a, b);
     } else {
