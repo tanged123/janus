@@ -10,6 +10,41 @@
 #include <janus/core/JanusTypes.hpp> 
 #include <numbers>
 
+// Helper to evaluate 0-argument CasADi MX to double
+double eval_scalar(const casadi::MX& x) {
+    try {
+        // Create function f() -> x
+        casadi::Function f("f", std::vector<casadi::MX>{}, std::vector<casadi::MX>{x});
+        // Evaluate
+        auto res = f(std::vector<casadi::DM>{});
+        // Convert DM to double (scalar)
+        return static_cast<double>(res[0]);
+    } catch (const std::exception& e) {
+        std::cerr << "CasADi eval failed: " << e.what() << std::endl;
+        throw;
+    }
+}
+
+// Helper to evaluate CasADi MX to Eigen Matrix
+Eigen::MatrixXd eval_matrix(const casadi::MX& x) {
+     casadi::Function f("f", std::vector<casadi::MX>{}, std::vector<casadi::MX>{x});
+     auto res = f(std::vector<casadi::DM>{});
+     casadi::DM res_dm = res[0];
+     
+     Eigen::MatrixXd mat(res_dm.size1(), res_dm.size2());
+     // Copy data
+     std::vector<double> elements = static_cast<std::vector<double>>(res_dm);
+     // CasADi is column-major, Eigen default is column-major. 
+     // Direct copy if we map correctly. DM is dense.
+     // Let's loop to be safe and explicit
+     for(int i=0; i<res_dm.size1(); ++i) {
+         for(int j=0; j<res_dm.size2(); ++j) {
+             mat(i, j) = static_cast<double>(res_dm(i,j));
+         }
+     }
+     return mat;
+}
+
 // Test Arithmetic Functions
 template <typename Scalar>
 void test_arithmetic() {
@@ -29,8 +64,13 @@ void test_arithmetic() {
         EXPECT_DOUBLE_EQ(res_pow, 8.0);
     } else {
         EXPECT_FALSE(res_abs.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_abs), 4.0);
+        
         EXPECT_FALSE(res_sqrt.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_sqrt), 4.0);
+        
         EXPECT_FALSE(res_pow.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_pow), 8.0);
     }
 }
 
@@ -46,7 +86,10 @@ void test_trig() {
         EXPECT_DOUBLE_EQ(res_cos, 1.0);
     } else {
         EXPECT_FALSE(res_sin.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_sin), 0.0);
+        
         EXPECT_FALSE(res_cos.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_cos), 1.0);
     }
 }
 
@@ -73,8 +116,13 @@ void test_logic() {
         EXPECT_NEAR(blend_high, 20.0, 1e-3);
     } else {
         EXPECT_FALSE(res.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res), 1.0);
+        
         EXPECT_FALSE(blend_low.is_empty());
+        EXPECT_NEAR(eval_scalar(blend_low), 10.0, 1e-3);
+        
         EXPECT_FALSE(blend_high.is_empty());
+        EXPECT_NEAR(eval_scalar(blend_high), 20.0, 1e-3);
     }
 }
 
@@ -112,8 +160,18 @@ void test_diffops() {
     } else {
         EXPECT_EQ(res_diff.size(), 3);
         EXPECT_FALSE(res_diff(0).is_empty());
+        
+        auto res_diff_eval = eval_matrix(janus::to_mx(res_diff));
+        EXPECT_DOUBLE_EQ(res_diff_eval(0), 1.0);
+        EXPECT_DOUBLE_EQ(res_diff_eval(1), 3.0);
+
         EXPECT_FALSE(res_trapz.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_trapz), 1.0);
+        
         EXPECT_FALSE(res_grad(1).is_empty());
+        auto res_grad_eval = eval_matrix(janus::to_mx(res_grad));
+        EXPECT_DOUBLE_EQ(res_grad_eval(1), 2.0);
+        EXPECT_DOUBLE_EQ(res_grad_eval(2), 4.0);
     }
 }
 
@@ -153,8 +211,17 @@ void test_linalg() {
     } else {
         EXPECT_EQ(x.rows(), 2);
         EXPECT_FALSE(x(0).is_empty());
+        auto x_eval = eval_matrix(janus::to_mx(x));
+        EXPECT_NEAR(x_eval(0), 1.0, 1e-6);
+        EXPECT_NEAR(x_eval(1), 1.0, 1e-6);
+        
         EXPECT_FALSE(n.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(n), 5.0);
+
         EXPECT_FALSE(M(0,0).is_empty());
+        auto M_eval = eval_matrix(janus::to_mx(M));
+        EXPECT_DOUBLE_EQ(M_eval(0,0), 3.0);
+        EXPECT_DOUBLE_EQ(M_eval(1,1), 8.0);
     }
 }
 
@@ -184,8 +251,13 @@ void test_interpolate() {
         EXPECT_DOUBLE_EQ(res_extrap, -10.0);
     } else {
         EXPECT_FALSE(res_mid.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_mid), 5.0);
+        
         EXPECT_FALSE(res_right.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_right), 5.0);
+        
         EXPECT_FALSE(res_extrap.is_empty());
+        EXPECT_DOUBLE_EQ(eval_scalar(res_extrap), -10.0);
     }
 }
 
@@ -224,9 +296,25 @@ void test_extras() {
     } else {
          EXPECT_EQ(lin.size(), 5);
          EXPECT_FALSE(lin(0).is_empty());
+         
+         auto lin_eval = eval_matrix(janus::to_mx(lin));
+         EXPECT_NEAR(lin_eval(2), 5.0, 1e-9);
+         EXPECT_NEAR(lin_eval(4), 10.0, 1e-9);
+         
          EXPECT_FALSE(cos(0).is_empty());
+         auto cos_eval = eval_matrix(janus::to_mx(cos));
+         EXPECT_NEAR(cos_eval(0), 0.0, 1e-9);
+
          EXPECT_FALSE(R2(0,0).is_empty());
+         auto R2_eval = eval_matrix(janus::to_mx(R2));
+         EXPECT_NEAR(R2_eval(0,0), 0.0, 1e-9);
+         EXPECT_NEAR(R2_eval(0,1), -1.0, 1e-9);
+
          EXPECT_FALSE(R3(0,0).is_empty());
+         auto R3_eval = eval_matrix(janus::to_mx(R3));
+         EXPECT_NEAR(R3_eval(0,0), 0.0, 1e-9);
+         EXPECT_NEAR(R3_eval(0,1), -1.0, 1e-9);
+         EXPECT_NEAR(R3_eval(2,2), 1.0, 1e-9);
     }
 }
 
