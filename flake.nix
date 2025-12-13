@@ -40,6 +40,8 @@
               casadi
               gtest
               clang-tools
+              doxygen
+              graphviz
             ]
             ++ [
               treefmtEval.config.build.wrapper

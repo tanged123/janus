@@ -15,12 +15,21 @@ namespace janus {
  */
 class Function {
   public:
+    /**
+     * @brief Construct a new Function object
+     *
+     * @param name Name of the function
+     * @param inputs Vector of symbolic arguments (scalars or matrices) describing the inputs
+     * @param outputs Vector of symbolic arguments (scalars or matrices) describing the outputs
+     */
     Function(const std::string &name, const std::vector<SymbolicArg> &inputs,
              const std::vector<SymbolicArg> &outputs)
         : fn_(name, convert_args(inputs), convert_args(outputs)) {}
 
     /**
      * @brief Constructor with auto-generated name
+     * @param inputs Vector of symbolic arguments (scalars or matrices) describing the inputs
+     * @param outputs Vector of symbolic arguments (scalars or matrices) describing the outputs
      */
     Function(const std::vector<SymbolicArg> &inputs, const std::vector<SymbolicArg> &outputs)
         : fn_(generate_unique_name(), convert_args(inputs), convert_args(outputs)) {}
@@ -43,6 +52,10 @@ class Function {
   public:
     /**
      * @brief Evaluate function with arbitrary arguments (scalars or Eigen matrices)
+     *
+     * @tparam Args Argument types (automatically deduced)
+     * @param args Variadic arguments matching the function inputs
+     * @return std::vector<Eigen::MatrixXd> Vector of result matrices (one per output)
      */
     template <typename... Args> std::vector<Eigen::MatrixXd> operator()(Args &&...args) const {
         std::vector<casadi::DM> dm_args;
@@ -75,6 +88,9 @@ class Function {
     /**
      * @brief Evaluate function with vector of arguments (non-const lvalue)
      * Resolves ambiguity with variadic template
+     *
+     * @param args Vector of input values
+     * @return std::vector<Eigen::MatrixXd> Vector of result matrices
      */
     std::vector<Eigen::MatrixXd> operator()(std::vector<double> &args) const {
         return operator()(const_cast<const std::vector<double> &>(args));
@@ -82,6 +98,9 @@ class Function {
 
     /**
      * @brief Evaluate function with vector of arguments (const lvalue)
+     *
+     * @param args Vector of input values
+     * @return std::vector<Eigen::MatrixXd> Vector of result matrices
      */
     std::vector<Eigen::MatrixXd> operator()(const std::vector<double> &args) const {
         std::vector<casadi::DM> dm_args;

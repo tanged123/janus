@@ -1,3 +1,7 @@
 #pragma once
 
-namespace janus {}
+namespace janus {
+/**
+ * @brief Calculus operations (future extension)
+ */
+}

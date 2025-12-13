@@ -1,0 +1,14 @@
+PROJECT_NAME           = "Janus"
+PROJECT_BRIEF          = "High-performance C++ numerical framework"
+OUTPUT_DIRECTORY       = build/docs
+INPUT                  = include docs
+RECURSIVE              = YES
+FILE_PATTERNS          = *.hpp *.cpp *.md
+USE_MDFILE_AS_MAINPAGE = README.md
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+WARN_IF_UNDOCUMENTED   = NO

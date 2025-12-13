@@ -7,7 +7,14 @@
 namespace janus {
 
 // --- linspace ---
-// Returns a vector of n points linearly spaced between start and end (inclusive)
+/**
+ * @brief Generates linearly spaced vector
+ *
+ * @param start Start value
+ * @param end End value
+ * @param n Number of points
+ * @return Vector of n points
+ */
 template <typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1> linspace(const T &start, const T &end, int n) {
     if (n < 2) {
@@ -30,8 +37,15 @@ Eigen::Matrix<T, Eigen::Dynamic, 1> linspace(const T &start, const T &end, int n
 }
 
 // --- cosine_spacing ---
-// Returns a vector of n points with cosine spacing (denser at ends)
-// x_i = 0.5 * (start + end) - 0.5 * (end - start) * cos(pi * i / (n - 1))
+/**
+ * @brief Generates cosine spaced vector (denser at ends)
+ * x_i = 0.5 * (start + end) - 0.5 * (end - start) * cos(pi * i / (n - 1))
+ *
+ * @param start Start value
+ * @param end End value
+ * @param n Number of points
+ * @return Vector of n points
+ */
 template <typename T>
 Eigen::Matrix<T, Eigen::Dynamic, 1> cosine_spacing(const T &start, const T &end, int n) {
     if (n < 2) {

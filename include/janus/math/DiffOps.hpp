@@ -5,15 +5,30 @@
 namespace janus {
 
 // --- diff(vector) ---
-// Returns adjacent differences: out[i] = v[i+1] - v[i]
-// Returns a vector of size N-1
+/**
+ * @brief Computes adjacent differences of a vector
+ * Returns a vector of size N-1 where out[i] = v[i+1] - v[i]
+ *
+ * @tparam Derived Eigen matrix type
+ * @param v Input vector
+ * @return Difference vector
+ */
 template <typename Derived> auto diff(const Eigen::MatrixBase<Derived> &v) {
     // Return expression template for efficiency
     return (v.tail(v.size() - 1) - v.head(v.size() - 1));
 }
 
 // --- trapz(y, x) ---
-// Trapezoidal integration: sum(0.5 * (y[i+1]+y[i]) * (x[i+1]-x[i]))
+/**
+ * @brief Computes trapezoidal integration
+ * Approximation of integral of y(x) using trapezoidal rule
+ *
+ * @tparam DerivedY Eigen matrix type for Y
+ * @tparam DerivedX Eigen matrix type for X
+ * @param y Values of function at x points
+ * @param x Grid points
+ * @return Integrated value
+ */
 template <typename DerivedY, typename DerivedX>
 auto trapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<DerivedX> &x) {
     auto dx = (x.tail(x.size() - 1) - x.head(x.size() - 1));
@@ -24,8 +39,15 @@ auto trapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<Derived
 }
 
 // --- gradient_1d(y, x) ---
-// Central difference gradient
-// Returns vector of same size as inputs
+/**
+ * @brief Computes gradient of 1D data using central differences
+ * Returns vector of same size as inputs.
+ * Uses forward/backward difference at boundaries.
+ *
+ * @param y Values
+ * @param x Grid points
+ * @return Gradient vector
+ */
 template <typename DerivedY, typename DerivedX>
 auto gradient_1d(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<DerivedX> &x) {
     Eigen::Index n = y.size();
@@ -53,9 +75,17 @@ auto gradient_1d(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<D
 }
 
 // --- Jacobian (Symbolic) ---
-// Computes Jacobian of an expression with respect to variables.
-// Helper to abstract away CasADi vertcat details.
-// Usage: auto J = janus::jacobian(expr, v1, v2); or janus::jacobian(expr, vector_of_vars);
+/**
+ * @brief Computes Jacobian of an expression with respect to variables.
+ *
+ * Wraps CasADi's jacobian function. Automatic Jacobian only supported for Symbolic types currently.
+ *
+ * @tparam Expr Expression type (must be convertible to MX)
+ * @tparam Vars Variable types (must be convertible to MX)
+ * @param expression Expression to differentiate
+ * @param variables Variables to differentiate with respect to
+ * @return Jacobian matrix (symbolic)
+ */
 template <typename Expr, typename... Vars>
 auto jacobian(const Expr &expression, const Vars &...variables) {
     if constexpr (std::is_same_v<Expr, casadi::MX>) {
@@ -93,8 +123,13 @@ inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg> &args
 //     return casadi::MX::jacobian(expression, v_cat);
 // }
 
-// Overload for vector of expressions and variables ({exprs}, {vars})
-// Supports mixed types via SymbolicArg
+/**
+ * @brief Computes Jacobian with vector arguments (expressions and variables)
+ *
+ * @param expressions Vector of symbolic expressions
+ * @param variables Vector of symbolic variables
+ * @return Jacobian matrix
+ */
 inline auto jacobian(const std::vector<SymbolicArg> &expressions,
                      const std::vector<SymbolicArg> &variables) {
     casadi::MX expr_cat = casadi::MX::vertcat(detail::to_mx_vector(expressions));

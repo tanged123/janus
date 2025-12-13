@@ -1,5 +1,11 @@
 #pragma once
 
+/**
+ * @file JanusMath.hpp
+ * @brief Master header for Janus Math library
+ * Includes all math sub-modules.
+ */
+
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/DiffOps.hpp"
 #include "janus/math/Interpolate.hpp"

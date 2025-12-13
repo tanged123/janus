@@ -7,7 +7,12 @@ namespace janus {
 
 // --- Conversion Helpers ---
 
-// Convert Eigen<MX> to CasADi MX (dense)
+/**
+ * @brief Convert Eigen matrix of MX to CasADi MX
+ * @tparam Derived Eigen matrix type
+ * @param e Input Eigen matrix
+ * @return CasADi MX (dense)
+ */
 template <typename Derived> casadi::MX to_mx(const Eigen::MatrixBase<Derived> &e) {
     if (e.size() == 0)
         return casadi::MX(e.rows(), e.cols());
@@ -23,7 +28,11 @@ template <typename Derived> casadi::MX to_mx(const Eigen::MatrixBase<Derived> &e
     return m;
 }
 
-// Convert CasADi MX to Eigen<MX>
+/**
+ * @brief Convert CasADi MX to Eigen matrix of MX
+ * @param m Input CasADi MX
+ * @return Eigen matrix (dynamic size)
+ */
 inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const casadi::MX &m) {
     Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> e(m.size1(), m.size2());
     for (int i = 0; i < m.size1(); ++i) {
@@ -35,7 +44,14 @@ inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const 
 }
 
 // --- solve(A, b) ---
-// Solves Ax = b
+/**
+ * @brief Solves linear system Ax = b
+ * Uses QR decomposition for numeric types, and symbolic solve for CasADi types.
+ *
+ * @param A Coefficient matrix
+ * @param b Right-hand side vector
+ * @return Solution vector x
+ */
 template <typename DerivedA, typename DerivedB>
 auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -54,7 +70,11 @@ auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<Derived
 }
 
 // --- norm(x) ---
-// Returns L2 norm
+/**
+ * @brief Computes L2 norm of a vector
+ * @param x Input vector
+ * @return L2 norm
+ */
 template <typename Derived> auto norm(const Eigen::MatrixBase<Derived> &x) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {
@@ -65,7 +85,12 @@ template <typename Derived> auto norm(const Eigen::MatrixBase<Derived> &x) {
 }
 
 // --- outer(x, y) ---
-// Outer product: x * y^T
+/**
+ * @brief Computes outer product x * y^T
+ * @param x First vector
+ * @param y Second vector
+ * @return Outer product matrix
+ */
 template <typename DerivedX, typename DerivedY>
 auto outer(const Eigen::MatrixBase<DerivedX> &x, const Eigen::MatrixBase<DerivedY> &y) {
     // Eigen's outer product works efficiently for both numeric and symbolic scalars
@@ -92,6 +117,11 @@ auto cross(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<Derived
 }
 
 // --- Inverse ---
+/**
+ * @brief Computes matrix inverse
+ * @param A Input matrix
+ * @return Inverse of A
+ */
 template <typename Derived> auto inv(const Eigen::MatrixBase<Derived> &A) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {
@@ -104,6 +134,11 @@ template <typename Derived> auto inv(const Eigen::MatrixBase<Derived> &A) {
 }
 
 // --- Determinant ---
+/**
+ * @brief Computes matrix determinant
+ * @param A Input matrix
+ * @return Determinant of A
+ */
 template <typename Derived> auto det(const Eigen::MatrixBase<Derived> &A) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_floating_point_v<Scalar>) {

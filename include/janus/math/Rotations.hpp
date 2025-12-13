@@ -6,7 +6,14 @@
 namespace janus {
 
 // --- 2D Rotation Matrix ---
-// Returns [cos(theta), -sin(theta); sin(theta), cos(theta)]
+// --- 2D Rotation Matrix ---
+/**
+ * @brief Creates a 2x2 rotation matrix
+ * Returns [cos(theta), -sin(theta); sin(theta), cos(theta)]
+ *
+ * @param theta Rotation angle (radians)
+ * @return 2x2 Rotation matrix
+ */
 template <typename T> Eigen::Matrix<T, 2, 2> rotation_matrix_2d(const T &theta) {
     T c = janus::cos(theta);
     T s = janus::sin(theta);
@@ -20,8 +27,14 @@ template <typename T> Eigen::Matrix<T, 2, 2> rotation_matrix_2d(const T &theta) 
 }
 
 // --- 3D Rotation Matrix (Principal Axes) ---
-// axis: 0 for X, 1 for Y, 2 for Z
-// Throws if axis is invalid (only in Numeric mode ideally, but we can just assert or fallback)
+// --- 3D Rotation Matrix (Principal Axes) ---
+/**
+ * @brief Creates a 3x3 rotation matrix about a principal axis
+ *
+ * @param theta Rotation angle (radians)
+ * @param axis Axis index (0=X, 1=Y, 2=Z)
+ * @return 3x3 Rotation matrix
+ */
 template <typename T> Eigen::Matrix<T, 3, 3> rotation_matrix_3d(const T &theta, int axis) {
     T c = janus::cos(theta);
     T s = janus::sin(theta);

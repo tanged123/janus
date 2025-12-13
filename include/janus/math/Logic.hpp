@@ -17,7 +17,16 @@ template <> struct BooleanType<casadi::MX> {
 template <typename T> using BooleanType_t = typename BooleanType<T>::type;
 
 // --- where (Scalar) ---
-// Returns: cond ? if_true : if_false
+/**
+ * @brief Select values based on condition (ternary operator)
+ * Returns: cond ? if_true : if_false
+ * Supports mixed types.
+ *
+ * @param cond Condition
+ * @param if_true Value if true
+ * @param if_false Value if false
+ * @return Selected value
+ */
 // Relaxed to allow mixed types (e.g. MX and double)
 template <typename Cond, JanusScalar T1, JanusScalar T2>
 auto where(const Cond &cond, const T1 &if_true, const T2 &if_false) {
@@ -30,9 +39,14 @@ auto where(const Cond &cond, const T1 &if_true, const T2 &if_false) {
 }
 
 // --- where (Vector/Matrix) ---
-// For Eigen types: uses .select()
-// For CasADi: handled by scalar overload (as MX is natively a matrix)
-// --- where (Vector/Matrix) ---
+/**
+ * @brief Element-wise select
+ *
+ * @param cond Condition matrix/array
+ * @param if_true Matrix of values if true
+ * @param if_false Matrix of values if false
+ * @return Result matrix
+ */
 template <typename DerivedCond, typename DerivedTrue, typename DerivedFalse>
 auto where(const Eigen::ArrayBase<DerivedCond> &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
            const Eigen::MatrixBase<DerivedFalse> &if_false) {
@@ -54,6 +68,12 @@ auto where(const Eigen::ArrayBase<DerivedCond> &cond, const Eigen::MatrixBase<De
 }
 
 // --- Min ---
+/**
+ * @brief Computes minimum of two values
+ * @param a First value
+ * @param b Second value
+ * @return Minimum value
+ */
 // Relaxed for mixed types
 template <JanusScalar T1, JanusScalar T2> auto min(const T1 &a, const T2 &b) {
     if constexpr (std::is_floating_point_v<T1> && std::is_floating_point_v<T2>) {
@@ -66,6 +86,13 @@ template <JanusScalar T1, JanusScalar T2> auto min(const T1 &a, const T2 &b) {
     }
 }
 
+/**
+ * @brief Computes minimum element-wise for a matrix/vector
+ * @tparam Derived Eigen matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Matrix of minimums
+ */
 template <typename Derived>
 auto min(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
     using Scalar = typename Derived::Scalar;
@@ -84,6 +111,12 @@ auto min(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &
 }
 
 // --- Max ---
+/**
+ * @brief Computes maximum of two values
+ * @param a First value
+ * @param b Second value
+ * @return Maximum value
+ */
 // Relaxed for mixed types
 template <JanusScalar T1, JanusScalar T2> auto max(const T1 &a, const T2 &b) {
     if constexpr (std::is_floating_point_v<T1> && std::is_floating_point_v<T2>) {
@@ -93,6 +126,13 @@ template <JanusScalar T1, JanusScalar T2> auto max(const T1 &a, const T2 &b) {
     }
 }
 
+/**
+ * @brief Computes maximum element-wise for a matrix/vector
+ * @tparam Derived Eigen matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Matrix of maximums
+ */
 template <typename Derived>
 auto max(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
     using Scalar = typename Derived::Scalar;
@@ -111,18 +151,47 @@ auto max(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &
 }
 
 // --- Clamp ---
+/**
+ * @brief Clamps value between low and high
+ * @param val Input value
+ * @param low Lower bound
+ * @param high Upper bound
+ * @return Clamped value
+ */
 // Relaxed for mixed types
 template <JanusScalar T, JanusScalar TLow, JanusScalar THigh>
 auto clamp(const T &val, const TLow &low, const THigh &high) {
     return janus::min(janus::max(val, low), high);
 }
 
+/**
+ * @brief Clamps values element-wise for a matrix/vector
+ * @tparam Derived Eigen matrix type
+ * @tparam Scalar Bounds type
+ * @param val Input matrix
+ * @param low Lower bound
+ * @param high Upper bound
+ * @return Matrix of clamped values
+ */
 template <typename Derived, typename Scalar>
 auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scalar &high) {
     return val.cwiseMax(low).cwiseMin(high);
 }
 
 // --- Less Than (lt) ---
+/**
+ * @brief Element-wise less than comparison
+ * @return Boolean expression or mask
+ */
+// --- Less Than (lt) ---
+/**
+ * @brief Element-wise less than comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a < b
+ */
 // Returns expressions suitable for 'where' condition
 template <typename DerivedA, typename DerivedB>
 auto lt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
@@ -135,6 +204,14 @@ auto lt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 }
 
 // --- Greater Than (gt) ---
+/**
+ * @brief Element-wise greater than comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a > b
+ */
 template <typename DerivedA, typename DerivedB>
 auto gt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -146,6 +223,14 @@ auto gt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 }
 
 // --- Less Than or Equal (le) ---
+/**
+ * @brief Element-wise less than or equal comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a <= b
+ */
 template <typename DerivedA, typename DerivedB>
 auto le(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -157,6 +242,14 @@ auto le(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 }
 
 // --- Greater Than or Equal (ge) ---
+/**
+ * @brief Element-wise greater than or equal comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a >= b
+ */
 template <typename DerivedA, typename DerivedB>
 auto ge(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -168,6 +261,14 @@ auto ge(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 }
 
 // --- Equal (eq) ---
+/**
+ * @brief Element-wise equality comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a == b
+ */
 template <typename DerivedA, typename DerivedB>
 auto eq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -179,6 +280,14 @@ auto eq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 }
 
 // --- Not Equal (neq) ---
+/**
+ * @brief Element-wise inequality comparison
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask where a != b
+ */
 template <typename DerivedA, typename DerivedB>
 auto neq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -190,8 +299,16 @@ auto neq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB>
 }
 
 // --- sigmoid_blend ---
-// Smoothly blends between val_low and val_high based on x
-// blend = val_low + (val_high - val_low) * (1 / (1 + exp(-sharpness * x)))
+/**
+ * @brief Smoothly blends between val_low and val_high using a sigmoid function
+ * blend = val_low + (val_high - val_low) * (1 / (1 + exp(-sharpness * x)))
+ *
+ * @param x Control variable (0 centers the sigmoid)
+ * @param val_low Value when x is negative large
+ * @param val_high Value when x is positive large
+ * @param sharpness Steepness of the transition
+ * @return Blended value
+ */
 // Relaxed for mixed types
 template <JanusScalar T, JanusScalar TLow, JanusScalar THigh, JanusScalar Sharpness = double>
 auto sigmoid_blend(const T &x, const TLow &val_low, const THigh &val_high,
@@ -205,6 +322,16 @@ auto sigmoid_blend(const T &x, const TLow &val_low, const THigh &val_high,
 // strictly relying on .array() operations in implementation code might be enough
 // if we make a vectorized wrapper like in Arithmetic.hpp
 
+/**
+ * @brief Smoothly blends element-wise for a matrix using a sigmoid function
+ * @tparam Derived Eigen matrix type
+ * @tparam Scalar Scalar type
+ * @param x Control variable matrix
+ * @param val_low Low value
+ * @param val_high High value
+ * @param sharpness Steepness
+ * @return Matrix of blended values
+ */
 template <typename Derived, typename Scalar>
 auto sigmoid_blend(const Eigen::MatrixBase<Derived> &x, const Scalar &val_low,
                    const Scalar &val_high, const Scalar &sharpness = 1.0) {

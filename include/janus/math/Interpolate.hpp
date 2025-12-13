@@ -9,6 +9,12 @@
 
 namespace janus {
 
+/**
+ * @brief 1D Interpolator using CasADi
+ *
+ * Supports both numeric and symbolic evaluation.
+ * Uses linear interpolation by default.
+ */
 class JanusInterpolator {
   private:
     std::vector<double> m_x;
@@ -17,8 +23,18 @@ class JanusInterpolator {
     bool m_valid = false;
 
   public:
+    /**
+     * @brief Default constructor
+     */
     JanusInterpolator() = default;
 
+    /**
+     * @brief Construct a new Janus Interpolator
+     *
+     * @param x Grid points (must be sorted)
+     * @param y Function values
+     * @throw std::invalid_argument if inputs are invalid
+     */
     JanusInterpolator(const Eigen::VectorXd &x, const Eigen::VectorXd &y) {
         if (x.size() != y.size()) {
             throw std::invalid_argument("JanusInterpolator: x and y must have same size");
@@ -44,6 +60,12 @@ class JanusInterpolator {
     }
 
     // Scalar operator
+    /**
+     * @brief Evaluate interpolant at a scalar point
+     * @tparam T Scalar type (double or MX)
+     * @param query Query point
+     * @return Interpolated value
+     */
     template <typename T> T operator()(const T &query) const {
         if (!m_valid)
             throw std::runtime_error("JanusInterpolator: Uninitialized");
@@ -56,6 +78,12 @@ class JanusInterpolator {
     }
 
     // Matrix operator (Vectorized)
+    /**
+     * @brief Evaluate interpolant at multiple points
+     * @tparam Derived Eigen matrix type
+     * @param query Matrix of query points
+     * @return Matrix of interpolated values
+     */
     template <typename Derived> auto operator()(const Eigen::MatrixBase<Derived> &query) const {
         using Scalar = typename Derived::Scalar;
         if (!m_valid)

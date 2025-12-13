@@ -23,8 +23,21 @@ using SymbolicScalar = casadi::MX;
 using SymbolicMatrix = JanusMatrix<SymbolicScalar>;
 
 // --- Symbolic Variable Creation ---
+
+/**
+ * @brief Create a named symbolic scalar variable
+ * @param name Name of the variable
+ * @return SymbolicScalar (casadi::MX)
+ */
 inline SymbolicScalar sym(const std::string &name) { return casadi::MX::sym(name); }
 
+/**
+ * @brief Create a named symbolic matrix variable
+ * @param name Name of the variable
+ * @param rows Number of rows
+ * @param cols Number of columns (default 1)
+ * @return SymbolicScalar (casadi::MX) representing a matrix
+ */
 inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
     return casadi::MX::sym(name, rows, cols);
 }
@@ -41,9 +54,16 @@ inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
 class SymbolicArg {
   public:
     // From Scalar (MX)
+    /**
+     * @brief Construct from single symbolic scalar (MX)
+     */
     SymbolicArg(const SymbolicScalar &s) : mx_(s) {}
 
     // From Matrix (Eigen<MX>)
+    /**
+     * @brief Construct from Eigen matrix of symbolic scalars
+     * Flattens the matrix into a CasADi DM/MX structure if needed or fills an MX.
+     */
     template <typename Derived> SymbolicArg(const Eigen::MatrixBase<Derived> &e) {
         if (e.size() == 0) {
             mx_ = casadi::MX(e.rows(), e.cols());
@@ -58,7 +78,14 @@ class SymbolicArg {
     }
 
     // Implicit conversion to MX
+    /**
+     * @brief Implicit conversion to CasADi MX
+     */
     operator SymbolicScalar() const { return mx_; }
+
+    /**
+     * @brief Get underlying CasADi MX object
+     */
     SymbolicScalar get() const { return mx_; }
 
   private:
