@@ -2,6 +2,7 @@
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Logic.hpp"
+#include "janus/math/Trig.hpp"
 #include <Eigen/Dense>
 #include <cmath>
 #include <numeric>

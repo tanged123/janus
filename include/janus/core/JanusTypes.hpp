@@ -1,7 +1,6 @@
 #pragma once
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
-#include <iostream>
 #include <limits>
 
 namespace Eigen {

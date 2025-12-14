@@ -294,7 +294,7 @@ The symbolic backend wraps CasADi's CVODES integrator to enable differentiation 
 - [x] **Task 2.5**: Write tests for Calculus and SurrogateModel modules (Surrogate done)
 
 ### Milestone 3: Advanced Numerics (Week 3)
-- [ ] **Task 3.1**: Create `FiniteDifference.hpp`
+- [x] **Task 3.1**: Create `FiniteDifference.hpp`
 - [ ] **Task 3.2**: Extend `Rotations.hpp` with euler angles and validation
 - [ ] **Task 3.3**: Create `IntegrateDiscrete.hpp` (core methods)
 - [ ] **Task 3.4**: Add Simpson's and cubic methods to `IntegrateDiscrete.hpp`

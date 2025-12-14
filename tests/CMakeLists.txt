@@ -20,6 +20,7 @@ add_executable(test_math
     math/test_interpolate.cpp
     math/test_geometry.cpp
     math/test_surrogate.cpp
+    math/test_finite_diff.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

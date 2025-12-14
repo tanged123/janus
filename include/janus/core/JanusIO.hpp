@@ -9,8 +9,10 @@
  * @brief IO Utilities and Traits for Janus
  *
  * Provides:
- * 1. Eigen::NumTraits specialization for casadi::MX to enable Eigen IO.
- * 2. Helper functions for printing/displaying.
+ * 1. Helper functions for printing/displaying matrices with wrappers.
+ * 2. Evaluation utilities (eval).
+ *
+ * Note: Eigen::NumTraits definitions are in JanusTypes.hpp usually.
  */
 
 namespace janus {
