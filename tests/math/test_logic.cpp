@@ -140,12 +140,103 @@ template <typename Scalar> void test_logic_matrix() {
     }
 }
 
+template <typename Scalar> void test_extended_logic() {
+    using Matrix = janus::JanusMatrix<Scalar>;
+    Matrix A(2, 2);
+    A << 1.0, 0.0, 
+         1.0, 1.0;
+    Matrix B(2, 2);
+    B << 1.0, 1.0, 
+         0.0, 1.0;
+
+    // AND: [1, 0; 0, 1]
+    // OR:  [1, 1; 1, 1]
+    auto res_and = janus::logical_and(A, B);
+    auto res_or = janus::logical_or(A, B);
+    
+    // NOT A: [0, 1; 0, 0]
+    auto res_not = janus::logical_not(A);
+
+    // All/Any
+    // A has zeros -> all = false, any = true
+    auto res_all = janus::all(A);
+    auto res_any = janus::any(A);
+
+    // Clip
+    Matrix C(2, 2);
+    C << -5.0, 5.0, 
+          0.0, 10.0;
+    auto res_clip = janus::clip(C, 0.0, 2.0); // -> [0, 2; 0, 2]
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        // Numeric checks
+        // AND
+        EXPECT_TRUE((bool)res_and(0, 0));
+        EXPECT_FALSE((bool)res_and(0, 1));
+        EXPECT_FALSE((bool)res_and(1, 0));
+        EXPECT_TRUE((bool)res_and(1, 1));
+
+        // OR
+        EXPECT_TRUE((bool)res_or(0, 0));
+        EXPECT_TRUE((bool)res_or(0, 1));
+        
+        // NOT
+        EXPECT_FALSE((bool)res_not(0, 0));
+        EXPECT_TRUE((bool)res_not(0, 1));
+
+        // All/Any
+        EXPECT_FALSE(res_all);
+        EXPECT_TRUE(res_any);
+
+        // Clip
+        EXPECT_DOUBLE_EQ(res_clip(0, 0), 0.0);
+        EXPECT_DOUBLE_EQ(res_clip(0, 1), 2.0);
+        EXPECT_DOUBLE_EQ(res_clip(1, 0), 0.0);
+        EXPECT_DOUBLE_EQ(res_clip(1, 1), 2.0);
+
+        // Scalar Logic
+        EXPECT_TRUE(janus::logical_and(1.0, 1.0));
+        EXPECT_FALSE(janus::logical_and(1.0, 0.0));
+        EXPECT_TRUE(janus::logical_or(0.0, 1.0));
+        EXPECT_FALSE(janus::logical_not(1.0));
+
+    } else {
+        // Symbolic checks
+        auto and_eval = eval_matrix(janus::to_mx(res_and));
+        EXPECT_NEAR(and_eval(0, 0), 1.0, 1e-9);
+        EXPECT_NEAR(and_eval(0, 1), 0.0, 1e-9);
+
+        auto or_eval = eval_matrix(janus::to_mx(res_or));
+        EXPECT_NEAR(or_eval(0, 0), 1.0, 1e-9);
+
+        auto not_eval = eval_matrix(janus::to_mx(res_not));
+        EXPECT_NEAR(not_eval(0, 0), 0.0, 1e-9);
+        EXPECT_NEAR(not_eval(0, 1), 1.0, 1e-9);
+
+        auto all_val = eval_scalar(res_all);
+        EXPECT_NEAR(all_val, 0.0, 1e-9);
+
+        auto any_val = eval_scalar(res_any);
+        EXPECT_NEAR(any_val, 1.0, 1e-9);
+
+        auto clip_eval = eval_matrix(janus::to_mx(res_clip));
+        EXPECT_NEAR(clip_eval(0, 0), 0.0, 1e-9);
+        EXPECT_NEAR(clip_eval(0, 1), 2.0, 1e-9);
+
+        // Scalar Logic
+        EXPECT_NEAR(eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(1.0))), 1.0, 1e-9);
+        EXPECT_NEAR(eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(0.0))), 0.0, 1e-9);
+    }
+}
+
 TEST(LogicTests, Numeric) {
     test_logic_ops<double>();
     test_logic_matrix<double>();
+    test_extended_logic<double>();
 }
 
 TEST(LogicTests, Symbolic) {
     test_logic_ops<janus::SymbolicScalar>();
     test_logic_matrix<janus::SymbolicScalar>();
+    test_extended_logic<janus::SymbolicScalar>();
 }

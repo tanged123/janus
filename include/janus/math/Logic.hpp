@@ -1,6 +1,7 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/math/Arithmetic.hpp"
+#include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
 
 namespace janus {
@@ -175,7 +176,12 @@ auto clamp(const T &val, const TLow &low, const THigh &high) {
  */
 template <typename Derived, typename Scalar>
 auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scalar &high) {
-    return val.cwiseMax(low).cwiseMin(high);
+    using MatrixScalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<MatrixScalar, casadi::MX>) {
+        return val.unaryExpr([=](const auto &x) { return janus::clamp(x, low, high); });
+    } else {
+        return val.cwiseMax(low).cwiseMin(high);
+    }
 }
 
 // --- Less Than (lt) ---
@@ -337,6 +343,113 @@ auto sigmoid_blend(const Eigen::MatrixBase<Derived> &x, const Scalar &val_low,
                    const Scalar &val_high, const Scalar &sharpness = 1.0) {
     auto alpha = (1.0 + (-sharpness * x.array()).exp()).inverse();
     return (val_low + alpha * (val_high - val_low)).matrix();
+}
+
+// --- Logical AND ---
+/**
+ * @brief Logical AND (x && y)
+ * @param x1 First operand
+ * @param x2 Second operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T1, JanusScalar T2> auto logical_and(const T1 &x1, const T2 &x2) {
+    // Both define operator &&
+    return x1 && x2;
+}
+
+template <typename DerivedA, typename DerivedB>
+auto logical_and(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.binaryExpr(b, [](const auto &x, const auto &y) { return x && y; });
+    } else {
+        // Ensure boolean context for Eigen arrays
+        return ((a.array() != 0) && (b.array() != 0));
+    }
+}
+
+// --- Logical OR ---
+/**
+ * @brief Logical OR (x || y)
+ * @param x1 First operand
+ * @param x2 Second operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T1, JanusScalar T2> auto logical_or(const T1 &x1, const T2 &x2) {
+    return x1 || x2;
+}
+
+template <typename DerivedA, typename DerivedB>
+auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.binaryExpr(b, [](const auto &x, const auto &y) { return x || y; });
+    } else {
+        return ((a.array() != 0) || (b.array() != 0));
+    }
+}
+
+// --- Logical NOT ---
+/**
+ * @brief Logical NOT (!x)
+ * @param x Operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T> auto logical_not(const T &x) {
+    return !x;
+}
+
+template <typename Derived>
+auto logical_not(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.unaryExpr([](const auto &x) { return !x; });
+    } else {
+        return (a.array() == 0);
+    }
+}
+
+// --- All ---
+/**
+ * @brief Returns true if all elements are true (non-zero)
+ * @param a Input matrix/array
+ * @return Boolean (numeric) or symbolic expression
+ */
+template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        // all is true if norm_inf(1 - a) == 0 (all a are 1)
+        using casadi::norm_inf;
+        return norm_inf(1.0 - to_mx(a)) == 0;
+    } else {
+        return (a.array() != 0).all();
+    }
+}
+
+// --- Any ---
+/**
+ * @brief Returns true if any element is true (non-zero)
+ * @param a Input matrix/array
+ * @return Boolean (numeric) or symbolic expression
+ */
+template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        // any is true if norm_inf(a) > 0 (at least one non-zero)
+        using casadi::norm_inf;
+        return norm_inf(to_mx(a)) != 0;
+    } else {
+        return (a.array() != 0).any();
+    }
+}
+
+// --- Clip ---
+/**
+ * @brief Alias for clamp
+ */
+template <typename... Args>
+auto clip(Args&&... args) {
+    return clamp(std::forward<Args>(args)...);
 }
 
 } // namespace janus
