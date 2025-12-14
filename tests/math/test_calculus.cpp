@@ -240,3 +240,46 @@ TEST(CalculusTests, DiffTrapzGradient1dNumeric) { test_diff_trapz_gradient1d<dou
 TEST(CalculusTests, DiffTrapzGradient1dSymbolic) {
     test_diff_trapz_gradient1d<janus::SymbolicScalar>();
 }
+
+// --- Periodic and Error Tests ---
+
+template <typename Scalar> void test_gradient_periodic_wrapper() {
+    using Vector = janus::JanusVector<Scalar>;
+    Vector x(5);
+    x << 0, 90, 180, 270, 360; // Degrees
+    Vector y(5);
+    // sin(x)
+    y << 0, 1, 0, -1, 0;
+
+    // This just dispatches to gradient() for now, but we want to cover the call
+    auto grad = janus::gradient_periodic(y, 90.0, 360.0);
+
+    // Check sizes
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_EQ(grad.size(), 5);
+    } else {
+        auto g = janus::eval(grad);
+        EXPECT_EQ(g.size(), 5);
+    }
+}
+
+TEST(CalculusTests, GradientPeriodic) {
+    test_gradient_periodic_wrapper<double>();
+    test_gradient_periodic_wrapper<janus::SymbolicScalar>();
+}
+
+TEST(CalculusTests, Errors) {
+    janus::JanusVector<double> x(5);
+    x.setZero();
+    janus::JanusVector<double> y = x;
+
+    // Invalid dx size (must be scalar, N, or N-1)
+    janus::JanusVector<double> bad_dx(2);
+    EXPECT_THROW(janus::gradient(y, bad_dx), std::invalid_argument);
+
+    // Invalid edge_order
+    EXPECT_THROW(janus::gradient(y, 1.0, 3), std::invalid_argument);
+
+    // Invalid n (derivative order)
+    EXPECT_THROW(janus::gradient(y, 1.0, 1, 3), std::invalid_argument);
+}
