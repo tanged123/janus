@@ -60,11 +60,19 @@ We provide shorthand scripts to streamline the workflow:
     Logs are saved to `logs/ci.log`, `logs/tests.log`, `logs/examples.log`, and `logs/verify.log`.
 ### Formatting
 
-We use **treefmt** to enforce code style for C++, CMake, and Nix files.
+We use **treefmt** (via `nix fmt`) to enforce code style for C++, CMake, and Nix files.
 
+**Manual formatting:**
 ```bash
 nix fmt
 ```
+
+**Auto-format on commit (recommended):**
+```bash
+./scripts/install-hooks.sh
+```
+
+This installs a pre-commit hook that automatically formats your code before each commit, so you never forget!
 
 ## Usage Example
 
