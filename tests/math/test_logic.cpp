@@ -239,5 +239,71 @@ TEST(LogicTests, Numeric) {
 TEST(LogicTests, Symbolic) {
     test_logic_ops<janus::SymbolicScalar>();
     test_logic_matrix<janus::SymbolicScalar>();
-    test_extended_logic<janus::SymbolicScalar>();
+}
+
+TEST(LogicTests, ExtendedLogicSymbolic) { test_extended_logic<janus::SymbolicScalar>(); }
+
+// --- Tests for select() function ---
+
+template <typename Scalar> void test_select() {
+    // Test 1: Basic 3-way select
+    Scalar x = 15.0;
+    auto result1 = janus::select({x < 10.0, x < 20.0, x < 30.0},
+                                 {Scalar(1.0), Scalar(2.0), Scalar(3.0)}, Scalar(4.0));
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_DOUBLE_EQ(result1, 2.0); // 10 <= 15 < 20
+    } else {
+        EXPECT_DOUBLE_EQ(eval_scalar(result1), 2.0);
+    }
+
+    // Test 2: First condition matches
+    Scalar y = 5.0;
+    auto result2 =
+        janus::select({y < 10.0, y < 20.0}, {Scalar(100.0), Scalar(200.0)}, Scalar(300.0));
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_DOUBLE_EQ(result2, 100.0);
+    } else {
+        EXPECT_DOUBLE_EQ(eval_scalar(result2), 100.0);
+    }
+
+    // Test 3: Default value (no condition matches)
+    Scalar z = 100.0;
+    auto result3 = janus::select({z < 10.0, z < 20.0, z < 30.0},
+                                 {Scalar(1.0), Scalar(2.0), Scalar(3.0)}, Scalar(99.0));
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_DOUBLE_EQ(result3, 99.0); // Default
+    } else {
+        EXPECT_DOUBLE_EQ(eval_scalar(result3), 99.0);
+    }
+
+    // Test 4: Single condition
+    Scalar w = 15.0;
+    auto result4 = janus::select({w > 10.0}, {Scalar(42.0)}, Scalar(7.0));
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_DOUBLE_EQ(result4, 42.0);
+    } else {
+        EXPECT_DOUBLE_EQ(eval_scalar(result4), 42.0);
+    }
+}
+
+TEST(LogicTests, SelectNumeric) { test_select<double>(); }
+
+TEST(LogicTests, SelectSymbolic) { test_select<janus::SymbolicScalar>(); }
+
+// Test select() vs nested where() equivalence
+TEST(LogicTests, SelectEquivalence) {
+    double x = 15.0;
+
+    // Using select
+    auto result_select = janus::select({x < 10.0, x < 20.0, x < 30.0}, {1.0, 2.0, 3.0}, 4.0);
+
+    // Using nested where
+    auto result_where =
+        janus::where(x < 10.0, 1.0, janus::where(x < 20.0, 2.0, janus::where(x < 30.0, 3.0, 4.0)));
+
+    EXPECT_DOUBLE_EQ(result_select, result_where);
 }

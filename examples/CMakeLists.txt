@@ -6,3 +6,6 @@ target_link_libraries(energy_intro PRIVATE janus)
 
 add_executable(numeric_intro numeric_intro.cpp)
 target_link_libraries(numeric_intro PRIVATE janus)
+
+add_executable(branching_logic branching_logic.cpp)
+target_link_libraries(branching_logic PRIVATE janus)

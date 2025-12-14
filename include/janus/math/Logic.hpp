@@ -440,6 +440,49 @@ template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
     }
 }
 
+// --- Select (Multi-way branching like switch/case) ---
+/**
+ * @brief Multi-way conditional selection (cleaner alternative to nested where)
+ *
+ * Evaluates conditions in order and returns the first matching value.
+ * Similar to NumPy's select() or a switch statement.
+ *
+ * Example:
+ *   select({x < 0, x < 10, x < 100}, {-1, 0, 1}, 2)
+ *   // Returns: -1 if x<0, 0 if 0<=x<10, 1 if 10<=x<100, else 2
+ *
+ * @tparam CondType Condition type (result of comparison, e.g., bool or Scalar)
+ * @tparam Scalar Scalar type for values (numeric or symbolic)
+ * @param conditions Vector of conditions to check (in order)
+ * @param values Vector of values to return (same size as conditions)
+ * @param default_value Value to return if no condition matches
+ * @return Result of first matching condition, or default
+ */
+template <typename CondType, typename Scalar>
+Scalar select(const std::vector<CondType> &conditions, const std::vector<Scalar> &values,
+              const Scalar &default_value) {
+    if (conditions.size() != values.size()) {
+        throw std::invalid_argument("select: conditions and values must have same size");
+    }
+
+    // Start with default
+    Scalar result = default_value;
+
+    // Work backwards so earlier conditions override later ones
+    for (int i = static_cast<int>(conditions.size()) - 1; i >= 0; --i) {
+        result = where(conditions[i], values[i], result);
+    }
+
+    return result;
+}
+
+// Overload for initializer lists (cleaner syntax)
+template <typename CondType, typename Scalar>
+Scalar select(std::initializer_list<CondType> conditions, std::initializer_list<Scalar> values,
+              const Scalar &default_value) {
+    return select(std::vector<CondType>(conditions), std::vector<Scalar>(values), default_value);
+}
+
 // --- Clip ---
 /**
  * @brief Alias for clamp

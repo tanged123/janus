@@ -14,16 +14,20 @@ echo "========================================"
 echo "Running Examples"
 echo "========================================"
 
-echo "[1/3] Drag Coefficient"
+echo "[1/4] Drag Coefficient"
 ./build/examples/drag_coefficient
 echo ""
 
-echo "[2/3] Energy Intro"
+echo "[2/4] Energy Intro"
 ./build/examples/energy_intro
 echo ""
 
-echo "[3/3] Numeric Intro"
+echo "[3/4] Numeric Intro"
 ./build/examples/numeric_intro
+echo ""
+
+echo "[4/4] Branching Logic"
+./build/examples/branching_logic
 echo ""
 
 echo "All examples ran successfully."
