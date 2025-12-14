@@ -316,13 +316,13 @@ void visualize_graph(const Function& func, const std::string& output_base);
 
 ## Task Breakdown & Milestones
 
-### Milestone 1: ODE Integration (Week 1)
-- [ ] **Task 1.1**: Create `Integrate.hpp` with `quad` (numeric backend)
-- [ ] **Task 1.2**: Add `quad` symbolic backend with CasADi CVODES
-- [ ] **Task 1.3**: Implement `solve_ivp` numeric backend (RK45)
-- [ ] **Task 1.4**: Add `solve_ivp` symbolic backend with CasADi
-- [ ] **Task 1.5**: Create `OdeResult` struct for return values
-- [ ] **Task 1.6**: Write comprehensive tests (`test_integrate.cpp`)
+### Milestone 1: ODE Integration (Week 1) ✅ COMPLETE
+- [x] **Task 1.1**: Create `Integrate.hpp` with `quad` (numeric backend - Gauss-Kronrod G7K15)
+- [x] **Task 1.2**: Add `quad` symbolic backend with CasADi CVODES
+- [x] **Task 1.3**: Implement `solve_ivp` numeric backend (RK4 with substeps)
+- [x] **Task 1.4**: Add `solve_ivp` symbolic backend with CasADi (`solve_ivp_symbolic`, `solve_ivp_expr`)
+- [x] **Task 1.5**: Create `OdeResult` and `QuadResult` structs for return values
+- [x] **Task 1.6**: Write comprehensive tests (`test_integrate.cpp` - 22 tests passing)
 
 ### Milestone 2: Extended Spacing (Week 1)
 - [ ] **Task 2.1**: Add `sinspace` to `Spacing.hpp`
