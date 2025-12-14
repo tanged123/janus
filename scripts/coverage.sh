@@ -17,15 +17,17 @@ cmake --build "$BUILD_DIR"
 CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target test
 
 # Determine GCOV tool
-if command -v gcov &> /dev/null; then
-    GCOV_TOOL="gcov"
-elif command -v llvm-cov &> /dev/null; then
+GCOV_TOOL=""
+# Prioritize llvm-cov for Clang builds (common in Nix/LLVM environments)
+if command -v llvm-cov &> /dev/null; then
     # Create wrapper script for llvm-cov gcov
     GCOV_WRAPPER="$BUILD_DIR/gcov_wrapper.sh"
     echo '#!/bin/sh' > "$GCOV_WRAPPER"
     echo 'exec llvm-cov gcov "$@"' >> "$GCOV_WRAPPER"
     chmod +x "$GCOV_WRAPPER"
     GCOV_TOOL="$GCOV_WRAPPER"
+elif command -v gcov &> /dev/null; then
+    GCOV_TOOL="gcov"
 else
     echo "Error: Neither gcov nor llvm-cov found."
     exit 1
