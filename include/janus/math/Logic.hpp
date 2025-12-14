@@ -395,12 +395,9 @@ auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<De
  * @param x Operand
  * @return Boolean result (numeric) or symbolic expression
  */
-template <JanusScalar T> auto logical_not(const T &x) {
-    return !x;
-}
+template <JanusScalar T> auto logical_not(const T &x) { return !x; }
 
-template <typename Derived>
-auto logical_not(const Eigen::MatrixBase<Derived> &a) {
+template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, casadi::MX>) {
         return a.unaryExpr([](const auto &x) { return !x; });
@@ -447,9 +444,6 @@ template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
 /**
  * @brief Alias for clamp
  */
-template <typename... Args>
-auto clip(Args&&... args) {
-    return clamp(std::forward<Args>(args)...);
-}
+template <typename... Args> auto clip(Args &&...args) { return clamp(std::forward<Args>(args)...); }
 
 } // namespace janus

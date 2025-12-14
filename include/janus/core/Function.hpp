@@ -68,7 +68,7 @@ class Function {
 
     /**
      * @brief Evaluate function and return first output (for single-output functions)
-     * 
+     *
      * Cleaner syntax for single-output functions:
      *   auto result = fn.eval(x, y);  // Returns MatrixXd directly
      * instead of:

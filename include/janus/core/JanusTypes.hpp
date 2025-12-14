@@ -14,8 +14,7 @@ namespace janus {
 template <typename Scalar>
 using JanusMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
 
-template <typename Scalar>
-using JanusVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+template <typename Scalar> using JanusVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
 
 // Numeric Backend
 using NumericScalar = double;

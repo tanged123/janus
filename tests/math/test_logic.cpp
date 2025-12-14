@@ -143,17 +143,15 @@ template <typename Scalar> void test_logic_matrix() {
 template <typename Scalar> void test_extended_logic() {
     using Matrix = janus::JanusMatrix<Scalar>;
     Matrix A(2, 2);
-    A << 1.0, 0.0, 
-         1.0, 1.0;
+    A << 1.0, 0.0, 1.0, 1.0;
     Matrix B(2, 2);
-    B << 1.0, 1.0, 
-         0.0, 1.0;
+    B << 1.0, 1.0, 0.0, 1.0;
 
     // AND: [1, 0; 0, 1]
     // OR:  [1, 1; 1, 1]
     auto res_and = janus::logical_and(A, B);
     auto res_or = janus::logical_or(A, B);
-    
+
     // NOT A: [0, 1; 0, 0]
     auto res_not = janus::logical_not(A);
 
@@ -164,8 +162,7 @@ template <typename Scalar> void test_extended_logic() {
 
     // Clip
     Matrix C(2, 2);
-    C << -5.0, 5.0, 
-          0.0, 10.0;
+    C << -5.0, 5.0, 0.0, 10.0;
     auto res_clip = janus::clip(C, 0.0, 2.0); // -> [0, 2; 0, 2]
 
     if constexpr (std::is_same_v<Scalar, double>) {
@@ -179,7 +176,7 @@ template <typename Scalar> void test_extended_logic() {
         // OR
         EXPECT_TRUE((bool)res_or(0, 0));
         EXPECT_TRUE((bool)res_or(0, 1));
-        
+
         // NOT
         EXPECT_FALSE((bool)res_not(0, 0));
         EXPECT_TRUE((bool)res_not(0, 1));
@@ -224,8 +221,12 @@ template <typename Scalar> void test_extended_logic() {
         EXPECT_NEAR(clip_eval(0, 1), 2.0, 1e-9);
 
         // Scalar Logic
-        EXPECT_NEAR(eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(1.0))), 1.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(0.0))), 0.0, 1e-9);
+        EXPECT_NEAR(
+            eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(1.0))),
+            1.0, 1e-9);
+        EXPECT_NEAR(
+            eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(0.0))),
+            0.0, 1e-9);
     }
 }
 

@@ -6,15 +6,15 @@
 
 template <typename Scalar> void test_gradient_uniform() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test case 1: Linear function y = 2x
     // dy/dx should be 2 everywhere
     Vector x(5);
     x << 0.0, 1.0, 2.0, 3.0, 4.0;
     Vector y = 2.0 * x.array();
-    
+
     auto grad = janus::gradient(y, 1.0, 1, 1);
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         // All points should have gradient = 2
         for (int i = 0; i < grad.size(); ++i) {
@@ -30,7 +30,7 @@ template <typename Scalar> void test_gradient_uniform() {
 
 template <typename Scalar> void test_gradient_quadratic() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test case 2: Quadratic y = x^2
     // dy/dx = 2x
     Vector x(11);
@@ -38,11 +38,11 @@ template <typename Scalar> void test_gradient_quadratic() {
         x(i) = static_cast<Scalar>(i - 5);
     }
     Vector y = x.array().square();
-    
+
     // Test with edge_order = 2 for better boundary accuracy
     auto grad = janus::gradient(y, 1.0, 2, 1);
     Vector expected = 2.0 * x.array();
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         for (int i = 0; i < grad.size(); ++i) {
             EXPECT_NEAR(grad(i), expected(i), 1e-10);
@@ -58,7 +58,7 @@ template <typename Scalar> void test_gradient_quadratic() {
 
 template <typename Scalar> void test_gradient_second_derivative() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test case 3: Quadratic y = x^2
     // d^2y/dx^2 = 2 everywhere
     Vector x(11);
@@ -66,9 +66,9 @@ template <typename Scalar> void test_gradient_second_derivative() {
         x(i) = static_cast<Scalar>(i);
     }
     Vector y = x.array().square();
-    
+
     auto grad2 = janus::gradient(y, 1.0, 1, 2);
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         for (int i = 0; i < grad2.size(); ++i) {
             EXPECT_NEAR(grad2(i), 2.0, 1e-10);
@@ -83,16 +83,16 @@ template <typename Scalar> void test_gradient_second_derivative() {
 
 template <typename Scalar> void test_gradient_nonuniform() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test case 4: Non-uniform grid
     Vector x(5);
     x << 0.0, 1.0, 3.0, 6.0, 10.0;
     Vector y = x.array().square();
-    
+
     // gradient should handle non-uniform spacing via x vector
     auto grad = janus::gradient(y, x, 2, 1);
     Vector expected = 2.0 * x.array();
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         for (int i = 0; i < grad.size(); ++i) {
             EXPECT_NEAR(grad(i), expected(i), 1e-8);
@@ -108,7 +108,7 @@ template <typename Scalar> void test_gradient_nonuniform() {
 
 template <typename Scalar> void test_gradient_cubic() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test case 5: Cubic y = x^3
     // dy/dx = 3x^2
     Vector x(9);
@@ -116,10 +116,10 @@ template <typename Scalar> void test_gradient_cubic() {
         x(i) = static_cast<Scalar>(i - 4);
     }
     Vector y = x.array().cube();
-    
+
     auto grad = janus::gradient(y, 1.0, 2, 1);
     Vector expected = 3.0 * x.array().square();
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         for (int i = 1; i < grad.size() - 1; ++i) {
             // Interior points: second-order formula has O(h^2) error for cubics
@@ -140,14 +140,14 @@ template <typename Scalar> void test_gradient_cubic() {
 
 template <typename Scalar> void test_gradient_edge_cases() {
     using Vector = janus::JanusVector<Scalar>;
-    
+
     // Test with 2 points
     Vector x2(2);
     x2 << 0.0, 1.0;
     Vector y2 = x2.array() * 3.0;
-    
+
     auto grad2 = janus::gradient(y2, 1.0, 1, 1);
-    
+
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_NEAR(grad2(0), 3.0, 1e-10);
         EXPECT_NEAR(grad2(1), 3.0, 1e-10);
@@ -158,49 +158,31 @@ template <typename Scalar> void test_gradient_edge_cases() {
     }
 }
 
-TEST(CalculusTests, GradientUniformNumeric) {
-    test_gradient_uniform<double>();
-}
+TEST(CalculusTests, GradientUniformNumeric) { test_gradient_uniform<double>(); }
 
-TEST(CalculusTests, GradientUniformSymbolic) {
-    test_gradient_uniform<janus::SymbolicScalar>();
-}
+TEST(CalculusTests, GradientUniformSymbolic) { test_gradient_uniform<janus::SymbolicScalar>(); }
 
-TEST(CalculusTests, GradientQuadraticNumeric) {
-    test_gradient_quadratic<double>();
-}
+TEST(CalculusTests, GradientQuadraticNumeric) { test_gradient_quadratic<double>(); }
 
-TEST(CalculusTests, GradientQuadraticSymbolic) {
-    test_gradient_quadratic<janus::SymbolicScalar>();
-}
+TEST(CalculusTests, GradientQuadraticSymbolic) { test_gradient_quadratic<janus::SymbolicScalar>(); }
 
-TEST(CalculusTests, GradientSecondDerivativeNumeric) {
-    test_gradient_second_derivative<double>();
-}
+TEST(CalculusTests, GradientSecondDerivativeNumeric) { test_gradient_second_derivative<double>(); }
 
 TEST(CalculusTests, GradientSecondDerivativeSymbolic) {
     test_gradient_second_derivative<janus::SymbolicScalar>();
 }
 
-TEST(CalculusTests, GradientNonuniformNumeric) {
-    test_gradient_nonuniform<double>();
-}
+TEST(CalculusTests, GradientNonuniformNumeric) { test_gradient_nonuniform<double>(); }
 
 TEST(CalculusTests, GradientNonuniformSymbolic) {
     test_gradient_nonuniform<janus::SymbolicScalar>();
 }
 
-TEST(CalculusTests, GradientCubicNumeric) {
-    test_gradient_cubic<double>();
-}
+TEST(CalculusTests, GradientCubicNumeric) { test_gradient_cubic<double>(); }
 
-TEST(CalculusTests, GradientCubicSymbolic) {
-    test_gradient_cubic<janus::SymbolicScalar>();
-}
+TEST(CalculusTests, GradientCubicSymbolic) { test_gradient_cubic<janus::SymbolicScalar>(); }
 
-TEST(CalculusTests, GradientEdgeCasesNumeric) {
-    test_gradient_edge_cases<double>();
-}
+TEST(CalculusTests, GradientEdgeCasesNumeric) { test_gradient_edge_cases<double>(); }
 
 TEST(CalculusTests, GradientEdgeCasesSymbolic) {
     test_gradient_edge_cases<janus::SymbolicScalar>();
@@ -253,9 +235,7 @@ template <typename Scalar> void test_diff_trapz_gradient1d() {
     }
 }
 
-TEST(CalculusTests, DiffTrapzGradient1dNumeric) {
-    test_diff_trapz_gradient1d<double>();
-}
+TEST(CalculusTests, DiffTrapzGradient1dNumeric) { test_diff_trapz_gradient1d<double>(); }
 
 TEST(CalculusTests, DiffTrapzGradient1dSymbolic) {
     test_diff_trapz_gradient1d<janus::SymbolicScalar>();
