@@ -66,6 +66,23 @@ class Function {
         return to_eigen_vector(res_dm);
     }
 
+    /**
+     * @brief Evaluate function and return first output (for single-output functions)
+     *
+     * Cleaner syntax for single-output functions:
+     *   auto result = fn.eval(x, y);  // Returns MatrixXd directly
+     * instead of:
+     *   auto result = fn(x, y)[0];
+     *
+     * @tparam Args Argument types (automatically deduced)
+     * @param args Variadic arguments matching the function inputs
+     * @return Eigen::MatrixXd First output matrix
+     */
+    template <typename... Args> Eigen::MatrixXd eval(Args &&...args) const {
+        auto results = operator()(std::forward<Args>(args)...);
+        return results[0];
+    }
+
   private:
     // Helper: Convert scalar (double/int) to DM
     template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<std::decay_t<T>>>>

@@ -1,5 +1,6 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
+#include <janus/core/JanusIO.hpp>
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp>
 
@@ -47,7 +48,23 @@ template <typename Scalar> void test_linalg_ops() {
     c2 << 0.0, 1.0, 0.0;
     auto c3 = janus::cross(c1, c2); // [0, 0, 1]
 
-    // Test inv and det
+    // Test inner
+    auto i_prod = janus::inner(v, v); // 25.0
+
+    // Test pinv
+    // A singular = [[1, 1], [2, 2]]
+    Matrix A_sing(2, 2);
+    A_sing << 1.0, 1.0, 2.0, 2.0;
+    auto A_pinv = janus::pinv(A_sing);
+
+    // Test extended norms
+    Vector v_norm(3);
+    v_norm << -1.0, 2.0, -3.0;
+
+    auto n_1 = janus::norm(v_norm, janus::NormType::L1);    // 1+2+3 = 6
+    auto n_inf = janus::norm(v_norm, janus::NormType::Inf); // 3
+
+    // Existing inv / det tests
     auto A_inv = janus::inv(A); // inv([[2, 1], [1, 2]]) = 1/3 * [[2, -1], [-1, 2]]
     auto A_det = janus::det(A); // 4 - 1 = 3
 
@@ -64,30 +81,52 @@ template <typename Scalar> void test_linalg_ops() {
         EXPECT_DOUBLE_EQ(c3(1), 0.0);
         EXPECT_DOUBLE_EQ(c3(2), 1.0);
 
+        EXPECT_DOUBLE_EQ(i_prod, 25.0);
+
+        // Pinv of [[1, 1], [2, 2]]
+        // SVD based, roughly [[0.1, 0.2], [0.1, 0.2]]
+        // Check A * pinv * A = A
+        auto recon = A_sing * A_pinv * A_sing;
+        EXPECT_TRUE(recon.isApprox(A_sing, 1e-5));
+
+        EXPECT_DOUBLE_EQ(n_1, 6.0);
+        EXPECT_DOUBLE_EQ(n_inf, 3.0);
+
         EXPECT_NEAR(A_det, 3.0, 1e-9);
         EXPECT_NEAR(A_inv(0, 0), 2.0 / 3.0, 1e-9);
     } else {
-        auto x_eval = eval_matrix(janus::to_mx(x));
+        auto x_eval = janus::eval(x);
         EXPECT_NEAR(x_eval(0), 1.0, 1e-6);
         EXPECT_NEAR(x_eval(1), 1.0, 1e-6);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(n), 5.0);
+        EXPECT_DOUBLE_EQ(janus::eval(n), 5.0);
 
-        auto M_eval = eval_matrix(janus::to_mx(M));
+        auto M_eval = janus::eval(M);
         EXPECT_DOUBLE_EQ(M_eval(0, 0), 3.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 1), 8.0);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(d), 25.0);
+        EXPECT_DOUBLE_EQ(janus::eval(d), 25.0);
 
-        auto c3_eval = eval_matrix(janus::to_mx(c3));
+        auto c3_eval = janus::eval(c3);
         EXPECT_NEAR(c3_eval(0), 0.0, 1e-9);
         EXPECT_NEAR(c3_eval(1), 0.0, 1e-9);
         EXPECT_NEAR(c3_eval(2), 1.0, 1e-9);
 
-        // Skip symbolic det eval if unsupported
-        // EXPECT_NEAR(eval_scalar(A_det), 3.0, 1e-9);
+        EXPECT_DOUBLE_EQ(janus::eval(i_prod), 25.0);
 
-        auto A_inv_eval = eval_matrix(janus::to_mx(A_inv));
+        // Pinv test symbolic
+        auto A_pinv_inv = janus::pinv(A);
+        auto A_pinv_eval = janus::eval(A_pinv_inv);
+        EXPECT_NEAR(A_pinv_eval(0, 0), 2.0 / 3.0, 1e-6);
+
+        EXPECT_DOUBLE_EQ(janus::eval(n_1), 6.0);
+        EXPECT_DOUBLE_EQ(janus::eval(n_inf), 3.0);
+
+        auto A_inv_eval = janus::eval(A_inv);
+        if (std::abs(A_inv_eval(0, 0) - (2.0 / 3.0)) > 1e-9) {
+            janus::print("A_inv (Symbolic)", A_inv);
+            janus::print("A_inv (Evaluated)", A_inv_eval);
+        }
         EXPECT_NEAR(A_inv_eval(0, 0), 2.0 / 3.0, 1e-9);
     }
 }

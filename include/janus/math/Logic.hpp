@@ -1,6 +1,7 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/math/Arithmetic.hpp"
+#include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
 
 namespace janus {
@@ -175,7 +176,12 @@ auto clamp(const T &val, const TLow &low, const THigh &high) {
  */
 template <typename Derived, typename Scalar>
 auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scalar &high) {
-    return val.cwiseMax(low).cwiseMin(high);
+    using MatrixScalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<MatrixScalar, casadi::MX>) {
+        return val.unaryExpr([=](const auto &x) { return janus::clamp(x, low, high); });
+    } else {
+        return val.cwiseMax(low).cwiseMin(high);
+    }
 }
 
 // --- Less Than (lt) ---
@@ -338,5 +344,149 @@ auto sigmoid_blend(const Eigen::MatrixBase<Derived> &x, const Scalar &val_low,
     auto alpha = (1.0 + (-sharpness * x.array()).exp()).inverse();
     return (val_low + alpha * (val_high - val_low)).matrix();
 }
+
+// --- Logical AND ---
+/**
+ * @brief Logical AND (x && y)
+ * @param x1 First operand
+ * @param x2 Second operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T1, JanusScalar T2> auto logical_and(const T1 &x1, const T2 &x2) {
+    // Both define operator &&
+    return x1 && x2;
+}
+
+template <typename DerivedA, typename DerivedB>
+auto logical_and(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.binaryExpr(b, [](const auto &x, const auto &y) { return x && y; });
+    } else {
+        // Ensure boolean context for Eigen arrays
+        return ((a.array() != 0) && (b.array() != 0));
+    }
+}
+
+// --- Logical OR ---
+/**
+ * @brief Logical OR (x || y)
+ * @param x1 First operand
+ * @param x2 Second operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T1, JanusScalar T2> auto logical_or(const T1 &x1, const T2 &x2) {
+    return x1 || x2;
+}
+
+template <typename DerivedA, typename DerivedB>
+auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    using Scalar = typename DerivedA::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.binaryExpr(b, [](const auto &x, const auto &y) { return x || y; });
+    } else {
+        return ((a.array() != 0) || (b.array() != 0));
+    }
+}
+
+// --- Logical NOT ---
+/**
+ * @brief Logical NOT (!x)
+ * @param x Operand
+ * @return Boolean result (numeric) or symbolic expression
+ */
+template <JanusScalar T> auto logical_not(const T &x) { return !x; }
+
+template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return a.unaryExpr([](const auto &x) { return !x; });
+    } else {
+        return (a.array() == 0);
+    }
+}
+
+// --- All ---
+/**
+ * @brief Returns true if all elements are true (non-zero)
+ * @param a Input matrix/array
+ * @return Boolean (numeric) or symbolic expression
+ */
+template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        // all is true if norm_inf(1 - a) == 0 (all a are 1)
+        using casadi::norm_inf;
+        return norm_inf(1.0 - to_mx(a)) == 0;
+    } else {
+        return (a.array() != 0).all();
+    }
+}
+
+// --- Any ---
+/**
+ * @brief Returns true if any element is true (non-zero)
+ * @param a Input matrix/array
+ * @return Boolean (numeric) or symbolic expression
+ */
+template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        // any is true if norm_inf(a) > 0 (at least one non-zero)
+        using casadi::norm_inf;
+        return norm_inf(to_mx(a)) != 0;
+    } else {
+        return (a.array() != 0).any();
+    }
+}
+
+// --- Select (Multi-way branching like switch/case) ---
+/**
+ * @brief Multi-way conditional selection (cleaner alternative to nested where)
+ *
+ * Evaluates conditions in order and returns the first matching value.
+ * Similar to NumPy's select() or a switch statement.
+ *
+ * Example:
+ *   select({x < 0, x < 10, x < 100}, {-1, 0, 1}, 2)
+ *   // Returns: -1 if x<0, 0 if 0<=x<10, 1 if 10<=x<100, else 2
+ *
+ * @tparam CondType Condition type (result of comparison, e.g., bool or Scalar)
+ * @tparam Scalar Scalar type for values (numeric or symbolic)
+ * @param conditions Vector of conditions to check (in order)
+ * @param values Vector of values to return (same size as conditions)
+ * @param default_value Value to return if no condition matches
+ * @return Result of first matching condition, or default
+ */
+template <typename CondType, typename Scalar>
+Scalar select(const std::vector<CondType> &conditions, const std::vector<Scalar> &values,
+              const Scalar &default_value) {
+    if (conditions.size() != values.size()) {
+        throw std::invalid_argument("select: conditions and values must have same size");
+    }
+
+    // Start with default
+    Scalar result = default_value;
+
+    // Work backwards so earlier conditions override later ones
+    for (int i = static_cast<int>(conditions.size()) - 1; i >= 0; --i) {
+        result = where(conditions[i], values[i], result);
+    }
+
+    return result;
+}
+
+// Overload for initializer lists (cleaner syntax)
+template <typename CondType, typename Scalar>
+Scalar select(std::initializer_list<CondType> conditions, std::initializer_list<Scalar> values,
+              const Scalar &default_value) {
+    return select(std::vector<CondType>(conditions), std::vector<Scalar>(values), default_value);
+}
+
+// --- Clip ---
+/**
+ * @brief Alias for clamp
+ */
+template <typename... Args> auto clip(Args &&...args) { return clamp(std::forward<Args>(args)...); }
 
 } // namespace janus

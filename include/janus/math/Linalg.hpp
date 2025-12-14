@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 
@@ -69,21 +70,6 @@ auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<Derived
     }
 }
 
-// --- norm(x) ---
-/**
- * @brief Computes L2 norm of a vector
- * @param x Input vector
- * @return L2 norm
- */
-template <typename Derived> auto norm(const Eigen::MatrixBase<Derived> &x) {
-    using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_floating_point_v<Scalar>) {
-        return x.norm();
-    } else {
-        return norm_2(to_mx(x));
-    }
-}
-
 // --- outer(x, y) ---
 /**
  * @brief Computes outer product x * y^T
@@ -147,6 +133,106 @@ template <typename Derived> auto det(const Eigen::MatrixBase<Derived> &A) {
         casadi::MX A_mx = to_mx(A);
         return det(A_mx);
     }
+}
+
+// --- Inner Product ---
+/**
+ * @brief Computes inner product of two vectors (dot product)
+ * @param x First vector
+ * @param y Second vector
+ * @return Inner product
+ */
+template <typename DerivedA, typename DerivedB>
+auto inner(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    return janus::dot(a, b);
+}
+
+// --- Pseudo-Inverse ---
+/**
+ * @brief Computes Moore-Penrose pseudo-inverse
+ * @param A Input matrix
+ * @return Pseudo-inverse of A
+ */
+template <typename Derived> auto pinv(const Eigen::MatrixBase<Derived> &A) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        return A.completeOrthogonalDecomposition().pseudoInverse();
+    } else {
+        casadi::MX A_mx = to_mx(A);
+        casadi::MX pinv_mx = casadi::MX::pinv(A_mx);
+        return to_eigen(pinv_mx);
+    }
+}
+
+// --- Norm Extensions ---
+
+enum class NormType { L1, L2, Inf, Frobenius };
+
+/**
+ * @brief Computes vector/matrix norm
+ * @param x Input vector/matrix
+ * @param type Norm type (L1, L2, Inf, Frobenius)
+ * @return Norm value
+ */
+template <typename Derived>
+auto norm(const Eigen::MatrixBase<Derived> &x, NormType type = NormType::L2) {
+    using Scalar = typename Derived::Scalar;
+
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        switch (type) {
+        case NormType::L1:
+            return x.template lpNorm<1>();
+        case NormType::L2:
+            return x.norm();
+        case NormType::Inf:
+            return x.template lpNorm<Eigen::Infinity>();
+        case NormType::Frobenius:
+            return x.norm(); // Frobenius equals L2 for vectors
+        default:
+            return x.norm();
+        }
+    } else {
+        casadi::MX x_mx = to_mx(x);
+        switch (type) {
+        case NormType::L1:
+            return casadi::MX::norm_1(x_mx);
+        case NormType::L2:
+            return casadi::MX::norm_2(x_mx);
+        case NormType::Inf:
+            return casadi::MX::norm_inf(x_mx);
+        case NormType::Frobenius:
+            return casadi::MX::norm_fro(x_mx);
+        default:
+            return casadi::MX::norm_2(x_mx);
+        }
+    }
+}
+
+// Backwards compatibility overload for just L2 norm (default handled above really, but if called
+// without args, it works)
+
+// --- Explicit 3x3 Symmetric Inverse (AeroSandbox Helper) ---
+/**
+ * @brief Explicit inverse of symmetric 3x3 matrix.
+ * Returns tuple of elements: a11, a22, a33, a12, a23, a13
+ */
+template <typename T>
+std::tuple<T, T, T, T, T, T> inv_symmetric_3x3_explicit(const T &m11, const T &m22, const T &m33,
+                                                        const T &m12, const T &m23, const T &m13) {
+
+    T det = m11 * (m33 * m22 - m23 * m23) - m12 * (m33 * m12 - m23 * m13) +
+            m13 * (m23 * m12 - m22 * m13);
+
+    T inv_det = 1.0 / det;
+
+    T a11 = (m33 * m22 - m23 * m23) * inv_det;
+    T a12 = (m13 * m23 - m33 * m12) * inv_det;
+    T a13 = (m12 * m23 - m13 * m22) * inv_det;
+    T a22 = (m33 * m11 - m13 * m13) * inv_det;
+    T a23 = (m12 * m13 - m11 * m23) * inv_det;
+    T a33 = (m11 * m22 - m12 * m12) * inv_det;
+
+    return {a11, a22, a33, a12, a23, a13};
 }
 
 } // namespace janus

@@ -12,4 +12,10 @@ ninja -C build
 
 # Run tests
 mkdir -p logs
-ctest --test-dir build -VV 2>&1 | tee logs/tests.log
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="logs/tests_${TIMESTAMP}.log"
+
+ctest --test-dir build -VV 2>&1 | tee "$LOG_FILE"
+
+# Create symlink to latest
+ln -sf "tests_${TIMESTAMP}.log" logs/tests.log

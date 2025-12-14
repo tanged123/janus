@@ -44,8 +44,8 @@ int main() {
     janus::Function drag_fun({v_sym, Cl_sym}, {drag_sym});
 
     // Evaluate symbolic function at numeric point
-    auto res = drag_fun(v, Cl);
-    std::cout << "Symbolic Drag (evaluated): " << res[0] << " N" << std::endl;
+    double drag_eval = drag_fun.eval(v, Cl)(0, 0);
+    std::cout << "Symbolic Drag (evaluated): " << drag_eval << " N" << std::endl;
 
     // --- Automatic Differentiation ---
     std::cout << "\nComputing Jacobian (Automatic Differentiation)..." << std::endl;
@@ -58,8 +58,8 @@ int main() {
     janus::Function J_fun({v_sym, Cl_sym}, {J_sym});
 
     // Evaluate Jacobian at operating point
-    auto J_res = J_fun(v, Cl);
-    std::cout << "Jacobian [dDrag/dv, dDrag/dCl]: " << J_res[0] << std::endl;
+    auto J = J_fun.eval(v, Cl);
+    std::cout << "Jacobian [dDrag/dv, dDrag/dCl]: " << J << std::endl;
 
     // Verification (Analytic/Numeric check)
     // Drag = 0.5 * rho * v^2 * S * (Cd0 + k * (Cl - Cl0)^2)

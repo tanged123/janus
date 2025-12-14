@@ -1,14 +1,24 @@
-name: Clang-Format Check
+name: Format Check
 
-on: [push, pull_request]
+on: push
 
 jobs:
-  check-format:
+  format:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: DoozyX/clang-format-lint-action@v0.15
-      with:
-        source: '.'
-        extensions: 'h,hpp,c,cpp'
-        clangFormatVersion: 16
+      - uses: actions/checkout@v4
+          
+      - uses: DeterminateSystems/nix-installer-action@main
+      
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Check formatting
+        run: |
+          if ! nix fmt -- --fail-on-change; then
+            echo ""
+            echo "❌ Code is not formatted correctly!"
+            echo "💡 Run 'nix fmt' locally to fix formatting"
+            echo "💡 Or run './scripts/install-hooks.sh' to auto-format on every commit"
+            exit 1
+          fi
+          echo "✅ All files are properly formatted!"

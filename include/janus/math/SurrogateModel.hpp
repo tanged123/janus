@@ -1,0 +1,221 @@
+#pragma once
+#include "janus/core/JanusConcepts.hpp"
+#include "janus/math/Arithmetic.hpp"
+#include "janus/math/Logic.hpp"
+#include "janus/math/Trig.hpp"
+#include <Eigen/Dense>
+#include <cmath>
+#include <numeric>
+#include <vector>
+
+namespace janus {
+
+// ======================================================================
+// Softmax (Smooth Maximum / LogSumExp)
+// ======================================================================
+
+/**
+ * @brief Computes the smooth maximum (LogSumExp) of a collection of values.
+ *
+ * Approximation of max(x1, x2, ...) that is differentiable.
+ * out = softness * log(sum(exp(x_i / softness)))
+ *
+ * Implemented with shift for numerical stability:
+ * out = max_val + softness * log(sum(exp((x_i - max_val) / softness)))
+ *
+ * @param args Vector of values (scalars or matrices)
+ * @param softness Smoothing parameter (default 1.0). Higher = smoother (further from max).
+ * @return Smooth maximum
+ */
+template <typename T> auto softmax(const std::vector<T> &args, double softness = 1.0) {
+    if (args.empty()) {
+        throw std::invalid_argument("softmax requires at least one argument");
+    }
+    if (softness <= 0.0) {
+        throw std::invalid_argument("softmax softness must be positive");
+    }
+
+    // 1. Find max element-wise
+    auto max_val = args[0];
+    for (size_t i = 1; i < args.size(); ++i) {
+        max_val = janus::max(max_val, args[i]);
+    }
+
+    // 2. Compute sum of exponentials: sum(exp((x - max) / softness))
+    // We need a way to initialize the sum with the correct type and dimensions.
+    // We can compute the first term to initialize.
+
+    // Using auto type deduction for the result of exp operation
+    auto first_term = janus::exp((args[0] - max_val) / softness);
+    auto sum_exp = first_term;
+
+    for (size_t i = 1; i < args.size(); ++i) {
+        sum_exp = sum_exp + janus::exp((args[i] - max_val) / softness);
+    }
+
+    // 3. Final computation
+    return max_val + softness * janus::log(sum_exp);
+}
+
+// Convenience overload for 2 arguments
+template <typename T1, typename T2> auto softmax(const T1 &a, const T2 &b, double softness = 1.0) {
+    // We need to construct a vector, but T1 and T2 might be different types (double vs Matrix)
+    // This is tricky if types are different.
+    // Ideally we assume they are compatible or castable to a common type.
+    // For simplicity in the generic case, let's implement the 2-arg logic directly to allow
+    // standard promotions.
+
+    auto max_val = janus::max(a, b);
+
+    // Compute exp terms
+    // exp((a - max) / softness) + exp((b - max) / softness)
+    // Note: One of the exponents will include (max - max) = 0, so exp(0) = 1.
+    // But we just compute blindly for simplicity and consistency.
+
+    auto term1 = janus::exp((a - max_val) / softness);
+    auto term2 = janus::exp((b - max_val) / softness);
+
+    // Check if we need to broadcast scalar to matrix if one is matrix and other is scalar
+    // janus::exp usually handles this if implemented correctly or if using Eigen arrays.
+    // However, addition `term1 + term2` might fail if one is scalar and other is matrix in standard
+    // Eigen without array(). We assume janus::exp returns compatible types (Eigen matrix or
+    // scalar). If mixed scalar/matrix, standard Eigen requires array operation or broadcasting.
+
+    // Let's rely on janus::exp returning something compatible with operator+
+    return max_val + softness * janus::log(term1 + term2);
+}
+
+// ======================================================================
+// Softmin (Smooth Minimum)
+// ======================================================================
+
+/**
+ * @brief Computes the smooth minimum of a collection of values.
+ * softmin(x) = -softmax(-x)
+ *
+ * @param args Vector of values
+ * @param softness Smoothing parameter
+ * @return Smooth minimum
+ */
+template <typename T> auto softmin(const std::vector<T> &args, double softness = 1.0) {
+    std::vector<T> neg_args;
+    neg_args.reserve(args.size());
+    for (const auto &arg : args) {
+        neg_args.push_back(-arg);
+    }
+    return -softmax(neg_args, softness);
+}
+
+// Convenience overload for 2 arguments
+template <typename T1, typename T2> auto softmin(const T1 &a, const T2 &b, double softness = 1.0) {
+    return -softmax(-a, -b, softness);
+}
+
+// ======================================================================
+// Softplus (Smooth ReLU)
+// ======================================================================
+
+/**
+ * @brief Smooth approximation of ReLU function: softplus(x) = (1/beta) * log(1 + exp(beta * x))
+ *
+ * @param x Input value
+ * @param beta Sharpness parameter (default 1.0). Higher = closer to ReLU.
+ * @param threshold Stability threshold (default 20.0). For beta*x > threshold, returns x (linear).
+ * @return Softplus value
+ */
+template <typename T> auto softplus(const T &x, double beta = 1.0, double threshold = 20.0) {
+    // Logic:
+    // if (beta * x > threshold) return x
+    // else return (1/beta) * log(1 + exp(beta * x))
+
+    auto bx = beta * x;
+    auto linear_approx = x;
+    auto smooth_approx = (1.0 / beta) * janus::log(1.0 + janus::exp(bx));
+
+    return janus::where(bx > threshold, linear_approx, smooth_approx);
+}
+
+// ======================================================================
+// Sigmoid
+// ======================================================================
+
+enum class SigmoidType { Tanh, Logistic, Arctan, Polynomial };
+
+/**
+ * @brief Sigmoid function with normalization capability.
+ *
+ * @param x Input value
+ * @param type Type of sigmoid shape (Tanh, Arctan, Polynomial)
+ * @param norm_min Minimum output value (asymptote at -inf)
+ * @param norm_max Maximum output value (asymptote at +inf)
+ * @return Sigmoid value scaled to [norm_min, norm_max]
+ */
+template <typename T>
+auto sigmoid(const T &x, SigmoidType type = SigmoidType::Tanh, double norm_min = 0.0,
+             double norm_max = 1.0) {
+
+    // 1. Compute base sigmoid 's' in range [-1, 1] if possible, or standard form
+    // The reference implementation normalizes based on the theoretical raw range of the function.
+    // Tanh: range (-1, 1)
+    // Arctan: scaled 2/pi * atan(pi/2 * x) -> range (-1, 1)
+    // Polynomial: x / sqrt(1 + x^2) -> range (-1, 1)
+
+    auto s = x; // placeholder type initialization
+
+    switch (type) {
+    case SigmoidType::Tanh:
+    case SigmoidType::Logistic:
+        s = janus::tanh(x);
+        break;
+    case SigmoidType::Arctan:
+        s = (2.0 / M_PI) * janus::atan((M_PI / 2.0) * x);
+        break;
+    case SigmoidType::Polynomial:
+        s = x / janus::sqrt(1.0 + x * x);
+        break;
+    }
+
+    // 2. Normalize from [-1, 1] to [norm_min, norm_max]
+    // s_normalized = s * (max - min) / 2 + (max + min) / 2
+    double scale = (norm_max - norm_min) / 2.0;
+    double offset = (norm_max + norm_min) / 2.0;
+
+    return s * scale + offset;
+}
+
+// ======================================================================
+// Swish
+// ======================================================================
+
+/**
+ * @brief Swish activation function: x / (1 + exp(-beta * x))
+ *
+ * @param x Input
+ * @param beta Beta parameter
+ * @return Swish value
+ */
+template <typename T> auto swish(const T &x, double beta = 1.0) {
+    return x / (1.0 + janus::exp(-beta * x));
+}
+
+// ======================================================================
+// Blend
+// ======================================================================
+
+/**
+ * @brief Smoothly blends between two values based on a switch parameter.
+ *
+ * @param switch_val Control value. 0 -> average, -inf -> low, +inf -> high.
+ * @param val_high Value when switch is high
+ * @param val_low Value when switch is low
+ * @return Blended value
+ */
+template <typename TSwitch, typename THigh, typename TLow>
+auto blend(const TSwitch &switch_val, const THigh &val_high, const TLow &val_low) {
+    // Helper sigmoid (tanh type, 0 to 1 range)
+    auto weights = sigmoid(switch_val, SigmoidType::Tanh, 0.0, 1.0);
+
+    return val_high * weights + val_low * (1.0 - weights);
+}
+
+} // namespace janus

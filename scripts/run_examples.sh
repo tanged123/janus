@@ -14,16 +14,36 @@ echo "========================================"
 echo "Running Examples"
 echo "========================================"
 
-echo "[1/3] Drag Coefficient"
+echo "[1/5] Drag Coefficient"
 ./build/examples/drag_coefficient
 echo ""
 
-echo "[2/3] Energy Intro"
+echo "[2/5] Energy Intro"
 ./build/examples/energy_intro
 echo ""
 
-echo "[3/3] Numeric Intro"
+echo "[3/5] Numeric Intro"
 ./build/examples/numeric_intro
+echo ""
+
+echo "[4/5] Branching Logic"
+./build/examples/branching_logic
+echo ""
+
+echo "[5/8] Loop Patterns"
+./build/examples/loop_patterns
+echo ""
+
+echo "[6/8] Hybrid Simulation"
+./build/examples/hybrid_sim
+echo ""
+
+echo "[7/8] Smooth Trajectory (Phase 3)"
+./build/examples/smooth_trajectory
+echo ""
+
+echo "[8/8] Aircraft Attitudes (Phase 3)"
+./build/examples/aircraft_attitudes
 echo ""
 
 echo "All examples ran successfully."

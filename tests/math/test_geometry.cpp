@@ -20,11 +20,11 @@ template <typename Scalar> void test_spacing() {
         EXPECT_NEAR(cos(0), 0.0, 1e-9);
     } else {
         EXPECT_EQ(lin.size(), 5);
-        auto lin_eval = eval_matrix(janus::to_mx(lin));
+        auto lin_eval = janus::eval(lin);
         EXPECT_NEAR(lin_eval(2), 5.0, 1e-9);
         EXPECT_NEAR(lin_eval(4), 10.0, 1e-9);
 
-        auto cos_eval = eval_matrix(janus::to_mx(cos));
+        auto cos_eval = janus::eval(cos);
         EXPECT_NEAR(cos_eval(0), 0.0, 1e-9);
     }
 }
@@ -44,14 +44,56 @@ template <typename Scalar> void test_rotations() {
         EXPECT_NEAR(R3(0, 1), -1.0, 1e-9);
         EXPECT_NEAR(R3(2, 2), 1.0, 1e-9);
     } else {
-        auto R2_eval = eval_matrix(janus::to_mx(R2));
+        auto R2_eval = janus::eval(R2);
         EXPECT_NEAR(R2_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(R2_eval(0, 1), -1.0, 1e-9);
 
-        auto R3_eval = eval_matrix(janus::to_mx(R3));
+        auto R3_eval = janus::eval(R3);
         EXPECT_NEAR(R3_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(R3_eval(0, 1), -1.0, 1e-9);
         EXPECT_NEAR(R3_eval(2, 2), 1.0, 1e-9);
+    }
+
+    // --- Euler Angles Test ---
+    // Roll=pi, Pitch=0, Yaw=0 -> 180 deg around X. Result: Diag(1, -1, -1)
+    Scalar pi = std::numbers::pi_v<double>;
+    auto R_euler = janus::rotation_matrix_from_euler_angles(pi, Scalar(0.0), Scalar(0.0));
+
+    // --- Validation Test ---
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_TRUE(janus::is_valid_rotation_matrix(R2, 1e-9)); // 2D matrix?
+        // Note: is_valid expects 3x3 for the cross product logic?
+        // Wait, my implementation uses transpose*self=I and det=1.
+        // It works for any square matrix.
+        EXPECT_TRUE(janus::is_valid_rotation_matrix(R3));
+        EXPECT_TRUE(janus::is_valid_rotation_matrix(R_euler));
+
+        EXPECT_NEAR(R_euler(0, 0), 1.0, 1e-9);
+        EXPECT_NEAR(R_euler(1, 1), -1.0, 1e-9);
+        EXPECT_NEAR(R_euler(2, 2), -1.0, 1e-9);
+
+        // Invalid matrix test
+        Eigen::Matrix<Scalar, 3, 3> bad = Eigen::Matrix<Scalar, 3, 3>::Identity() * 2.0;
+        EXPECT_FALSE(janus::is_valid_rotation_matrix(bad));
+    } else {
+        auto valid_R3 = janus::is_valid_rotation_matrix(R3);
+        EXPECT_NEAR(janus::eval(valid_R3), 1.0, 1e-9);
+
+        auto valid_euler = janus::is_valid_rotation_matrix(R_euler);
+        EXPECT_NEAR(janus::eval(valid_euler), 1.0, 1e-9);
+
+        auto R_euler_eval = janus::eval(R_euler);
+        EXPECT_NEAR(R_euler_eval(0, 0), 1.0, 1e-9);
+        EXPECT_NEAR(R_euler_eval(1, 1), -1.0, 1e-9);
+        EXPECT_NEAR(R_euler_eval(2, 2), -1.0, 1e-9);
+
+        // Invalid matrix test
+        // Construct invalid symbolic matrix
+        Eigen::Matrix<janus::SymbolicScalar, 3, 3> bad;
+        bad.setIdentity();
+        bad = bad * 2.0;
+        auto valid_bad = janus::is_valid_rotation_matrix(bad);
+        EXPECT_NEAR(janus::eval(valid_bad), 0.0, 1e-9);
     }
 }
 
