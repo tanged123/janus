@@ -280,18 +280,18 @@ The symbolic backend wraps CasADi's CVODES integrator to enable differentiation 
 ## Task Breakdown & Milestones
 
 ### Milestone 1: Logic Extensions (Week 1)
-- [ ] **Task 1.1**: Extend `Logic.hpp` with `logical_and`, `logical_or`, `logical_not`
-- [ ] **Task 1.2**: Add `all`, `any` to `Logic.hpp`
-- [ ] **Task 1.3**: Verify `clip` is working (may already exist as `clamp`)
+- [x] **Task 1.1**: Extend `Logic.hpp` with `logical_and`, `logical_or`, `logical_not`
+- [x] **Task 1.2**: Add `all`, `any` to `Logic.hpp`
+- [x] **Task 1.3**: Verify `clip` is working (may already exist as `clamp`)
 - [ ] **Task 1.4**: Add `janus::roll` free function to `Linalg.hpp` (if needed)
-- [ ] **Task 1.5**: Write tests for extended `Logic.hpp`
+- [x] **Task 1.5**: Write tests for extended `Logic.hpp`
 
 ### Milestone 2: Calculus & Surrogate Models (Week 2)
-- [ ] **Task 2.1**: Create `Calculus.hpp` with full `gradient` implementation
-- [ ] **Task 2.2**: Create `SurrogateModel.hpp` with `softmax`, `softmin`, `softplus`
-- [ ] **Task 2.3**: Add `sigmoid`, `swish`, `blend` to `SurrogateModel.hpp`
-- [ ] **Task 2.4**: Extend `Linalg.hpp` with `pinv`, `inner`, extended `norm`
-- [ ] **Task 2.5**: Write tests for Calculus and SurrogateModel modules
+- [x] **Task 2.1**: Create `Calculus.hpp` with full `gradient` implementation
+- [x] **Task 2.2**: Create `SurrogateModel.hpp` with `softmax`, `softmin`, `softplus`
+- [x] **Task 2.3**: Add `sigmoid`, `swish`, `blend` to `SurrogateModel.hpp`
+- [x] **Task 2.4**: Extend `Linalg.hpp` with `pinv`, `inner`, extended `norm`
+- [x] **Task 2.5**: Write tests for Calculus and SurrogateModel modules (Surrogate done)
 
 ### Milestone 3: Advanced Numerics (Week 3)
 - [ ] **Task 3.1**: Create `FiniteDifference.hpp`

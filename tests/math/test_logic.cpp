@@ -115,27 +115,27 @@ template <typename Scalar> void test_logic_matrix() {
         // neq: All true
         EXPECT_DOUBLE_EQ(check_neq(0, 0), 10.0);
     } else {
-        auto M_eval = eval_matrix(janus::to_mx(M));
+        auto M_eval = eval_matrix(M);
         EXPECT_DOUBLE_EQ(M_eval(0, 0), 1.0);
         EXPECT_DOUBLE_EQ(M_eval(0, 1), 2.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 0), 1.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 1), 5.0);
 
-        auto W_eval = eval_matrix(janus::to_mx(where_mat));
+        auto W_eval = eval_matrix(where_mat);
         EXPECT_DOUBLE_EQ(W_eval(0, 1), 2.0);
 
-        auto G_eval = eval_matrix(janus::to_mx(check_gt));
+        auto G_eval = eval_matrix(check_gt);
         EXPECT_DOUBLE_EQ(G_eval(0, 0), -10.0);
         EXPECT_DOUBLE_EQ(G_eval(0, 1), 10.0);
 
-        auto L_eval = eval_matrix(janus::to_mx(check_le));
+        auto L_eval = eval_matrix(check_le);
         EXPECT_DOUBLE_EQ(L_eval(0, 0), 10.0);
         EXPECT_DOUBLE_EQ(L_eval(0, 1), -10.0);
 
-        auto E_eval = eval_matrix(janus::to_mx(check_eq));
+        auto E_eval = eval_matrix(check_eq);
         EXPECT_DOUBLE_EQ(E_eval(0, 0), 10.0);
 
-        auto N_eval = eval_matrix(janus::to_mx(check_neq));
+        auto N_eval = eval_matrix(check_neq);
         EXPECT_DOUBLE_EQ(N_eval(0, 0), 10.0);
     }
 }
@@ -199,14 +199,14 @@ template <typename Scalar> void test_extended_logic() {
 
     } else {
         // Symbolic checks
-        auto and_eval = eval_matrix(janus::to_mx(res_and));
+        auto and_eval = eval_matrix(res_and);
         EXPECT_NEAR(and_eval(0, 0), 1.0, 1e-9);
         EXPECT_NEAR(and_eval(0, 1), 0.0, 1e-9);
 
-        auto or_eval = eval_matrix(janus::to_mx(res_or));
+        auto or_eval = eval_matrix(res_or);
         EXPECT_NEAR(or_eval(0, 0), 1.0, 1e-9);
 
-        auto not_eval = eval_matrix(janus::to_mx(res_not));
+        auto not_eval = eval_matrix(res_not);
         EXPECT_NEAR(not_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(not_eval(0, 1), 1.0, 1e-9);
 
@@ -216,7 +216,7 @@ template <typename Scalar> void test_extended_logic() {
         auto any_val = eval_scalar(res_any);
         EXPECT_NEAR(any_val, 1.0, 1e-9);
 
-        auto clip_eval = eval_matrix(janus::to_mx(res_clip));
+        auto clip_eval = eval_matrix(res_clip);
         EXPECT_NEAR(clip_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(clip_eval(0, 1), 2.0, 1e-9);
 

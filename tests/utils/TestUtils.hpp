@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 #include <iostream>
+#include <janus/math/Linalg.hpp>
 #include <vector>
 
 // Helper to evaluate 0-argument CasADi MX to double
@@ -31,3 +32,20 @@ inline Eigen::MatrixXd eval_matrix(const casadi::MX &x) {
     }
     return mat;
 }
+
+// Overload for Eigen matrix of MX
+template <typename Derived>
+inline Eigen::MatrixXd eval_matrix(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return eval_matrix(janus::to_mx(x));
+    } else if constexpr (std::is_arithmetic_v<Scalar>) {
+        return x.template cast<double>();
+    } else {
+        // Fallback or error
+        return eval_matrix(janus::to_mx(x));
+    }
+}
+
+// Overload for scalar MX in eval_scalar just in case
+inline double eval_scalar(const double &x) { return x; }
