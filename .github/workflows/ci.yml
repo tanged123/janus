@@ -1,6 +1,6 @@
 name: Janus CI
 
-on: [push, pull_request]
+on: push
 
 jobs:
   build-and-test:
