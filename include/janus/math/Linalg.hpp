@@ -44,6 +44,28 @@ inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const 
     return e;
 }
 
+/**
+ * @brief Convert CasADi MX vector to SymbolicVector (Eigen container of MX)
+ *
+ * This unpacks a CasADi MX (which internally represents a vector) into an
+ * Eigen container where each element is an individual MX scalar.
+ * Useful for passing symbolic vectors to templated functions that expect
+ * JanusVector<Scalar> types.
+ *
+ * @param m Input CasADi MX (column vector)
+ * @return SymbolicVector (Eigen::Matrix<casadi::MX, Dynamic, 1>)
+ */
+inline SymbolicVector as_vector(const casadi::MX &m) {
+    SymbolicVector v(m.size1());
+    for (int i = 0; i < m.size1(); ++i) {
+        v(i) = m(i);
+    }
+    return v;
+}
+
+// Backwards compatibility alias
+inline SymbolicVector to_eigen_vec(const casadi::MX &m) { return as_vector(m); }
+
 // --- solve(A, b) ---
 /**
  * @brief Solves linear system Ax = b

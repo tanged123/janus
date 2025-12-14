@@ -60,11 +60,8 @@ TEST(IntegrateSymbolic, QuadBasic) {
 
     auto result = janus::quad(expr, x, 0.0, 1.0);
 
-    // Evaluate the symbolic result
-    casadi::Function f("f", std::vector<casadi::MX>{}, std::vector<casadi::MX>{result.value});
-    auto res = f(std::vector<casadi::DM>{});
-    double val = static_cast<double>(res[0]);
-
+    // Use janus::eval for clean evaluation
+    double val = janus::eval(result.value);
     EXPECT_NEAR(val, 0.5, 1e-6);
 }
 
@@ -75,15 +72,13 @@ TEST(IntegrateSymbolic, QuadSquare) {
 
     auto result = janus::quad(expr, x, 0.0, 1.0);
 
-    casadi::Function f("f", std::vector<casadi::MX>{}, std::vector<casadi::MX>{result.value});
-    auto res = f(std::vector<casadi::DM>{});
-    double val = static_cast<double>(res[0]);
-
+    // Use janus::eval for clean evaluation
+    double val = janus::eval(result.value);
     EXPECT_NEAR(val, 1.0 / 3.0, 1e-6);
 }
 
 // ============================================================================
-// Tests for solve_ivp (numeric)
+// Tests for solve_ivp (numeric) - Using Janus native types
 // ============================================================================
 
 TEST(Integrate, SolveIvpExponentialDecay) {
@@ -92,9 +87,11 @@ TEST(Integrate, SolveIvpExponentialDecay) {
     double lambda = 0.5;
     double y0_val = 2.5;
 
+    // Use initializer list for clean API
     auto sol =
-        janus::solve_ivp([lambda](double t, const Eigen::VectorXd &y) { return -lambda * y; },
-                         {0.0, 4.0}, Eigen::VectorXd::Constant(1, y0_val), 50);
+        janus::solve_ivp([lambda](double t, const janus::NumericVector &y) { return -lambda * y; },
+                         {0.0, 4.0}, {y0_val}, // initializer list syntax
+                         50);
 
     EXPECT_TRUE(sol.success);
     EXPECT_EQ(sol.t.size(), 50);
@@ -116,18 +113,16 @@ TEST(Integrate, SolveIvpHarmonicOscillator) {
     // y(0) = 1, v(0) = 0  =>  y(t) = cos(ωt)
     double omega = 2.0;
 
-    Eigen::VectorXd y0(2);
-    y0 << 1.0, 0.0; // y=1, v=0
-
+    // Use initializer list for multi-state initial condition
     auto sol = janus::solve_ivp(
-        [omega](double t, const Eigen::VectorXd &state) {
-            Eigen::VectorXd dydt(2);
-            dydt(0) = state(1);                  // dy/dt = v
-            dydt(1) = -omega * omega * state(0); // dv/dt = -ω²y
+        [omega](double t, const janus::NumericVector &state) {
+            janus::NumericVector dydt(2);
+            dydt << state(1), -omega * omega * state(0);
             return dydt;
         },
         {0.0, M_PI / omega}, // One half period
-        y0, 100);
+        {1.0, 0.0},          // y=1, v=0 as initializer list
+        100);
 
     EXPECT_TRUE(sol.success);
 
@@ -146,10 +141,12 @@ TEST(Integrate, SolveIvpLogistic) {
     double y0_val = 0.1;
 
     auto sol = janus::solve_ivp(
-        [r, K](double t, const Eigen::VectorXd &y) {
-            return Eigen::VectorXd::Constant(1, r * y(0) * (1 - y(0) / K));
+        [r, K](double t, const janus::NumericVector &y) {
+            janus::NumericVector dydt(1);
+            dydt << r * y(0) * (1 - y(0) / K);
+            return dydt;
         },
-        {0.0, 10.0}, Eigen::VectorXd::Constant(1, y0_val), 100);
+        {0.0, 10.0}, {y0_val}, 100);
 
     EXPECT_TRUE(sol.success);
 
@@ -167,11 +164,12 @@ TEST(IntegrateSymbolic, SolveIvpExprExponential) {
     double lambda = 0.5;
     double y0_val = 2.5;
 
-    auto t = casadi::MX::sym("t");
-    auto y = casadi::MX::sym("y");
-    casadi::MX ode = -lambda * y;
+    auto t = janus::sym("t");
+    auto y = janus::sym("y");
+    auto ode = -lambda * y;
 
-    Eigen::VectorXd y0(1);
+    // Use NumericVector
+    janus::NumericVector y0(1);
     y0(0) = y0_val;
 
     auto sol = janus::solve_ivp_expr(ode, t, y, {0.0, 4.0}, y0, 50);
@@ -188,14 +186,15 @@ TEST(IntegrateSymbolic, SolveIvpExprOscillator) {
     // y'' = -ω²y  =>  y' = v, v' = -ω²y
     double omega = 2.0;
 
-    auto t = casadi::MX::sym("t");
-    auto state = casadi::MX::sym("state", 2); // [y, v]
+    auto t = janus::sym("t");
+    auto state = janus::sym("state", 2); // [y, v]
 
-    casadi::MX ode = casadi::MX(2, 1);
-    ode(0) = state(1);                  // dy/dt = v
-    ode(1) = -omega * omega * state(0); // dv/dt = -ω²y
+    janus::SymbolicScalar ode_y = state(1);                  // dy/dt = v
+    janus::SymbolicScalar ode_v = -omega * omega * state(0); // dv/dt = -ω²y
 
-    Eigen::VectorXd y0(2);
+    casadi::MX ode = casadi::MX::vertcat({ode_y, ode_v});
+
+    janus::NumericVector y0(2);
     y0 << 1.0, 0.0;
 
     auto sol = janus::solve_ivp_expr(ode, t, state, {0.0, M_PI / omega}, y0, 100);
@@ -223,9 +222,9 @@ TEST(Integrate, QuadNegativeInterval) {
 }
 
 TEST(Integrate, SolveIvpSingleStep) {
-    // Minimal case: 2 output points
-    auto sol = janus::solve_ivp([](double t, const Eigen::VectorXd &y) { return -y; }, {0.0, 1.0},
-                                Eigen::VectorXd::Constant(1, 1.0), 2);
+    // Minimal case: 2 output points using initializer list
+    auto sol = janus::solve_ivp([](double t, const janus::NumericVector &y) { return -y; },
+                                {0.0, 1.0}, {1.0}, 2);
 
     EXPECT_TRUE(sol.success);
     EXPECT_EQ(sol.t.size(), 2);

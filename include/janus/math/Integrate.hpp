@@ -210,10 +210,6 @@ inline QuadResult<SymbolicScalar> quad(const SymbolicScalar &expr, const Symboli
     return result;
 }
 
-// ============================================================================
-// solve_ivp: Initial Value Problem
-// ============================================================================
-
 /**
  * @brief Solve initial value problem: dy/dt = f(t, y), y(t0) = y0
  *
@@ -221,27 +217,40 @@ inline QuadResult<SymbolicScalar> quad(const SymbolicScalar &expr, const Symboli
  * Symbolic backend uses CasADi CVODES for automatic differentiation through the ODE.
  *
  * @tparam Func Callable type f(t, y) -> dy/dt
- * @tparam Scalar Scalar type (double or casadi::MX)
- * @param fun Right-hand side function f(t, y)
+ * @param fun Right-hand side function f(t, y) returning derivative
  * @param t_span Integration interval (t0, tf)
- * @param y0 Initial state vector
+ * @param y0 Initial state vector (NumericVector or initializer list)
  * @param n_eval Number of output points (default 100)
  * @param abstol Absolute tolerance
  * @param reltol Relative tolerance
- * @return OdeResult<Scalar> with time points and solution
+ * @return OdeResult<double> with time points and solution
  *
  * @code
- * // Exponential decay: dy/dt = -0.5*y
+ * // Simple exponential decay: dy/dt = -0.5*y
  * auto sol = janus::solve_ivp(
- *     [](double t, const Eigen::VectorXd& y) { return -0.5 * y; },
+ *     [](double t, const janus::NumericVector& y) { return -0.5 * y; },
  *     {0.0, 10.0},  // t_span
- *     Eigen::VectorXd::Constant(1, 2.5),  // y0
- *     100  // n_eval
+ *     {2.5},        // y0 as initializer list
+ *     100           // n_eval
+ * );
+ *
+ * // Multi-state ODE (harmonic oscillator):
+ * // dy/dt = v, dv/dt = -ω²y
+ * double omega = 2.0;
+ * auto sol = janus::solve_ivp(
+ *     [omega](double t, const janus::NumericVector& state) {
+ *         janus::NumericVector dydt(2);
+ *         dydt << state(1), -omega * omega * state(0);
+ *         return dydt;
+ *     },
+ *     {0.0, M_PI / omega},
+ *     {1.0, 0.0},  // y=1, v=0
+ *     100
  * );
  * @endcode
  */
 template <typename Func>
-OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const Eigen::VectorXd &y0,
+OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const NumericVector &y0,
                             int n_eval = 100, double abstol = 1e-8, double reltol = 1e-6) {
     double t0 = t_span.first;
     double tf = t_span.second;
@@ -258,7 +267,7 @@ OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const 
     // Substeps per output interval for accuracy
     int substeps = std::max(1, static_cast<int>(std::ceil(1.0 / std::sqrt(reltol))));
 
-    Eigen::VectorXd y = y0;
+    NumericVector y = y0;
 
     for (int i = 1; i < n_eval; ++i) {
         double t = result.t(i - 1);
@@ -266,10 +275,10 @@ OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const 
 
         for (int s = 0; s < substeps; ++s) {
             // RK4 step
-            Eigen::VectorXd k1 = fun(t, y);
-            Eigen::VectorXd k2 = fun(t + dt / 2, y + dt / 2 * k1);
-            Eigen::VectorXd k3 = fun(t + dt / 2, y + dt / 2 * k2);
-            Eigen::VectorXd k4 = fun(t + dt, y + dt * k3);
+            NumericVector k1 = fun(t, y);
+            NumericVector k2 = fun(t + dt / 2, y + dt / 2 * k1);
+            NumericVector k3 = fun(t + dt / 2, y + dt / 2 * k2);
+            NumericVector k4 = fun(t + dt, y + dt * k3);
 
             y = y + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4);
             t += dt;
@@ -283,6 +292,29 @@ OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const 
     result.status = 0;
 
     return result;
+}
+
+/**
+ * @brief Convenience overload: solve_ivp with initializer list for y0
+ *
+ * @code
+ * auto sol = janus::solve_ivp(
+ *     [](double t, const janus::NumericVector& y) { return -0.5 * y; },
+ *     {0.0, 10.0},
+ *     {2.5}  // Single-element initial state
+ * );
+ * @endcode
+ */
+template <typename Func>
+OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span,
+                            std::initializer_list<double> y0_init, int n_eval = 100,
+                            double abstol = 1e-8, double reltol = 1e-6) {
+    NumericVector y0(y0_init.size());
+    int idx = 0;
+    for (double val : y0_init) {
+        y0(idx++) = val;
+    }
+    return solve_ivp(std::forward<Func>(fun), t_span, y0, n_eval, abstol, reltol);
 }
 
 /**
@@ -404,7 +436,7 @@ OdeResult<SymbolicScalar> solve_ivp_symbolic(Func &&fun, std::pair<double, doubl
  */
 inline OdeResult<double> solve_ivp_expr(const casadi::MX &ode_expr, const casadi::MX &t_var,
                                         const casadi::MX &y_var, std::pair<double, double> t_span,
-                                        const Eigen::VectorXd &y0, int n_eval = 100,
+                                        const NumericVector &y0, int n_eval = 100,
                                         double abstol = 1e-8, double reltol = 1e-6) {
     double t0 = t_span.first;
     double tf = t_span.second;
