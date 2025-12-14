@@ -12,3 +12,6 @@ target_link_libraries(branching_logic PRIVATE janus)
 
 add_executable(loop_patterns loop_patterns.cpp)
 target_link_libraries(loop_patterns PRIVATE janus)
+
+add_executable(hybrid_sim hybrid_sim.cpp)
+target_link_libraries(hybrid_sim PRIVATE janus)
