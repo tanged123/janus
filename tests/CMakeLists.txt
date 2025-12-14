@@ -18,11 +18,12 @@ add_executable(test_math
     math/test_autodiff.cpp
     math/test_linalg.cpp
     math/test_interpolate.cpp
-    math/test_geometry.cpp
+    math/test_rotations.cpp
     math/test_surrogate.cpp
     math/test_finite_diff.cpp
     math/test_integrate_discrete.cpp
     math/test_integrate.cpp
+    math/test_spacing.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

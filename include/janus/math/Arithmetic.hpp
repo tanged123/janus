@@ -89,6 +89,20 @@ T pow(const T &base, double exponent) {
 }
 
 /**
+ * @brief Computes power function base^exponent for scalars (mixed types: double base)
+ * @tparam T Scalar type
+ * @param base Base value
+ * @param exponent Exponent value
+ * @return base raised to exponent
+ */
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
+T pow(double base, const T &exponent) {
+    // Cast base to T to match homogeneous overload
+    return janus::pow(static_cast<T>(base), exponent);
+}
+
+/**
  * @brief Computes power function element-wise for a matrix
  * @tparam Derived Eigen matrix type
  * @tparam Scalar Exponent type
@@ -149,6 +163,30 @@ template <JanusScalar T> T log(const T &x) {
  */
 template <typename Derived> auto log(const Eigen::MatrixBase<Derived> &x) {
     return x.array().log().matrix();
+}
+
+/**
+ * @brief Computes the base-10 logarithm of x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return Base-10 logarithm of x
+ */
+template <JanusScalar T> T log10(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::log10(x);
+    } else {
+        return log10(x);
+    }
+}
+
+/**
+ * @brief Computes base-10 logarithm element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of base-10 logarithms
+ */
+template <typename Derived> auto log10(const Eigen::MatrixBase<Derived> &x) {
+    return x.array().log10().matrix();
 }
 
 // --- Hyperbolic Functions ---

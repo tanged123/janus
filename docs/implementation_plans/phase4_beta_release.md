@@ -325,10 +325,10 @@ void visualize_graph(const Function& func, const std::string& output_base);
 - [x] **Task 1.6**: Write comprehensive tests (`test_integrate.cpp` - 22 tests passing)
 
 ### Milestone 2: Extended Spacing (Week 1)
-- [ ] **Task 2.1**: Add `sinspace` to `Spacing.hpp`
-- [ ] **Task 2.2**: Add `logspace` to `Spacing.hpp`
-- [ ] **Task 2.3**: Add `geomspace` to `Spacing.hpp`
-- [ ] **Task 2.4**: Write tests in `test_spacing.cpp`
+- [x] **Task 2.1**: Add `sinspace` to `Spacing.hpp`
+- [x] **Task 2.2**: Add `logspace` to `Spacing.hpp`
+- [x] **Task 2.3**: Add `geomspace` to `Spacing.hpp`
+- [x] **Task 2.4**: Write tests in `test_spacing.cpp`
 
 ### Milestone 3: Quaternion Math (Week 2)
 - [ ] **Task 3.1**: Create `Quaternion.hpp` with `Quaternion<T>` class

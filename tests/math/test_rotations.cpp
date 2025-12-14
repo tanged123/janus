@@ -3,31 +3,7 @@
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp> // to_mx
 #include <janus/math/Rotations.hpp>
-#include <janus/math/Spacing.hpp>
 #include <numbers>
-
-template <typename Scalar> void test_spacing() {
-    Scalar start = 0.0;
-    Scalar end = 10.0;
-    auto lin = janus::linspace(start, end, 5);
-    auto cos = janus::cosine_spacing(start, end, 5);
-
-    if constexpr (std::is_same_v<Scalar, double>) {
-        EXPECT_EQ(lin.size(), 5);
-        EXPECT_NEAR(lin(2), 5.0, 1e-9);
-        EXPECT_NEAR(lin(4), 10.0, 1e-9);
-
-        EXPECT_NEAR(cos(0), 0.0, 1e-9);
-    } else {
-        EXPECT_EQ(lin.size(), 5);
-        auto lin_eval = janus::eval(lin);
-        EXPECT_NEAR(lin_eval(2), 5.0, 1e-9);
-        EXPECT_NEAR(lin_eval(4), 10.0, 1e-9);
-
-        auto cos_eval = janus::eval(cos);
-        EXPECT_NEAR(cos_eval(0), 0.0, 1e-9);
-    }
-}
 
 template <typename Scalar> void test_rotations() {
     Scalar theta = std::numbers::pi_v<double> / 2.0;
@@ -97,10 +73,6 @@ template <typename Scalar> void test_rotations() {
     }
 }
 
-TEST(GeometryTests, SpacingNumeric) { test_spacing<double>(); }
+TEST(RotationsTests, RotationsNumeric) { test_rotations<double>(); }
 
-TEST(GeometryTests, SpacingSymbolic) { test_spacing<janus::SymbolicScalar>(); }
-
-TEST(GeometryTests, RotationsNumeric) { test_rotations<double>(); }
-
-TEST(GeometryTests, RotationsSymbolic) { test_rotations<janus::SymbolicScalar>(); }
+TEST(RotationsTests, RotationsSymbolic) { test_rotations<janus::SymbolicScalar>(); }
