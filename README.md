@@ -39,19 +39,25 @@ We provide shorthand scripts to streamline the workflow:
     ./scripts/test.sh
     ```
 
-3. **CI / Clean Verification**: Runs the full build and test pipeline inside the reproducible Nix environment (what CI does).
+3. **Clean**: Cleans out the build folder.
+
+    ```bash
+    ./scripts/clean.sh
+    ```
+
+4. **CI / Clean Verification**: Runs the full build and test pipeline inside the reproducible Nix environment (what CI does).
 
     ```bash
     ./scripts/ci.sh
     ```
     
-4. **Examples**: Runs the example simulations (`drag_coefficient`, `energy_intro`, `numeric_intro`).
+5. **Examples**: Runs all example simulations.
 
     ```bash
-    ./scripts/examples.sh
+    ./scripts/run_examples.sh
     ```
 
-5. **Full Verification**: Runs everything (Build + Test + Examples). This is the recommended pre-push check.
+6. **Full Verification**: Runs everything (Build + Test + Examples). This is the recommended pre-push check.
 
     ```bash
     ./scripts/verify.sh
@@ -125,17 +131,19 @@ janus/
 │   │   ├── JanusConcepts.hpp # Type concepts & constraints
 │   │   └── JanusTypes.hpp    # Matrix/Vector types
 │   └── math/           # Math & Numerics Layer
-│       ├── Arithmetic.hpp   # Core arithmetic (pow, exp, log...)
-│       ├── AutoDiff.hpp     # Automatic differentiation (jacobian)
-│       ├── Calculus.hpp     # Numerical calculus (diff, gradient, trapz)
-│       ├── DiffOps.hpp      # Legacy compatibility (→ Calculus + AutoDiff)
-│       ├── Interpolate.hpp  # Interpolation utilities
-│       ├── Linalg.hpp       # Linear algebra (to_mx, to_eigen, norm)
-│       ├── Logic.hpp        # Logical ops & branching (where, clip)
-│       ├── Rotations.hpp    # 2D/3D rotations (DCM)
-│       ├── Spacing.hpp      # Grid generation (linspace, logspace)
-│       ├── Trig.hpp         # Trigonometry (sin, cos, atan2...)
-│       └── JanusMath.hpp    # Master header (includes all math)
+│       ├── Arithmetic.hpp       # Core arithmetic (pow, exp, log...)
+│       ├── AutoDiff.hpp         # Automatic differentiation (jacobian)
+│       ├── Calculus.hpp         # Numerical calculus (diff, gradient, trapz)
+│       ├── FiniteDifference.hpp # Finite difference coefficients (Fornberg)
+│       ├── IntegrateDiscrete.hpp # Discrete integration (Simpson, curvature)
+│       ├── Interpolate.hpp      # Interpolation utilities
+│       ├── Linalg.hpp           # Linear algebra (to_mx, to_eigen, norm)
+│       ├── Logic.hpp            # Logical ops & branching (where, clip)
+│       ├── Rotations.hpp        # 2D/3D rotations, Euler angles
+│       ├── Spacing.hpp          # Grid generation (linspace, logspace)
+│       ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, blend, softmax)
+│       ├── Trig.hpp             # Trigonometry (sin, cos, atan2...)
+│       └── JanusMath.hpp        # Master header (includes all math)
 ├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
