@@ -210,6 +210,27 @@ integrate_discrete_intervals(const Eigen::MatrixBase<DerivedF> &f,
     } else if (m == "backward_simpson" || m == "simpson_backward") {
         avg_f = detail::integrate_backward_simpson(f, x);
         // remaining_endpoint_intervals = (1, 0)
+    } else if (m == "simpson") {
+        // Fused simpson: combines forward and backward with RMS fusion
+        if (n_points < 3) {
+            return integrate_discrete_intervals(f, x, multiply_by_dx, "trapezoidal",
+                                                method_endpoints);
+        }
+        auto res_fwd = detail::integrate_forward_simpson(f, x);
+        auto res_bwd = detail::integrate_backward_simpson(f, x);
+
+        auto first = detail::slice(res_fwd, 0, 1);
+        auto last = detail::slice(res_bwd, -1, res_bwd.size());
+
+        auto a = detail::slice(res_bwd, 0, -1);
+        auto b = detail::slice(res_fwd, 1, res_fwd.size());
+
+        // RMS fusion for middle intervals
+        auto mid_sq = (a.array().square() + b.array().square()) * 0.5 + 1e-100;
+        JanusVector<Scalar> mid = janus::sqrt(mid_sq.matrix());
+
+        auto tmp = detail::concatenate(first, mid);
+        avg_f = detail::concatenate(tmp, last);
     } else if (m.find("simpson") != std::string::npos && m != "simpson") {
         // Generic simpson check, but specific variants matched above
         throw std::invalid_argument("Invalid Simpson variant: " + method);

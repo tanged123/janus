@@ -30,12 +30,20 @@ echo "[4/5] Branching Logic"
 ./build/examples/branching_logic
 echo ""
 
-echo "[5/6] Loop Patterns"
+echo "[5/8] Loop Patterns"
 ./build/examples/loop_patterns
 echo ""
 
-echo "[6/6] Hybrid Simulation"
+echo "[6/8] Hybrid Simulation"
 ./build/examples/hybrid_sim
+echo ""
+
+echo "[7/8] Smooth Trajectory (Phase 3)"
+./build/examples/smooth_trajectory
+echo ""
+
+echo "[8/8] Aircraft Attitudes (Phase 3)"
+./build/examples/aircraft_attitudes
 echo ""
 
 echo "All examples ran successfully."

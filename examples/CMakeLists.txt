@@ -18,3 +18,10 @@ target_link_libraries(hybrid_sim PRIVATE janus)
 
 add_executable(print_example print_example.cpp)
 target_link_libraries(print_example PRIVATE janus)
+
+# Phase 3 Graduation Examples
+add_executable(smooth_trajectory smooth_trajectory.cpp)
+target_link_libraries(smooth_trajectory PRIVATE janus)
+
+add_executable(aircraft_attitudes aircraft_attitudes.cpp)
+target_link_libraries(aircraft_attitudes PRIVATE janus)
