@@ -14,6 +14,7 @@ add_executable(test_math
     math/test_arithmetic.cpp
     math/test_trig.cpp
     math/test_logic.cpp
+    math/test_calculus.cpp
     math/test_diffops.cpp
     math/test_linalg.cpp
     math/test_interpolate.cpp

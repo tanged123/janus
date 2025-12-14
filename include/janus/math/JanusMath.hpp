@@ -7,6 +7,8 @@
  */
 
 #include "janus/math/Arithmetic.hpp"
+#include "janus/math/AutoDiff.hpp"
+#include "janus/math/Calculus.hpp"
 #include "janus/math/DiffOps.hpp"
 #include "janus/math/Interpolate.hpp"
 #include "janus/math/Linalg.hpp"

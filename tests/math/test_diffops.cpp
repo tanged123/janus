@@ -1,11 +1,11 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
 #include <janus/core/JanusTypes.hpp>
-#include <janus/math/DiffOps.hpp>
+#include <janus/math/Calculus.hpp>
 #include <janus/math/Linalg.hpp> // needed for to_mx
 
 template <typename Scalar> void test_diffops() {
-    using Vector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+    using Vector = janus::JanusVector<Scalar>;
 
     // Test diff
     Vector v(4);
