@@ -96,7 +96,8 @@ int main() {
     // Create Callable Function (wraps CasADi)
     janus::Function f_grad({v_sym, m_sym}, {dE_dv});
     
-    auto result = f_grad(10.0, 2.0); // Evaluate derivatives numerically
+    // Evaluate derivatives numerically
+    auto dE_dv_result = f_grad.eval(10.0, 2.0); // Returns 1x1 matrix with dE/dv = m*v = 20
 }
 ```
 
@@ -112,17 +113,23 @@ janus/
 ├── examples/           # Example Implementations (numeric & symbolic)
 ├── include/janus/      # Core Library Headers
 │   ├── core/           # Concepts, Types & Function Wrapper
-│   ├── math/           # Math & Numerics Layer
-│   │   ├── Arithmetic.hpp   # Core arithmetic (pow, exp, log...)
-│   │   ├── Trig.hpp         # Trigonometry (sin, cos, atan2...)
-│   │   ├── Logic.hpp        # Branching (where) & sigmoids
-│   │   ├── Linalg.hpp       # Linear Algebra (solve, norm)
-│   │   ├── DiffOps.hpp      # Calculus (gradient, trapz)
-│   │   ├── Interpolate.hpp  # Interpolation utilities
-│   │   ├── Spacing.hpp      # Grid generation (linspace)
-│   │   └── Rotations.hpp    # 2D Rotations (DCM)
-│   └── linalg/         # Matrix extensions (future)
+│   │   ├── Function.hpp      # CasADi Function wrapper
+│   │   ├── JanusConcepts.hpp # Type concepts & constraints
+│   │   └── JanusTypes.hpp    # Matrix/Vector types
+│   └── math/           # Math & Numerics Layer
+│       ├── Arithmetic.hpp   # Core arithmetic (pow, exp, log...)
+│       ├── AutoDiff.hpp     # Automatic differentiation (jacobian)
+│       ├── Calculus.hpp     # Numerical calculus (diff, gradient, trapz)
+│       ├── DiffOps.hpp      # Legacy compatibility (→ Calculus + AutoDiff)
+│       ├── Interpolate.hpp  # Interpolation utilities
+│       ├── Linalg.hpp       # Linear algebra (to_mx, to_eigen, norm)
+│       ├── Logic.hpp        # Logical ops & branching (where, clip)
+│       ├── Rotations.hpp    # 2D/3D rotations (DCM)
+│       ├── Spacing.hpp      # Grid generation (linspace, logspace)
+│       ├── Trig.hpp         # Trigonometry (sin, cos, atan2...)
+│       └── JanusMath.hpp    # Master header (includes all math)
 ├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
 ```
+

@@ -28,9 +28,9 @@ int main() {
     janus::Function f_grad({v_sym, m_sym}, {dE_dv});
 
     // Evaluate derivatives numerically
-    auto result = f_grad(10.0, 2.0);
+    auto dE_dv_result = f_grad.eval(10.0, 2.0);
 
-    std::cout << "Symbolic dE/dv (evaluated at v=10, m=2): " << result[0] << "\n";
+    std::cout << "Symbolic dE/dv (evaluated at v=10, m=2): " << dE_dv_result(0, 0) << "\n";
     std::cout << "Analytic Check (m*v): " << 2.0 * 10.0 << "\n";
 
     return 0;
