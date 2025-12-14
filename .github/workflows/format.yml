@@ -14,7 +14,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          if ! nix fmt -- --check --fail-on-change; then
+          if ! nix fmt -- --fail-on-change; then
             echo ""
             echo "❌ Code is not formatted correctly!"
             echo "💡 Run 'nix fmt' locally to fix formatting"
