@@ -140,9 +140,18 @@ int main() {
     // =========================================================================
     std::cout << "\n--- ODE Integration (solve_ivp) ---" << std::endl;
 
-    double theta_start = 0.1;
-    double theta_end = M_PI / 2 - 0.1;
-    double T_total = 1.0;
+    // Problem: Bead slides from (x=0, y=10) towards (x=10, y=5)
+    // Drop of 5 meters, horizontal distance of 10 meters
+    std::cout << "Problem: Start at (0, 10), target (10, 5)" << std::endl;
+    std::cout << "Drop: 5m, Horizontal: 10m" << std::endl;
+
+    double theta_start = 0.3;           // Start fairly steep (closer to vertical)
+    double theta_end = M_PI / 2 - 0.05; // End nearly horizontal
+    double T_total = 2.0;               // Longer time for the larger distance
+
+    // Initial state: x=0, y=10, v=0.01 (small initial velocity to avoid singularity)
+    janus::NumericVector y0(3);
+    y0 << 0.0, 10.0, 0.01;
 
     // ODE wrapper for solve_ivp (includes time-varying theta)
     auto ode_with_control = [=](double t, const janus::NumericVector &y) {
@@ -150,15 +159,15 @@ int main() {
         return brachistochrone_ode(y, theta_t);
     };
 
-    auto sol = janus::solve_ivp(ode_with_control, {0.0, T_total}, {0.0, 0.0, 0.01}, 100);
+    auto sol = janus::solve_ivp(ode_with_control, {0.0, T_total}, y0, 100);
 
-    std::cout << "Trajectory with θ(t) from " << theta_start * 180 / M_PI << "° to "
+    std::cout << "\nTrajectory with θ(t) from " << theta_start * 180 / M_PI << "° to "
               << theta_end * 180 / M_PI << "°:" << std::endl;
     std::cout << std::setw(8) << "t" << std::setw(10) << "x" << std::setw(10) << "y"
               << std::setw(10) << "v" << std::endl;
     std::cout << std::string(38, '-') << std::endl;
 
-    for (int i = 0; i < sol.y.cols(); i += 20) {
+    for (int i = 0; i < sol.y.cols(); i += 10) {
         std::cout << std::fixed << std::setprecision(3);
         std::cout << std::setw(8) << sol.t(i) << std::setw(10) << sol.y(0, i) << std::setw(10)
                   << sol.y(1, i) << std::setw(10) << sol.y(2, i) << std::endl;
