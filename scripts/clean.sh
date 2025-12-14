@@ -14,11 +14,3 @@ if [ -d "$BUILD_DIR" ]; then
 else
     echo "Build directory does not exist: $BUILD_DIR"
 fi
-
-if [ -d "$LOGS_DIR" ]; then
-    echo "Cleaning logs directory: $LOGS_DIR"
-    rm -rf "$LOGS_DIR"
-    echo "Done."
-else
-    echo "Logs directory does not exist: $LOGS_DIR"
-fi

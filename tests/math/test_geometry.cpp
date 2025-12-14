@@ -20,11 +20,11 @@ template <typename Scalar> void test_spacing() {
         EXPECT_NEAR(cos(0), 0.0, 1e-9);
     } else {
         EXPECT_EQ(lin.size(), 5);
-        auto lin_eval = eval_matrix(janus::to_mx(lin));
+        auto lin_eval = janus::eval(lin);
         EXPECT_NEAR(lin_eval(2), 5.0, 1e-9);
         EXPECT_NEAR(lin_eval(4), 10.0, 1e-9);
 
-        auto cos_eval = eval_matrix(janus::to_mx(cos));
+        auto cos_eval = janus::eval(cos);
         EXPECT_NEAR(cos_eval(0), 0.0, 1e-9);
     }
 }
@@ -44,11 +44,11 @@ template <typename Scalar> void test_rotations() {
         EXPECT_NEAR(R3(0, 1), -1.0, 1e-9);
         EXPECT_NEAR(R3(2, 2), 1.0, 1e-9);
     } else {
-        auto R2_eval = eval_matrix(janus::to_mx(R2));
+        auto R2_eval = janus::eval(R2);
         EXPECT_NEAR(R2_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(R2_eval(0, 1), -1.0, 1e-9);
 
-        auto R3_eval = eval_matrix(janus::to_mx(R3));
+        auto R3_eval = janus::eval(R3);
         EXPECT_NEAR(R3_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(R3_eval(0, 1), -1.0, 1e-9);
         EXPECT_NEAR(R3_eval(2, 2), 1.0, 1e-9);

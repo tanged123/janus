@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 

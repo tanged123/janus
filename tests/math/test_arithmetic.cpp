@@ -50,25 +50,25 @@ template <typename Scalar> void test_arithmetic_ops() {
         EXPECT_NEAR(res_mod, 1.3, 1e-9);
     } else {
         EXPECT_FALSE(res_abs.is_empty());
-        EXPECT_DOUBLE_EQ(eval_scalar(res_abs), 4.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_abs), 4.0);
 
         EXPECT_FALSE(res_sqrt.is_empty());
-        EXPECT_DOUBLE_EQ(eval_scalar(res_sqrt), 4.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_sqrt), 4.0);
 
         EXPECT_FALSE(res_pow.is_empty());
-        EXPECT_DOUBLE_EQ(eval_scalar(res_pow), 8.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_pow_double), 8.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_pow), 8.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_pow_double), 8.0);
 
-        EXPECT_NEAR(eval_scalar(res_sinh), std::sinh(1.0), 1e-9);
-        EXPECT_NEAR(eval_scalar(res_cosh), std::cosh(1.0), 1e-9);
-        EXPECT_NEAR(eval_scalar(res_tanh), std::tanh(1.0), 1e-9);
+        EXPECT_NEAR(janus::eval(res_sinh), std::sinh(1.0), 1e-9);
+        EXPECT_NEAR(janus::eval(res_cosh), std::cosh(1.0), 1e-9);
+        EXPECT_NEAR(janus::eval(res_tanh), std::tanh(1.0), 1e-9);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(res_floor), 2.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_ceil), 3.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_sign_neg), -1.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_sign_pos), 1.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_floor), 2.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_ceil), 3.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_sign_neg), -1.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_sign_pos), 1.0);
 
-        EXPECT_NEAR(eval_scalar(res_mod), 1.3, 1e-9);
+        EXPECT_NEAR(janus::eval(res_mod), 1.3, 1e-9);
     }
 }
 

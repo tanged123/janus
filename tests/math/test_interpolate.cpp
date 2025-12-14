@@ -27,9 +27,9 @@ template <typename Scalar> void test_interpolate() {
         EXPECT_DOUBLE_EQ(res_right, 5.0);
         EXPECT_DOUBLE_EQ(res_extrap, -10.0);
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(res_mid), 5.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_right), 5.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_extrap), -10.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_mid), 5.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_right), 5.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_extrap), -10.0);
     }
 }
 

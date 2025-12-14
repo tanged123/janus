@@ -34,12 +34,12 @@ template <typename Scalar> void test_logic_ops() {
         EXPECT_NEAR(blend_low, 10.0, 1e-3);
         EXPECT_NEAR(blend_high, 20.0, 1e-3);
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(res_where), 1.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_min), 1.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_max), 2.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(res_clamp), 3.0);
-        EXPECT_NEAR(eval_scalar(blend_low), 10.0, 1e-3);
-        EXPECT_NEAR(eval_scalar(blend_high), 20.0, 1e-3);
+        EXPECT_DOUBLE_EQ(janus::eval(res_where), 1.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_min), 1.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_max), 2.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_clamp), 3.0);
+        EXPECT_NEAR(janus::eval(blend_low), 10.0, 1e-3);
+        EXPECT_NEAR(janus::eval(blend_high), 20.0, 1e-3);
     }
 }
 
@@ -115,27 +115,27 @@ template <typename Scalar> void test_logic_matrix() {
         // neq: All true
         EXPECT_DOUBLE_EQ(check_neq(0, 0), 10.0);
     } else {
-        auto M_eval = eval_matrix(M);
+        auto M_eval = janus::eval(M);
         EXPECT_DOUBLE_EQ(M_eval(0, 0), 1.0);
         EXPECT_DOUBLE_EQ(M_eval(0, 1), 2.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 0), 1.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 1), 5.0);
 
-        auto W_eval = eval_matrix(where_mat);
+        auto W_eval = janus::eval(where_mat);
         EXPECT_DOUBLE_EQ(W_eval(0, 1), 2.0);
 
-        auto G_eval = eval_matrix(check_gt);
+        auto G_eval = janus::eval(check_gt);
         EXPECT_DOUBLE_EQ(G_eval(0, 0), -10.0);
         EXPECT_DOUBLE_EQ(G_eval(0, 1), 10.0);
 
-        auto L_eval = eval_matrix(check_le);
+        auto L_eval = janus::eval(check_le);
         EXPECT_DOUBLE_EQ(L_eval(0, 0), 10.0);
         EXPECT_DOUBLE_EQ(L_eval(0, 1), -10.0);
 
-        auto E_eval = eval_matrix(check_eq);
+        auto E_eval = janus::eval(check_eq);
         EXPECT_DOUBLE_EQ(E_eval(0, 0), 10.0);
 
-        auto N_eval = eval_matrix(check_neq);
+        auto N_eval = janus::eval(check_neq);
         EXPECT_DOUBLE_EQ(N_eval(0, 0), 10.0);
     }
 }
@@ -199,33 +199,33 @@ template <typename Scalar> void test_extended_logic() {
 
     } else {
         // Symbolic checks
-        auto and_eval = eval_matrix(res_and);
+        auto and_eval = janus::eval(res_and);
         EXPECT_NEAR(and_eval(0, 0), 1.0, 1e-9);
         EXPECT_NEAR(and_eval(0, 1), 0.0, 1e-9);
 
-        auto or_eval = eval_matrix(res_or);
+        auto or_eval = janus::eval(res_or);
         EXPECT_NEAR(or_eval(0, 0), 1.0, 1e-9);
 
-        auto not_eval = eval_matrix(res_not);
+        auto not_eval = janus::eval(res_not);
         EXPECT_NEAR(not_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(not_eval(0, 1), 1.0, 1e-9);
 
-        auto all_val = eval_scalar(res_all);
+        auto all_val = janus::eval(res_all);
         EXPECT_NEAR(all_val, 0.0, 1e-9);
 
-        auto any_val = eval_scalar(res_any);
+        auto any_val = janus::eval(res_any);
         EXPECT_NEAR(any_val, 1.0, 1e-9);
 
-        auto clip_eval = eval_matrix(res_clip);
+        auto clip_eval = janus::eval(res_clip);
         EXPECT_NEAR(clip_eval(0, 0), 0.0, 1e-9);
         EXPECT_NEAR(clip_eval(0, 1), 2.0, 1e-9);
 
         // Scalar Logic
         EXPECT_NEAR(
-            eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(1.0))),
+            janus::eval(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(1.0))),
             1.0, 1e-9);
         EXPECT_NEAR(
-            eval_scalar(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(0.0))),
+            janus::eval(janus::logical_and(janus::SymbolicScalar(1.0), janus::SymbolicScalar(0.0))),
             0.0, 1e-9);
     }
 }
@@ -254,7 +254,7 @@ template <typename Scalar> void test_select() {
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(result1, 2.0); // 10 <= 15 < 20
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(result1), 2.0);
+        EXPECT_DOUBLE_EQ(janus::eval(result1), 2.0);
     }
 
     // Test 2: First condition matches
@@ -265,7 +265,7 @@ template <typename Scalar> void test_select() {
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(result2, 100.0);
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(result2), 100.0);
+        EXPECT_DOUBLE_EQ(janus::eval(result2), 100.0);
     }
 
     // Test 3: Default value (no condition matches)
@@ -276,7 +276,7 @@ template <typename Scalar> void test_select() {
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(result3, 99.0); // Default
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(result3), 99.0);
+        EXPECT_DOUBLE_EQ(janus::eval(result3), 99.0);
     }
 
     // Test 4: Single condition
@@ -286,7 +286,7 @@ template <typename Scalar> void test_select() {
     if constexpr (std::is_same_v<Scalar, double>) {
         EXPECT_DOUBLE_EQ(result4, 42.0);
     } else {
-        EXPECT_DOUBLE_EQ(eval_scalar(result4), 42.0);
+        EXPECT_DOUBLE_EQ(janus::eval(result4), 42.0);
     }
 }
 

@@ -30,14 +30,14 @@ template <typename Scalar> void test_trig_ops() {
         EXPECT_NEAR(at, 0.0, 1e-9);
         EXPECT_NEAR(at2, pi / 4.0, 1e-9);
     } else {
-        EXPECT_NEAR(eval_scalar(s), 0.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(c), 1.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(t), 0.0, 1e-9);
+        EXPECT_NEAR(janus::eval(s), 0.0, 1e-9);
+        EXPECT_NEAR(janus::eval(c), 1.0, 1e-9);
+        EXPECT_NEAR(janus::eval(t), 0.0, 1e-9);
 
-        EXPECT_NEAR(eval_scalar(as), std::numbers::pi_v<double> / 2.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(ac), 0.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(at), 0.0, 1e-9);
-        EXPECT_NEAR(eval_scalar(at2), std::numbers::pi_v<double> / 4.0, 1e-9);
+        EXPECT_NEAR(janus::eval(as), std::numbers::pi_v<double> / 2.0, 1e-9);
+        EXPECT_NEAR(janus::eval(ac), 0.0, 1e-9);
+        EXPECT_NEAR(janus::eval(at), 0.0, 1e-9);
+        EXPECT_NEAR(janus::eval(at2), std::numbers::pi_v<double> / 4.0, 1e-9);
     }
 }
 

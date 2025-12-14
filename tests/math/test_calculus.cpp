@@ -21,7 +21,7 @@ template <typename Scalar> void test_gradient_uniform() {
             EXPECT_NEAR(grad(i), 2.0, 1e-10);
         }
     } else {
-        auto grad_eval = eval_matrix(janus::to_mx(grad));
+        auto grad_eval = janus::eval(grad);
         for (int i = 0; i < grad_eval.size(); ++i) {
             EXPECT_NEAR(grad_eval(i), 2.0, 1e-9);
         }
@@ -48,8 +48,8 @@ template <typename Scalar> void test_gradient_quadratic() {
             EXPECT_NEAR(grad(i), expected(i), 1e-10);
         }
     } else {
-        auto grad_eval = eval_matrix(janus::to_mx(grad));
-        auto expected_eval = eval_matrix(janus::to_mx(expected));
+        auto grad_eval = janus::eval(grad);
+        auto expected_eval = janus::eval(expected);
         for (int i = 0; i < grad_eval.size(); ++i) {
             EXPECT_NEAR(grad_eval(i), expected_eval(i), 1e-9);
         }
@@ -74,7 +74,7 @@ template <typename Scalar> void test_gradient_second_derivative() {
             EXPECT_NEAR(grad2(i), 2.0, 1e-10);
         }
     } else {
-        auto grad2_eval = eval_matrix(janus::to_mx(grad2));
+        auto grad2_eval = janus::eval(grad2);
         for (int i = 0; i < grad2_eval.size(); ++i) {
             EXPECT_NEAR(grad2_eval(i), 2.0, 1e-9);
         }
@@ -98,8 +98,8 @@ template <typename Scalar> void test_gradient_nonuniform() {
             EXPECT_NEAR(grad(i), expected(i), 1e-8);
         }
     } else {
-        auto grad_eval = eval_matrix(janus::to_mx(grad));
-        auto expected_eval = eval_matrix(janus::to_mx(expected));
+        auto grad_eval = janus::eval(grad);
+        auto expected_eval = janus::eval(expected);
         for (int i = 0; i < grad_eval.size(); ++i) {
             EXPECT_NEAR(grad_eval(i), expected_eval(i), 1e-8);
         }
@@ -130,8 +130,8 @@ template <typename Scalar> void test_gradient_cubic() {
         EXPECT_NEAR(grad(0), expected(0), 5.0);
         EXPECT_NEAR(grad(8), expected(8), 5.0);
     } else {
-        auto grad_eval = eval_matrix(janus::to_mx(grad));
-        auto expected_eval = eval_matrix(janus::to_mx(expected));
+        auto grad_eval = janus::eval(grad);
+        auto expected_eval = janus::eval(expected);
         for (int i = 1; i < grad_eval.size() - 1; ++i) {
             EXPECT_NEAR(grad_eval(i), expected_eval(i), 2.0);
         }
@@ -152,7 +152,7 @@ template <typename Scalar> void test_gradient_edge_cases() {
         EXPECT_NEAR(grad2(0), 3.0, 1e-10);
         EXPECT_NEAR(grad2(1), 3.0, 1e-10);
     } else {
-        auto grad2_eval = eval_matrix(janus::to_mx(grad2));
+        auto grad2_eval = janus::eval(grad2);
         EXPECT_NEAR(grad2_eval(0), 3.0, 1e-9);
         EXPECT_NEAR(grad2_eval(1), 3.0, 1e-9);
     }
@@ -223,13 +223,13 @@ template <typename Scalar> void test_diff_trapz_gradient1d() {
         EXPECT_DOUBLE_EQ(res_grad(2), 4.0);
     } else {
         EXPECT_EQ(res_diff.size(), 3);
-        auto res_diff_eval = eval_matrix(janus::to_mx(res_diff));
+        auto res_diff_eval = janus::eval(res_diff);
         EXPECT_DOUBLE_EQ(res_diff_eval(0), 1.0);
         EXPECT_DOUBLE_EQ(res_diff_eval(1), 3.0);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(res_trapz), 1.0);
+        EXPECT_DOUBLE_EQ(janus::eval(res_trapz), 1.0);
 
-        auto res_grad_eval = eval_matrix(janus::to_mx(res_grad));
+        auto res_grad_eval = janus::eval(res_grad);
         EXPECT_DOUBLE_EQ(res_grad_eval(1), 2.0);
         EXPECT_DOUBLE_EQ(res_grad_eval(2), 4.0);
     }

@@ -1,6 +1,34 @@
 #pragma once
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
+#include <iostream>
+#include <limits>
+
+namespace Eigen {
+/**
+ * @brief NumTraits specialization for casadi::MX
+ * Required for Eigen's operator<< and other scalar-dependent operations.
+ */
+template <> struct NumTraits<casadi::MX> : GenericNumTraits<casadi::MX> {
+    enum {
+        IsComplex = 0,
+        IsInteger = 0,
+        IsSigned = 1,
+        RequireInitialization = 1,
+        ReadCost = 1,
+        AddCost = 1,
+        MulCost = 1
+    };
+
+    static inline int digits10() { return std::numeric_limits<double>::digits10; }
+    static inline int min_exponent() { return std::numeric_limits<double>::min_exponent; }
+    static inline int max_exponent() { return std::numeric_limits<double>::max_exponent; }
+    static inline casadi::MX epsilon() { return std::numeric_limits<double>::epsilon(); }
+    static inline casadi::MX dummy_precision() { return 1e-5; }
+    static inline casadi::MX highest() { return std::numeric_limits<double>::max(); }
+    static inline casadi::MX lowest() { return std::numeric_limits<double>::lowest(); }
+};
+} // namespace Eigen
 
 namespace janus {
 

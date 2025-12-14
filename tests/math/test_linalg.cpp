@@ -1,5 +1,6 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
+#include <janus/core/JanusIO.hpp>
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp>
 
@@ -94,41 +95,38 @@ template <typename Scalar> void test_linalg_ops() {
         EXPECT_NEAR(A_det, 3.0, 1e-9);
         EXPECT_NEAR(A_inv(0, 0), 2.0 / 3.0, 1e-9);
     } else {
-        auto x_eval = eval_matrix(x);
+        auto x_eval = janus::eval(x);
         EXPECT_NEAR(x_eval(0), 1.0, 1e-6);
         EXPECT_NEAR(x_eval(1), 1.0, 1e-6);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(n), 5.0);
+        EXPECT_DOUBLE_EQ(janus::eval(n), 5.0);
 
-        auto M_eval = eval_matrix(M);
+        auto M_eval = janus::eval(M);
         EXPECT_DOUBLE_EQ(M_eval(0, 0), 3.0);
         EXPECT_DOUBLE_EQ(M_eval(1, 1), 8.0);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(d), 25.0);
+        EXPECT_DOUBLE_EQ(janus::eval(d), 25.0);
 
-        auto c3_eval = eval_matrix(c3);
+        auto c3_eval = janus::eval(c3);
         EXPECT_NEAR(c3_eval(0), 0.0, 1e-9);
         EXPECT_NEAR(c3_eval(1), 0.0, 1e-9);
         EXPECT_NEAR(c3_eval(2), 1.0, 1e-9);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(i_prod), 25.0);
+        EXPECT_DOUBLE_EQ(janus::eval(i_prod), 25.0);
 
         // Pinv test symbolic
-        // Try on Invertible A first (pinv(A) should be inv(A))
         auto A_pinv_inv = janus::pinv(A);
-        auto A_pinv_eval = eval_matrix(A_pinv_inv);
-
-        // Compare with A_inv_eval (which was tested implicitly via inv numeric check, let's just
-        // check valid) A_inv is [[2/3, -1/3], [-1/3, 2/3]]
+        auto A_pinv_eval = janus::eval(A_pinv_inv);
         EXPECT_NEAR(A_pinv_eval(0, 0), 2.0 / 3.0, 1e-6);
 
-        EXPECT_DOUBLE_EQ(eval_scalar(n_1), 6.0);
-        EXPECT_DOUBLE_EQ(eval_scalar(n_inf), 3.0);
+        EXPECT_DOUBLE_EQ(janus::eval(n_1), 6.0);
+        EXPECT_DOUBLE_EQ(janus::eval(n_inf), 3.0);
 
-        // Skip symbolic det eval if unsupported
-        // EXPECT_NEAR(eval_scalar(A_det), 3.0, 1e-9);
-
-        auto A_inv_eval = eval_matrix(A_inv);
+        auto A_inv_eval = janus::eval(A_inv);
+        if (std::abs(A_inv_eval(0, 0) - (2.0 / 3.0)) > 1e-9) {
+            janus::print("A_inv (Symbolic)", A_inv);
+            janus::print("A_inv (Evaluated)", A_inv_eval);
+        }
         EXPECT_NEAR(A_inv_eval(0, 0), 2.0 / 3.0, 1e-9);
     }
 }
