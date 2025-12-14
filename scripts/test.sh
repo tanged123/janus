@@ -11,4 +11,5 @@ fi
 ninja -C build
 
 # Run tests
-ctest --test-dir build --output-on-failure
+mkdir -p logs
+ctest --test-dir build -VV 2>&1 | tee logs/tests.log
