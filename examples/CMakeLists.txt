@@ -9,3 +9,6 @@ target_link_libraries(numeric_intro PRIVATE janus)
 
 add_executable(branching_logic branching_logic.cpp)
 target_link_libraries(branching_logic PRIVATE janus)
+
+add_executable(loop_patterns loop_patterns.cpp)
+target_link_libraries(loop_patterns PRIVATE janus)
