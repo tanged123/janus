@@ -42,6 +42,8 @@
               clang-tools
               doxygen
               graphviz
+              lcov
+              llvmPackages_latest.llvm
             ]
             ++ [
               treefmtEval.config.build.wrapper
