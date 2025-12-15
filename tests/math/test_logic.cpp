@@ -319,17 +319,17 @@ TEST(LogicTests, SelectInitializerList) {
 }
 
 TEST(LogicTests, NumericAllAny) {
-    Eigen::MatrixXd M(2, 2);
+    janus::NumericMatrix M(2, 2);
     M << 1, 0, 1, 1;
     // all should be false
     EXPECT_FALSE(janus::all(M));
     // any should be true
     EXPECT_TRUE(janus::any(M));
 
-    Eigen::MatrixXd AllOnes = Eigen::MatrixXd::Ones(2, 2);
+    janus::NumericMatrix AllOnes = janus::NumericMatrix::Ones(2, 2);
     EXPECT_TRUE(janus::all(AllOnes));
 
-    Eigen::MatrixXd AllZeros = Eigen::MatrixXd::Zero(2, 2);
+    janus::NumericMatrix AllZeros = janus::NumericMatrix::Zero(2, 2);
     EXPECT_FALSE(janus::any(AllZeros));
 }
 

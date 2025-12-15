@@ -49,7 +49,7 @@ template <typename Scalar> void test_rotations() {
         EXPECT_NEAR(R_euler(2, 2), -1.0, 1e-9);
 
         // Invalid matrix test
-        Eigen::Matrix<Scalar, 3, 3> bad = Eigen::Matrix<Scalar, 3, 3>::Identity() * 2.0;
+        janus::Mat3<Scalar> bad = janus::Mat3<Scalar>::Identity() * 2.0;
         EXPECT_FALSE(janus::is_valid_rotation_matrix(bad));
     } else {
         auto valid_R3 = janus::is_valid_rotation_matrix(R3);
@@ -65,7 +65,7 @@ template <typename Scalar> void test_rotations() {
 
         // Invalid matrix test
         // Construct invalid symbolic matrix
-        Eigen::Matrix<janus::SymbolicScalar, 3, 3> bad;
+        janus::Mat3<janus::SymbolicScalar> bad;
         bad.setIdentity();
         bad = bad * 2.0;
         auto valid_bad = janus::is_valid_rotation_matrix(bad);

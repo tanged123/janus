@@ -5,8 +5,8 @@
 #include <janus/math/Linalg.hpp>
 
 template <typename Scalar> void test_linalg_ops() {
-    using Matrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
-    using Vector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+    using Matrix = janus::JanusMatrix<Scalar>;
+    using Vector = janus::JanusVector<Scalar>;
 
     // Test solve
     // A = [[2, 1], [1, 2]]
@@ -137,12 +137,12 @@ TEST(LinalgTests, Symbolic) { test_linalg_ops<janus::SymbolicScalar>(); }
 
 TEST(LinalgTests, CoverageEdges) {
     // 1. Empty to_mx coverage
-    Eigen::MatrixXd empty(0, 0);
+    janus::NumericMatrix empty(0, 0);
     casadi::MX empty_mx = janus::to_mx(empty);
     EXPECT_TRUE(empty_mx.is_empty());
 
     // 2. Numeric Norm Edges
-    Eigen::VectorXd v(3);
+    janus::NumericVector v(3);
     v << 1.0, 2.0, 2.0; // norm = 3
 
     // Frobenius (same as L2 for vectors)

@@ -78,7 +78,7 @@ TEST(ArithmeticTests, Symbolic) { test_arithmetic_ops<janus::SymbolicScalar>(); 
 
 TEST(ArithmeticTests, MatrixOps) {
     // Numeric Matrix Sqrt
-    Eigen::MatrixXd M(2, 2);
+    janus::NumericMatrix M(2, 2);
     M << 4.0, 9.0, 16.0, 25.0;
     auto S = janus::sqrt(M);
     EXPECT_DOUBLE_EQ(S(0, 0), 2.0);
