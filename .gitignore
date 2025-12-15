@@ -63,4 +63,4 @@ cmake-build-*/
 *.dot
 
 # Ignore 
-!docs/images
+!docs/images/*.png
