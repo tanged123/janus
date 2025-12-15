@@ -307,3 +307,44 @@ TEST(LogicTests, SelectEquivalence) {
 
     EXPECT_DOUBLE_EQ(result_select, result_where);
 }
+
+TEST(LogicTests, SelectError) {
+    EXPECT_THROW(janus::select({true, false}, {1.0}, 0.0), std::invalid_argument);
+}
+
+TEST(LogicTests, SelectInitializerList) {
+    double x = 5.0;
+    auto res = janus::select({x < 0.0, x > 0.0}, {-1.0, 1.0}, 0.0);
+    EXPECT_DOUBLE_EQ(res, 1.0);
+}
+
+TEST(LogicTests, NumericAllAny) {
+    Eigen::MatrixXd M(2, 2);
+    M << 1, 0, 1, 1;
+    // all should be false
+    EXPECT_FALSE(janus::all(M));
+    // any should be true
+    EXPECT_TRUE(janus::any(M));
+
+    Eigen::MatrixXd AllOnes = Eigen::MatrixXd::Ones(2, 2);
+    EXPECT_TRUE(janus::all(AllOnes));
+
+    Eigen::MatrixXd AllZeros = Eigen::MatrixXd::Zero(2, 2);
+    EXPECT_FALSE(janus::any(AllZeros));
+}
+
+TEST(LogicTests, MixedTypeLogic) {
+    // Test mixed double/Symbolic for min/max/clamp to hit those branches
+    double d = 1.0;
+    janus::SymbolicScalar s(2.0);
+
+    auto res_min = janus::min(d, s); // Should convert to fmin(double, MX) -> MX
+    auto res_max = janus::max(d, s);
+
+    EXPECT_DOUBLE_EQ(janus::eval(res_min), 1.0);
+    EXPECT_DOUBLE_EQ(janus::eval(res_max), 2.0);
+
+    // Test clamp with mixed
+    auto res_clamp = janus::clamp(janus::SymbolicScalar(5.0), 0.0, 3.0);
+    EXPECT_DOUBLE_EQ(janus::eval(res_clamp), 3.0);
+}

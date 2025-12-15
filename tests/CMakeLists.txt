@@ -1,6 +1,10 @@
 find_package(GTest REQUIRED)
 
-add_executable(test_core test_core.cpp)
+add_executable(test_core 
+    test_core.cpp
+    core/test_janus_io.cpp
+    core/test_janus_types.cpp
+)
 target_link_libraries(test_core PRIVATE janus GTest::gtest_main)
 
 include(GoogleTest)

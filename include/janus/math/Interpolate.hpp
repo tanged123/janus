@@ -66,7 +66,7 @@ class JanusInterpolator {
      * @param query Query point
      * @return Interpolated value
      */
-    template <typename T> T operator()(const T &query) const {
+    template <JanusScalar T> T operator()(const T &query) const {
         if (!m_valid)
             throw std::runtime_error("JanusInterpolator: Uninitialized");
 

@@ -95,3 +95,30 @@ template <typename Scalar> void test_spacing_funcs() {
 TEST(SpacingTests, Numeric) { test_spacing_funcs<double>(); }
 
 TEST(SpacingTests, Symbolic) { test_spacing_funcs<janus::SymbolicScalar>(); }
+
+TEST(SpacingTests, CoverageDegenerate) {
+    // n < 2 cases
+    auto lin = janus::linspace(0.0, 10.0, 1);
+    EXPECT_EQ(lin.size(), 1);
+    EXPECT_NEAR(lin(0), 0.0, 1e-9);
+
+    auto cos = janus::cosine_spacing(0.0, 10.0, 1);
+    EXPECT_EQ(cos.size(), 1);
+    EXPECT_NEAR(cos(0), 0.0, 1e-9);
+
+    auto sin = janus::sinspace(0.0, 10.0, 1);
+    EXPECT_EQ(sin.size(), 1);
+    EXPECT_NEAR(sin(0), 0.0, 1e-9);
+
+    auto log = janus::logspace(0.0, 2.0, 1);
+    EXPECT_EQ(log.size(), 1);
+    EXPECT_NEAR(log(0), 1.0, 1e-9);
+
+    // Reverse spacing for sinspace
+    auto rev = janus::sinspace(0.0, 10.0, 5, true);
+    // Should be bunched at end (large steps first, small steps last)
+    // Differences:
+    double d0 = rev(1) - rev(0);
+    double d_last = rev(4) - rev(3);
+    EXPECT_GT(d0, d_last);
+}

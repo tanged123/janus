@@ -75,3 +75,32 @@ template <typename Scalar> void test_arithmetic_ops() {
 TEST(ArithmeticTests, Numeric) { test_arithmetic_ops<double>(); }
 
 TEST(ArithmeticTests, Symbolic) { test_arithmetic_ops<janus::SymbolicScalar>(); }
+
+TEST(ArithmeticTests, MatrixOps) {
+    // Numeric Matrix Sqrt
+    Eigen::MatrixXd M(2, 2);
+    M << 4.0, 9.0, 16.0, 25.0;
+    auto S = janus::sqrt(M);
+    EXPECT_DOUBLE_EQ(S(0, 0), 2.0);
+    EXPECT_DOUBLE_EQ(S(0, 1), 3.0);
+
+    // Symbolic Matrix Sqrt
+    janus::SymbolicMatrix Ms = janus::to_eigen(janus::to_mx(M));
+    auto Ss = janus::sqrt(Ms);
+    auto Ss_eval = janus::eval(Ss);
+    EXPECT_DOUBLE_EQ(Ss_eval(0, 0), 2.0);
+}
+
+TEST(ArithmeticTests, MixedTypePow) {
+    // Test pow(double, MX)
+    double base = 2.0;
+    janus::SymbolicScalar exp(3.0);
+    auto res = janus::pow(base, exp);
+    EXPECT_DOUBLE_EQ(janus::eval(res), 8.0);
+
+    // Test pow(MX, double) - already covered but reinforcing
+    janus::SymbolicScalar base_s(2.0);
+    double exp_d = 3.0;
+    auto res2 = janus::pow(base_s, exp_d);
+    EXPECT_DOUBLE_EQ(janus::eval(res2), 8.0);
+}

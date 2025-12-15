@@ -224,3 +224,63 @@ template <typename Scalar> void test_slerp() {
 TEST(QuaternionTest, SlerpNumeric) { test_slerp<double>(); }
 
 TEST(QuaternionTest, SlerpSymbolic) { test_slerp<janus::SymbolicScalar>(); }
+
+TEST(QuaternionTest, CoverageBranches) {
+    // 1. rom_rotation_matrix branches (Trace <= 0)
+    // Case 1: max diag is 0,0 (already tested implicitly or rarely hit?)
+    // Construct matrices that force specific branches
+
+    // Rotation 180 deg around X: [1 0 0; 0 -1 0; 0 0 -1], trace = -1. Max diag is 0,0.
+    Eigen::Matrix3d Rx_180;
+    Rx_180 << 1, 0, 0, 0, -1, 0, 0, 0, -1;
+    auto qx = janus::Quaternion<double>::from_rotation_matrix(Rx_180);
+    EXPECT_NEAR(qx.x, 1.0, 1e-9);
+
+    // Rotation 180 deg around Y: [-1 0 0; 0 1 0; 0 0 -1], trace = -1. Max diag is 1,1.
+    Eigen::Matrix3d Ry_180;
+    Ry_180 << -1, 0, 0, 0, 1, 0, 0, 0, -1;
+    auto qy = janus::Quaternion<double>::from_rotation_matrix(Ry_180);
+    EXPECT_NEAR(qy.y, 1.0, 1e-9);
+
+    // Rotation 180 deg around Z: [-1 0 0; 0 -1 0; 0 0 1], trace = -1. Max diag is 2,2.
+    Eigen::Matrix3d Rz_180;
+    Rz_180 << -1, 0, 0, 0, -1, 0, 0, 0, 1;
+    auto qz = janus::Quaternion<double>::from_rotation_matrix(Rz_180);
+    EXPECT_NEAR(qz.z, 1.0, 1e-9);
+}
+
+TEST(QuaternionTest, CoverageSlerpLimits) {
+    auto q0 = janus::Quaternion<double>();           // Identity
+    auto q1 = janus::Quaternion<double>(0, 1, 0, 0); // 180 deg rot around X
+
+    // t=0
+    auto res0 = janus::slerp(q0, q1, 0.0);
+    EXPECT_NEAR(res0.w, 1.0, 1e-9);
+
+    // t=1
+    auto res1 = janus::slerp(q0, q1, 1.0);
+    EXPECT_NEAR(res1.x, 1.0, 1e-9);
+
+    // Test for Quaternion addition operator line 51 and mult operator line 43
+    janus::Quaternion<double> qa(1, 0, 0, 0);
+    janus::Quaternion<double> qb(0, 1, 0, 0);
+    auto qc = qa + qb;
+    EXPECT_NEAR(qc.w, 1.0, 1e-9);
+    EXPECT_NEAR(qc.x, 1.0, 1e-9);
+
+    // Symbolic addition/mult check
+    janus::Quaternion<janus::SymbolicScalar> sa, sb;
+    auto sc = sa + sb; // hits line 50/51 symbolic instantiation
+    EXPECT_NEAR(janus::eval(sc.w), 2.0, 1e-9);
+
+    // Line 262/263: Pitch gimbal lock case (sinp >= 1)
+    // Create quaternion corresponding to pitch=pi/2
+    auto q_lock = janus::Quaternion<double>::from_euler(0.0, std::numbers::pi_v<double> / 2.0, 0.0);
+    auto euler = q_lock.to_euler();
+    EXPECT_NEAR(euler(1), std::numbers::pi_v<double> / 2.0, 1e-5);
+
+    auto q_lock_neg =
+        janus::Quaternion<double>::from_euler(0.0, -std::numbers::pi_v<double> / 2.0, 0.0);
+    auto euler_neg = q_lock_neg.to_euler();
+    EXPECT_NEAR(euler_neg(1), -std::numbers::pi_v<double> / 2.0, 1e-5);
+}
