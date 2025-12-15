@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Linalg.hpp"
@@ -64,9 +65,7 @@ template <typename T> Mat3<T> rotation_matrix_3d(const T &theta, int axis) {
         R(1, 1) = c;
         break;
     default:
-        // Simple fallback or error. For now, Identity.
-        // In critical code, throw or assert.
-        break;
+        throw InvalidArgument("rotation_matrix_3d: axis must be 0 (X), 1 (Y), or 2 (Z)");
     }
     return R;
 }

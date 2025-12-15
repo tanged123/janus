@@ -6,6 +6,7 @@
  * Includes all math sub-modules.
  */
 
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/AutoDiff.hpp"
 #include "janus/math/Calculus.hpp"

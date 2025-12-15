@@ -275,11 +275,11 @@ TEST(CalculusTests, Errors) {
 
     // Invalid dx size (must be scalar, N, or N-1)
     janus::JanusVector<double> bad_dx(2);
-    EXPECT_THROW(janus::gradient(y, bad_dx), std::invalid_argument);
+    EXPECT_THROW(janus::gradient(y, bad_dx), janus::InvalidArgument);
 
     // Invalid edge_order
-    EXPECT_THROW(janus::gradient(y, 1.0, 3), std::invalid_argument);
+    EXPECT_THROW(janus::gradient(y, 1.0, 3), janus::InvalidArgument);
 
     // Invalid n (derivative order)
-    EXPECT_THROW(janus::gradient(y, 1.0, 1, 3), std::invalid_argument);
+    EXPECT_THROW(janus::gradient(y, 1.0, 1, 3), janus::InvalidArgument);
 }

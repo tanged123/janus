@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
@@ -113,8 +114,18 @@ auto dot(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB>
 }
 
 // --- Cross Product ---
+/**
+ * @brief Computes 3D cross product
+ * @param a First 3-element vector
+ * @param b Second 3-element vector
+ * @return Cross product vector
+ * @throws InvalidArgument if vectors are not 3 elements
+ */
 template <typename DerivedA, typename DerivedB>
 auto cross(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    if (a.size() != 3 || b.size() != 3) {
+        throw InvalidArgument("cross: both vectors must have exactly 3 elements");
+    }
     // Manual implementation to support Dynamic vectors (Eigen::cross requires fixed size 3)
     using Scalar = typename DerivedA::Scalar;
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1> res(3);

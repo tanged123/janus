@@ -1,4 +1,5 @@
 #pragma once
+#include "janus/core/JanusError.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 #include <iostream>
@@ -63,10 +64,8 @@ template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
             }
             return res_eigen;
         } catch (const std::exception &e) {
-            // If it fails (variables present), return the symbolic expression?
-            // Or throw? The user likely expects a number.
-            throw std::runtime_error("janus::eval failed (likely contains free variables): " +
-                                     std::string(e.what()));
+            throw RuntimeError("eval failed (expression contains free variables): " +
+                               std::string(e.what()));
         }
     } else {
         return mat.eval();
@@ -81,7 +80,7 @@ inline double eval(const casadi::MX &val) {
         casadi::DM res_dm = res[0];
         return static_cast<double>(res_dm);
     } catch (const std::exception &e) {
-        throw std::runtime_error("janus::eval scalar failed: " + std::string(e.what()));
+        throw RuntimeError("eval scalar failed: " + std::string(e.what()));
     }
 }
 

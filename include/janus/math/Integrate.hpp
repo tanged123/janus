@@ -8,6 +8,7 @@
  */
 
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Spacing.hpp"
@@ -15,7 +16,6 @@
 #include <casadi/casadi.hpp>
 #include <functional>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -152,8 +152,8 @@ QuadResult<T> quad(Func &&func, T a, T b, double abstol = 1e-8, double reltol = 
     } else {
         // Symbolic path: This won't work with a lambda directly
         // User should use the symbolic expression overload below
-        throw std::runtime_error("quad with callable is not supported for symbolic types. "
-                                 "Use quad(expr, variable, a, b) instead.");
+        throw IntegrationError("quad with callable is not supported for symbolic types. "
+                               "Use quad(expr, variable, a, b) instead.");
     }
 }
 

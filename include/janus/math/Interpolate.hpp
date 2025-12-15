@@ -1,10 +1,10 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
 #include <algorithm>
 #include <casadi/casadi.hpp>
-#include <stdexcept>
 #include <vector>
 
 namespace janus {
@@ -37,10 +37,10 @@ class JanusInterpolator {
      */
     JanusInterpolator(const Eigen::VectorXd &x, const Eigen::VectorXd &y) {
         if (x.size() != y.size()) {
-            throw std::invalid_argument("JanusInterpolator: x and y must have same size");
+            throw InterpolationError("x and y must have same size");
         }
         if (x.size() < 2) {
-            throw std::invalid_argument("JanusInterpolator: Need at least 2 points");
+            throw InterpolationError("need at least 2 grid points");
         }
 
         m_x.resize(x.size());
@@ -50,7 +50,7 @@ class JanusInterpolator {
 
         // rudimentary check for sorted x
         if (!std::is_sorted(m_x.begin(), m_x.end())) {
-            throw std::invalid_argument("JanusInterpolator: x grid must be sorted");
+            throw InterpolationError("x grid must be sorted");
         }
 
         // Setup CasADi interpolant
@@ -68,7 +68,7 @@ class JanusInterpolator {
      */
     template <JanusScalar T> T operator()(const T &query) const {
         if (!m_valid)
-            throw std::runtime_error("JanusInterpolator: Uninitialized");
+            throw InterpolationError("interpolator not initialized");
 
         if constexpr (std::is_floating_point_v<T>) {
             return eval_numeric(query);
@@ -87,7 +87,7 @@ class JanusInterpolator {
     template <typename Derived> auto operator()(const Eigen::MatrixBase<Derived> &query) const {
         using Scalar = typename Derived::Scalar;
         if (!m_valid)
-            throw std::runtime_error("JanusInterpolator: Uninitialized");
+            throw InterpolationError("interpolator not initialized");
 
         if constexpr (std::is_floating_point_v<Scalar>) {
             // Numeric: Element-wise map

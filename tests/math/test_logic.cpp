@@ -309,7 +309,7 @@ TEST(LogicTests, SelectEquivalence) {
 }
 
 TEST(LogicTests, SelectError) {
-    EXPECT_THROW(janus::select({true, false}, {1.0}, 0.0), std::invalid_argument);
+    EXPECT_THROW(janus::select({true, false}, {1.0}, 0.0), janus::InvalidArgument);
 }
 
 TEST(LogicTests, SelectInitializerList) {

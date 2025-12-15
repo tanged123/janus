@@ -44,30 +44,30 @@ TEST(InterpolateTests, CoverageErrorChecks) {
     y << 0, 1;
 
     // Mismatched size
-    EXPECT_THROW(janus::JanusInterpolator(x, y), std::invalid_argument);
+    EXPECT_THROW(janus::JanusInterpolator(x, y), janus::InterpolationError);
 
     // Size < 2
     Eigen::VectorXd x1(1);
     x1 << 0;
     Eigen::VectorXd y1(1);
     y1 << 0;
-    EXPECT_THROW(janus::JanusInterpolator(x1, y1), std::invalid_argument);
+    EXPECT_THROW(janus::JanusInterpolator(x1, y1), janus::InterpolationError);
 
     // Unsorted
     Eigen::VectorXd xu(3);
     xu << 0, 2, 1;
     Eigen::VectorXd yu(3);
     yu << 0, 0, 0;
-    EXPECT_THROW(janus::JanusInterpolator(xu, yu), std::invalid_argument);
+    EXPECT_THROW(janus::JanusInterpolator(xu, yu), janus::InterpolationError);
 
     // Uninitialized use
     janus::JanusInterpolator empty;
-    EXPECT_THROW(empty(1.0), std::runtime_error);
+    EXPECT_THROW(empty(1.0), janus::InterpolationError);
 
     // Uninitialized matrix use
     Eigen::MatrixXd q(1, 1);
     q << 1.0;
-    EXPECT_THROW(empty(q), std::runtime_error);
+    EXPECT_THROW(empty(q), janus::InterpolationError);
 }
 
 TEST(InterpolateTests, NumericExtrapolationLow) {

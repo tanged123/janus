@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp" // for pow, log10
 #include "janus/math/Trig.hpp"       // for cos, pi
@@ -18,9 +19,12 @@ namespace janus {
  * @return Vector of n points
  */
 template <typename T> JanusVector<T> linspace(const T &start, const T &end, int n) {
-    if (n < 2) {
+    if (n < 1) {
+        throw InvalidArgument("linspace: n must be >= 1");
+    }
+    if (n == 1) {
         JanusVector<T> ret(1);
-        ret(0) = start; // degenerate case
+        ret(0) = start;
         return ret;
     }
 
@@ -47,7 +51,10 @@ template <typename T> JanusVector<T> linspace(const T &start, const T &end, int 
  * @return Vector of n points
  */
 template <typename T> JanusVector<T> cosine_spacing(const T &start, const T &end, int n) {
-    if (n < 2) {
+    if (n < 1) {
+        throw InvalidArgument("cosine_spacing: n must be >= 1");
+    }
+    if (n == 1) {
         JanusVector<T> ret(1);
         ret(0) = start;
         return ret;
@@ -79,7 +86,10 @@ template <typename T> JanusVector<T> cosine_spacing(const T &start, const T &end
  */
 template <typename T>
 JanusVector<T> sinspace(const T &start, const T &end, int n, bool reverse_spacing = false) {
-    if (n < 2) {
+    if (n < 1) {
+        throw InvalidArgument("sinspace: n must be >= 1");
+    }
+    if (n == 1) {
         JanusVector<T> ret(1);
         ret(0) = start;
         return ret;
@@ -116,7 +126,10 @@ JanusVector<T> sinspace(const T &start, const T &end, int n, bool reverse_spacin
  * @return Vector of n points
  */
 template <typename T> JanusVector<T> logspace(const T &start, const T &end, int n) {
-    if (n < 2) {
+    if (n < 1) {
+        throw InvalidArgument("logspace: n must be >= 1");
+    }
+    if (n == 1) {
         JanusVector<T> ret(1);
         ret(0) = janus::pow(10.0, start);
         return ret;
@@ -144,6 +157,9 @@ template <typename T> JanusVector<T> logspace(const T &start, const T &end, int 
  * @return Vector of n points
  */
 template <typename T> JanusVector<T> geomspace(const T &start, const T &end, int n) {
+    if (n < 1) {
+        throw InvalidArgument("geomspace: n must be >= 1");
+    }
     T log_start = janus::log10(start);
     T log_end = janus::log10(end);
     return logspace(log_start, log_end, n);

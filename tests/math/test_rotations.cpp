@@ -83,10 +83,11 @@ TEST(RotationsTests, CoverageAxes) {
     auto R0 = janus::rotation_matrix_3d(theta, 0);
     auto R1 = janus::rotation_matrix_3d(theta, 1);
     auto R2 = janus::rotation_matrix_3d(theta, 2);
-    auto R_inv = janus::rotation_matrix_3d(theta, 99); // default case
 
     EXPECT_NEAR(R0(1, 1), std::cos(theta), 1e-9);
     EXPECT_NEAR(R1(0, 0), std::cos(theta), 1e-9);
     EXPECT_NEAR(R2(0, 0), std::cos(theta), 1e-9);
-    EXPECT_TRUE(R_inv.isIdentity());
+
+    // Invalid axis should throw
+    EXPECT_THROW(janus::rotation_matrix_3d(theta, 99), janus::InvalidArgument);
 }

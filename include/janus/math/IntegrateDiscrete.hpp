@@ -1,13 +1,13 @@
 #pragma once
 
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Calculus.hpp"
 #include "janus/math/Logic.hpp"
 #include <Eigen/Dense>
 #include <algorithm>
-#include <stdexcept>
 #include <string>
 
 namespace janus {
@@ -233,7 +233,7 @@ integrate_discrete_intervals(const Eigen::MatrixBase<DerivedF> &f,
         avg_f = detail::concatenate(tmp, last);
     } else if (m.find("simpson") != std::string::npos && m != "simpson") {
         // Generic simpson check, but specific variants matched above
-        throw std::invalid_argument("Invalid Simpson variant: " + method);
+        throw IntegrationError("unknown Simpson variant: " + method);
     } else if (m == "cubic" || m == "cubic_spline") {
         if (n_points < 4) {
             // Need at least 4 points for cubic, fallback to simpson
@@ -244,7 +244,9 @@ integrate_discrete_intervals(const Eigen::MatrixBase<DerivedF> &f,
     } else if (m != "forward_euler" && m != "backward_euler" && m != "trapezoidal" &&
                m != "forward" && m != "backward" && m != "euler_forward" && m != "euler_backward" &&
                m != "trapz" && m != "trapezoid") {
-        throw std::invalid_argument("Invalid integration method: " + method);
+        throw IntegrationError(
+            "unknown method: " + method +
+            ". Use forward_euler, backward_euler, trapezoidal, simpson, or cubic.");
     }
 
     // --- Endpoint Handling ---
@@ -428,8 +430,8 @@ integrate_discrete_squared_curvature(const Eigen::MatrixBase<DerivedF> &f,
 
         return (term1 + term2).matrix();
     } else {
-        throw std::invalid_argument("Invalid squared curvature method: " + method +
-                                    ". Use 'simpson' or 'hybrid_simpson_cubic'.");
+        throw IntegrationError("unknown curvature method: " + method +
+                               ". Use 'simpson' or 'hybrid_simpson_cubic'.");
     }
 }
 
