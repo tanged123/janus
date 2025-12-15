@@ -2,9 +2,9 @@
 
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://tanged123.github.io/janus/) [![Janus CI](https://github.com/tanged123/janus/actions/workflows/ci.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/ci.yml) [![Clang-Format Check](https://github.com/tanged123/janus/actions/workflows/format.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/format.yml) [![codecov](https://codecov.io/github/tanged123/janus/graph/badge.svg?token=0DSF7KK8W7)](https://codecov.io/github/tanged123/janus)
 
-**Janus** is a high-performance C++ numerical framework designed to implement the Code Transformations paradigm. It serves as a dual-backend physics modeling library, achieving **1:1 capability parity** with AeroSandbox's numpy module while maintaining **100% code coverage**.
+**Janus** is a high-performance C++ numerical framework named after the Roman god of duality. True to its name, it allows a single physics model to face two directions: **Numeric Mode** for fast execution and **Symbolic Mode** for graph generation and optimization.
 
-Engineers write physics models once and execute them in two distinct modes:
+Built on C++20, Eigen, and CasADi, Janus implements the Code Transformations paradigm, enabling engineers to write physics models once and execute them in two distinct modes:
 
 1. **Fast Numeric Mode**: For real-time simulation and control (standard C++/Eigen).
 2. **Symbolic Trace Mode**: For gradient-based optimization and graph visualization (CasADi).
