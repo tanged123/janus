@@ -192,13 +192,13 @@ TEST(IntegrateDiscrete, Errors) {
     janus::JanusVector<double> f = x;
 
     EXPECT_THROW(janus::integrate_discrete_intervals(f, x, true, "invalid_method"),
-                 std::invalid_argument);
+                 janus::IntegrationError);
     EXPECT_THROW(janus::integrate_discrete_squared_curvature(f, x, "invalid_method"),
-                 std::invalid_argument);
+                 janus::IntegrationError);
 
     // Check Simpon generic error
     EXPECT_THROW(janus::integrate_discrete_intervals(f, x, true, "simpson_invalid"),
-                 std::invalid_argument);
+                 janus::IntegrationError);
 }
 
 TEST(IntegrateDiscrete, CoreNumeric) { test_integrate_core<double>(); }

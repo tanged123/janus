@@ -1,6 +1,11 @@
 find_package(GTest REQUIRED)
 
-add_executable(test_core test_core.cpp)
+add_executable(test_core 
+    test_core.cpp
+    core/test_janus_io.cpp
+    core/test_janus_types.cpp
+    core/test_io_coverage.cpp
+)
 target_link_libraries(test_core PRIVATE janus GTest::gtest_main)
 
 include(GoogleTest)
@@ -18,10 +23,14 @@ add_executable(test_math
     math/test_autodiff.cpp
     math/test_linalg.cpp
     math/test_interpolate.cpp
-    math/test_geometry.cpp
+    math/test_rotations.cpp
     math/test_surrogate.cpp
     math/test_finite_diff.cpp
     math/test_integrate_discrete.cpp
+    math/test_integrate.cpp
+    math/test_spacing.cpp
+    math/test_quaternion.cpp
+    math/test_coverage_gaps.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

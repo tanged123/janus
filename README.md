@@ -2,10 +2,12 @@
 
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://tanged123.github.io/janus/) [![Janus CI](https://github.com/tanged123/janus/actions/workflows/ci.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/ci.yml) [![Clang-Format Check](https://github.com/tanged123/janus/actions/workflows/format.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/format.yml) [![codecov](https://codecov.io/github/tanged123/janus/graph/badge.svg?token=0DSF7KK8W7)](https://codecov.io/github/tanged123/janus)
 
-**Janus** is a high-performance C++ numerical framework designed to implement the Code Transformations paradigm. It allows engineers to write physics models once and execute them in two distinct modes:
+**Janus** is a high-performance C++ numerical framework designed to implement the Code Transformations paradigm. It serves as a dual-backend physics modeling library, achieving **1:1 capability parity** with AeroSandbox's numpy module while maintaining **100% code coverage**.
+
+Engineers write physics models once and execute them in two distinct modes:
 
 1. **Fast Numeric Mode**: For real-time simulation and control (standard C++/Eigen).
-2. **Symbolic Trace Mode**: For gradient-based optimization (CasADi).
+2. **Symbolic Trace Mode**: For gradient-based optimization and graph visualization (CasADi).
 
 > For a deep dive into the architecture, see [Design Overview](docs/design_overview.md).
 
@@ -125,25 +127,32 @@ For high-performance numeric simulations, see the [Numeric Computing Guide](docs
 janus/
 ├── docs/               # Documentation
 ├── examples/           # Example Implementations (numeric & symbolic)
-├── include/janus/      # Core Library Headers
-│   ├── core/           # Concepts, Types & Function Wrapper
-│   │   ├── Function.hpp      # CasADi Function wrapper
-│   │   ├── JanusConcepts.hpp # Type concepts & constraints
-│   │   └── JanusTypes.hpp    # Matrix/Vector types
-│   └── math/           # Math & Numerics Layer
-│       ├── Arithmetic.hpp       # Core arithmetic (pow, exp, log...)
-│       ├── AutoDiff.hpp         # Automatic differentiation (jacobian)
-│       ├── Calculus.hpp         # Numerical calculus (diff, gradient, trapz)
-│       ├── FiniteDifference.hpp # Finite difference coefficients (Fornberg)
-│       ├── IntegrateDiscrete.hpp # Discrete integration (Simpson, curvature)
-│       ├── Interpolate.hpp      # Interpolation utilities
-│       ├── Linalg.hpp           # Linear algebra (to_mx, to_eigen, norm)
-│       ├── Logic.hpp            # Logical ops & branching (where, clip)
-│       ├── Rotations.hpp        # 2D/3D rotations, Euler angles
-│       ├── Spacing.hpp          # Grid generation (linspace, logspace)
-│       ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, blend, softmax)
-│       ├── Trig.hpp             # Trigonometry (sin, cos, atan2...)
-│       └── JanusMath.hpp        # Master header (includes all math)
+├── include/
+│   └── janus/
+│       ├── core/           # Concepts, Types & Function Wrapper
+│       │   ├── Function.hpp      # CasADi Function wrapper
+│       │   ├── JanusConcepts.hpp # Type concepts & constraints
+│       │   ├── JanusError.hpp    # Exception handling types
+│       │   ├── JanusIO.hpp       # Graph visualization & IO
+│       │   └── JanusTypes.hpp    # Matrix/Vector types
+│       ├── janus.hpp           # Main entry point
+│       └── math/           # Math & Numerics Layer
+│           ├── Arithmetic.hpp       # Core arithmetic
+│           ├── AutoDiff.hpp         # Automatic differentiation
+│           ├── Calculus.hpp         # Numerical calculus (gradient, trapz)
+│           ├── DiffOps.hpp          # Differential operators
+│           ├── FiniteDifference.hpp # Finite difference coefficients
+│           ├── Integrate.hpp        # ODE integration (quad, solve_ivp)
+│           ├── IntegrateDiscrete.hpp # Discrete integration schemes
+│           ├── Interpolate.hpp      # Interpolation utilities
+│           ├── JanusMath.hpp        # Math aggregation header
+│           ├── Linalg.hpp           # Linear algebra extensions
+│           ├── Logic.hpp            # Logical ops & branching (where)
+│           ├── Quaternion.hpp       # Quaternion algebra
+│           ├── Rotations.hpp        # 2D/3D rotations
+│           ├── Spacing.hpp          # Grid generation
+│           ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, etc)
+│           └── Trig.hpp             # Trigonometry
 ├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition

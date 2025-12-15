@@ -6,14 +6,17 @@
  * Includes all math sub-modules.
  */
 
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/AutoDiff.hpp"
 #include "janus/math/Calculus.hpp"
 #include "janus/math/FiniteDifference.hpp"
+#include "janus/math/Integrate.hpp"
 #include "janus/math/IntegrateDiscrete.hpp"
 #include "janus/math/Interpolate.hpp"
 #include "janus/math/Linalg.hpp"
 #include "janus/math/Logic.hpp"
+#include "janus/math/Quaternion.hpp"
 #include "janus/math/Rotations.hpp"
 #include "janus/math/Spacing.hpp"
 #include "janus/math/SurrogateModel.hpp"

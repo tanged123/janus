@@ -169,5 +169,14 @@ TEST(SurrogateTests, BlendSymbolic) {
     EXPECT_NEAR(val, 5.0, 1e-5);
 }
 
+TEST(SurrogateTests, CoverageErrors) {
+    std::vector<double> empty;
+    EXPECT_THROW(janus::softmax(empty), janus::InvalidArgument);
+
+    std::vector<double> valid = {1.0, 2.0};
+    EXPECT_THROW(janus::softmax(valid, -1.0), janus::InvalidArgument); // Invalid softness
+    EXPECT_THROW(janus::softmax(valid, 0.0), janus::InvalidArgument);  // Invalid softness
+}
+
 } // namespace test
 } // namespace janus

@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
@@ -462,7 +463,7 @@ template <typename CondType, typename Scalar>
 Scalar select(const std::vector<CondType> &conditions, const std::vector<Scalar> &values,
               const Scalar &default_value) {
     if (conditions.size() != values.size()) {
-        throw std::invalid_argument("select: conditions and values must have same size");
+        throw InvalidArgument("select: conditions and values must have same size");
     }
 
     // Start with default

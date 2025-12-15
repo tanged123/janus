@@ -56,13 +56,15 @@ Standard C++ `if/else` cannot branch on symbolic types because symbols do not ev
 * **Standard Loops**: Standard `for` loops are supported. The symbolic backend unrolls these loops into a chain of graph operations.
 * **Variable Bounds**: Loops with variable iteration counts (e.g., `i < optimization_var`) are banned as they break the static graph topology.
 
-## 4. Implementation Plan (Archive)
+## 4. Implementation Plan
 
-* **Phase 1**: Scalar Concept & Math Primitives
-* **Phase 2**: The Linear Algebra Shim (Eigen Integration)
-* **Phase 2.5**: Data-Driven Primitives (Interpolation)
-* **Phase 3**: The "NaN Propagation" Sparsity Engine
-* **Phase 4**: Optimization Interface
+- [x] **Phase 1**: Scalar Concept & Math Primitives
+- [x] **Phase 2**: The Linear Algebra Shim (Eigen Integration)
+- [x] **Phase 2.5**: Data-Driven Primitives (Interpolation)
+- [x] **Phase 3**: AeroSandbox Numerical Parity (Logic, Calculus, Surrogate Models, Discrete Integration)
+- [x] **Phase 4**: Beta 1.0 Release (ODE Integration, Extended Spacing, Quaternions, Graph Visualization, Full Coverage)
+- [ ] **Phase 5**: Advanced Math Utilities (N-Dimensional Interpolation, Root Finding, B-Splines)
+- [ ] **Phase 6**: Optimization Engines & Strategies (IPOPT/SNOPT Interface, NaN Propagation Sparsity)
 
 ## 5. API Reference Example
 

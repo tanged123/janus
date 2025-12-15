@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
@@ -43,6 +44,28 @@ inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const 
     }
     return e;
 }
+
+/**
+ * @brief Convert CasADi MX vector to SymbolicVector (Eigen container of MX)
+ *
+ * This unpacks a CasADi MX (which internally represents a vector) into an
+ * Eigen container where each element is an individual MX scalar.
+ * Useful for passing symbolic vectors to templated functions that expect
+ * JanusVector<Scalar> types.
+ *
+ * @param m Input CasADi MX (column vector)
+ * @return SymbolicVector (Eigen::Matrix<casadi::MX, Dynamic, 1>)
+ */
+inline SymbolicVector as_vector(const casadi::MX &m) {
+    SymbolicVector v(m.size1());
+    for (int i = 0; i < m.size1(); ++i) {
+        v(i) = m(i);
+    }
+    return v;
+}
+
+// Backwards compatibility alias
+inline SymbolicVector to_eigen_vec(const casadi::MX &m) { return as_vector(m); }
 
 // --- solve(A, b) ---
 /**
@@ -91,8 +114,18 @@ auto dot(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB>
 }
 
 // --- Cross Product ---
+/**
+ * @brief Computes 3D cross product
+ * @param a First 3-element vector
+ * @param b Second 3-element vector
+ * @return Cross product vector
+ * @throws InvalidArgument if vectors are not 3 elements
+ */
 template <typename DerivedA, typename DerivedB>
 auto cross(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
+    if (a.size() != 3 || b.size() != 3) {
+        throw InvalidArgument("cross: both vectors must have exactly 3 elements");
+    }
     // Manual implementation to support Dynamic vectors (Eigen::cross requires fixed size 3)
     using Scalar = typename DerivedA::Scalar;
     Eigen::Matrix<Scalar, Eigen::Dynamic, 1> res(3);

@@ -5,8 +5,8 @@
 #include <janus/math/Linalg.hpp>
 
 template <typename Scalar> void test_linalg_ops() {
-    using Matrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
-    using Vector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+    using Matrix = janus::JanusMatrix<Scalar>;
+    using Vector = janus::JanusVector<Scalar>;
 
     // Test solve
     // A = [[2, 1], [1, 2]]
@@ -134,3 +134,25 @@ template <typename Scalar> void test_linalg_ops() {
 TEST(LinalgTests, Numeric) { test_linalg_ops<double>(); }
 
 TEST(LinalgTests, Symbolic) { test_linalg_ops<janus::SymbolicScalar>(); }
+
+TEST(LinalgTests, CoverageEdges) {
+    // 1. Empty to_mx coverage
+    janus::NumericMatrix empty(0, 0);
+    casadi::MX empty_mx = janus::to_mx(empty);
+    EXPECT_TRUE(empty_mx.is_empty());
+
+    // 2. Numeric Norm Edges
+    janus::NumericVector v(3);
+    v << 1.0, 2.0, 2.0; // norm = 3
+
+    // Frobenius (same as L2 for vectors)
+    EXPECT_DOUBLE_EQ(janus::norm(v, janus::NormType::Frobenius), 3.0);
+
+    // Default (invalid enum)
+    EXPECT_DOUBLE_EQ(janus::norm(v, static_cast<janus::NormType>(999)), 3.0);
+
+    // 3. Symbolic Norm Edges (Default branch)
+    janus::SymbolicVector vs = janus::as_vector(janus::to_mx(v));
+    auto n_def = janus::norm(vs, static_cast<janus::NormType>(999));
+    EXPECT_DOUBLE_EQ(janus::eval(n_def), 3.0);
+}

@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include <Eigen/Dense>
 #include <optional>
@@ -121,7 +122,7 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
             // dx are already spacings
             dx_vec = dx;
         } else {
-            throw std::invalid_argument("dx must be scalar, size N, or size N-1");
+            throw InvalidArgument("gradient: dx must be scalar, size N, or size N-1");
         }
     }
 
@@ -174,7 +175,7 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
             grad(N - 1) = (-dfm_N * hp_N * hp_N + dfp_N * hm_N * hm_N + 2.0 * dfp_N * hm_N * hp_N) /
                           (hm_N * hp_N * (hm_N + hp_N));
         } else {
-            throw std::invalid_argument("edge_order must be 1 or 2");
+            throw InvalidArgument("gradient: edge_order must be 1 or 2");
         }
 
     } else if (n == 2) {
@@ -187,7 +188,7 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
         grad(N - 1) = grad(N - 2);
 
     } else {
-        throw std::invalid_argument("n must be 1 or 2");
+        throw InvalidArgument("gradient: derivative order (n) must be 1 or 2");
     }
 
     return grad;

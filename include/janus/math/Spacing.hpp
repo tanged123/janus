@@ -1,6 +1,9 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
-#include "janus/math/Trig.hpp" // for cos, pi
+#include "janus/core/JanusError.hpp"
+#include "janus/core/JanusTypes.hpp"
+#include "janus/math/Arithmetic.hpp" // for pow, log10
+#include "janus/math/Trig.hpp"       // for cos, pi
 #include <Eigen/Dense>
 #include <numbers>
 
@@ -15,17 +18,18 @@ namespace janus {
  * @param n Number of points
  * @return Vector of n points
  */
-template <typename T>
-Eigen::Matrix<T, Eigen::Dynamic, 1> linspace(const T &start, const T &end, int n) {
-    if (n < 2) {
-        Eigen::Matrix<T, Eigen::Dynamic, 1> ret(1);
-        ret(0) = start; // degenerate case
+template <typename T> JanusVector<T> linspace(const T &start, const T &end, int n) {
+    if (n < 1) {
+        throw InvalidArgument("linspace: n must be >= 1");
+    }
+    if (n == 1) {
+        JanusVector<T> ret(1);
+        ret(0) = start;
         return ret;
     }
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> ret(n);
+    JanusVector<T> ret(n);
     // Explicit loop to support symbolic types (cannot use .setLinSpaced)
-    // step = (end - start) / (n - 1)
     T step = (end - start) / static_cast<double>(n - 1);
 
     for (int i = 0; i < n; ++i) {
@@ -46,32 +50,119 @@ Eigen::Matrix<T, Eigen::Dynamic, 1> linspace(const T &start, const T &end, int n
  * @param n Number of points
  * @return Vector of n points
  */
-template <typename T>
-Eigen::Matrix<T, Eigen::Dynamic, 1> cosine_spacing(const T &start, const T &end, int n) {
-    if (n < 2) {
-        Eigen::Matrix<T, Eigen::Dynamic, 1> ret(1);
+template <typename T> JanusVector<T> cosine_spacing(const T &start, const T &end, int n) {
+    if (n < 1) {
+        throw InvalidArgument("cosine_spacing: n must be >= 1");
+    }
+    if (n == 1) {
+        JanusVector<T> ret(1);
         ret(0) = start;
         return ret;
     }
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> ret(n);
+    JanusVector<T> ret(n);
     T center = 0.5 * (start + end);
     T radius = 0.5 * (end - start);
     double pi = std::numbers::pi_v<double>;
 
     for (int i = 0; i < n; ++i) {
-        // We use std::cos here because the argument is always double (setup logic),
-        // BUT we want to support symbolic start/end.
-        // If we want consistency, we can use janus::cos if we cast argument to T,
-        // but typically the angle fraction is purely numeric.
-        // Actually, let's keep the fraction numeric.
         double angle = pi * static_cast<double>(i) / static_cast<double>(n - 1);
-        // We need T's cos if T is symbolic? No, angle is double.
-        // Wait, if T is symbolic, `radius * cos(angle)` involves mixing T and double.
-        // This is fine for CasADi (MX * double is valid).
         ret(i) = center - radius * std::cos(angle);
     }
     return ret;
+}
+
+// --- sinspace ---
+/**
+ * @brief Generates sine spaced vector (denser at start by default)
+ * Standard: start + (end - start) * (1 - cos(linspace(0, pi/2, n)))
+ * Reverse: bunches at end (computed as reverse of sinspace(end, start))
+ *
+ * @param start Start value
+ * @param end End value
+ * @param n Number of points
+ * @param reverse_spacing If true, bunches points at the end instead of start
+ * @return Vector of n points
+ */
+template <typename T>
+JanusVector<T> sinspace(const T &start, const T &end, int n, bool reverse_spacing = false) {
+    if (n < 1) {
+        throw InvalidArgument("sinspace: n must be >= 1");
+    }
+    if (n == 1) {
+        JanusVector<T> ret(1);
+        ret(0) = start;
+        return ret;
+    }
+
+    if (reverse_spacing) {
+        auto ret = sinspace(end, start, n, false);
+        return ret.reverse();
+    }
+
+    JanusVector<T> ret(n);
+    double pi_half = std::numbers::pi_v<double> / 2.0;
+
+    for (int i = 0; i < n; ++i) {
+        // angle goes from 0 to pi/2
+        double angle = pi_half * static_cast<double>(i) / static_cast<double>(n - 1);
+        double factor = 1.0 - std::cos(angle); // 0 to 1
+        ret(i) = start + (end - start) * factor;
+    }
+    // Ensure exact endpoints
+    ret(0) = start;   // cos(0) = 1, factor=0
+    ret(n - 1) = end; // cos(pi/2) = 0, factor=1
+    return ret;
+}
+
+// --- logspace ---
+/**
+ * @brief Generates logarithmically spaced vector (base 10)
+ * Values are 10^x where x is linearly spaced from start to end.
+ *
+ * @param start Start exponent (10^start)
+ * @param end End exponent (10^end)
+ * @param n Number of points
+ * @return Vector of n points
+ */
+template <typename T> JanusVector<T> logspace(const T &start, const T &end, int n) {
+    if (n < 1) {
+        throw InvalidArgument("logspace: n must be >= 1");
+    }
+    if (n == 1) {
+        JanusVector<T> ret(1);
+        ret(0) = janus::pow(10.0, start);
+        return ret;
+    }
+
+    JanusVector<T> ret(n);
+    // Linear spacing in exponent
+    for (int i = 0; i < n; ++i) {
+        double fraction = static_cast<double>(i) / static_cast<double>(n - 1);
+        T exponents = start + (end - start) * fraction;
+        ret(i) = janus::pow(10.0, exponents);
+    }
+    // ret(0) is 10^start, ret(n-1) is 10^end
+    return ret;
+}
+
+// --- geomspace ---
+/**
+ * @brief Generates geometrically spaced vector (log spacing with limits)
+ * Equivalent to logspace(log10(start), log10(end), n)
+ *
+ * @param start Start value
+ * @param end End value
+ * @param n Number of points
+ * @return Vector of n points
+ */
+template <typename T> JanusVector<T> geomspace(const T &start, const T &end, int n) {
+    if (n < 1) {
+        throw InvalidArgument("geomspace: n must be >= 1");
+    }
+    T log_start = janus::log10(start);
+    T log_end = janus::log10(end);
+    return logspace(log_start, log_end, n);
 }
 
 } // namespace janus

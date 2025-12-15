@@ -29,6 +29,27 @@
         };
       in
       {
+        packages.default = stdenv.mkDerivation {
+          pname = "janus";
+          version = "1.0.0-beta.1";
+          src = ./.;
+
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.ninja
+            pkgs.pkg-config
+          ];
+
+          buildInputs = [
+            pkgs.eigen
+            pkgs.casadi
+          ];
+
+          cmakeFlags = [
+            "-DENABLE_COVERAGE=OFF"
+          ];
+        };
+
         devShells.default = pkgs.mkShell.override { inherit stdenv; } {
           packages =
             with pkgs;

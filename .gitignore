@@ -58,3 +58,9 @@ cmake-build-*/
 *.log
 *.tmp
 .cache/
+*.pdf
+*.png
+*.dot
+
+# Ignore 
+!docs/images

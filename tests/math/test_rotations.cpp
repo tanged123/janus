@@ -3,31 +3,7 @@
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp> // to_mx
 #include <janus/math/Rotations.hpp>
-#include <janus/math/Spacing.hpp>
 #include <numbers>
-
-template <typename Scalar> void test_spacing() {
-    Scalar start = 0.0;
-    Scalar end = 10.0;
-    auto lin = janus::linspace(start, end, 5);
-    auto cos = janus::cosine_spacing(start, end, 5);
-
-    if constexpr (std::is_same_v<Scalar, double>) {
-        EXPECT_EQ(lin.size(), 5);
-        EXPECT_NEAR(lin(2), 5.0, 1e-9);
-        EXPECT_NEAR(lin(4), 10.0, 1e-9);
-
-        EXPECT_NEAR(cos(0), 0.0, 1e-9);
-    } else {
-        EXPECT_EQ(lin.size(), 5);
-        auto lin_eval = janus::eval(lin);
-        EXPECT_NEAR(lin_eval(2), 5.0, 1e-9);
-        EXPECT_NEAR(lin_eval(4), 10.0, 1e-9);
-
-        auto cos_eval = janus::eval(cos);
-        EXPECT_NEAR(cos_eval(0), 0.0, 1e-9);
-    }
-}
 
 template <typename Scalar> void test_rotations() {
     Scalar theta = std::numbers::pi_v<double> / 2.0;
@@ -73,7 +49,7 @@ template <typename Scalar> void test_rotations() {
         EXPECT_NEAR(R_euler(2, 2), -1.0, 1e-9);
 
         // Invalid matrix test
-        Eigen::Matrix<Scalar, 3, 3> bad = Eigen::Matrix<Scalar, 3, 3>::Identity() * 2.0;
+        janus::Mat3<Scalar> bad = janus::Mat3<Scalar>::Identity() * 2.0;
         EXPECT_FALSE(janus::is_valid_rotation_matrix(bad));
     } else {
         auto valid_R3 = janus::is_valid_rotation_matrix(R3);
@@ -89,7 +65,7 @@ template <typename Scalar> void test_rotations() {
 
         // Invalid matrix test
         // Construct invalid symbolic matrix
-        Eigen::Matrix<janus::SymbolicScalar, 3, 3> bad;
+        janus::Mat3<janus::SymbolicScalar> bad;
         bad.setIdentity();
         bad = bad * 2.0;
         auto valid_bad = janus::is_valid_rotation_matrix(bad);
@@ -97,10 +73,21 @@ template <typename Scalar> void test_rotations() {
     }
 }
 
-TEST(GeometryTests, SpacingNumeric) { test_spacing<double>(); }
+TEST(RotationsTests, RotationsNumeric) { test_rotations<double>(); }
 
-TEST(GeometryTests, SpacingSymbolic) { test_spacing<janus::SymbolicScalar>(); }
+TEST(RotationsTests, RotationsSymbolic) { test_rotations<janus::SymbolicScalar>(); }
 
-TEST(GeometryTests, RotationsNumeric) { test_rotations<double>(); }
+TEST(RotationsTests, CoverageAxes) {
+    // Explicitly test all axes for rotation_matrix_3d coverage
+    double theta = 0.1;
+    auto R0 = janus::rotation_matrix_3d(theta, 0);
+    auto R1 = janus::rotation_matrix_3d(theta, 1);
+    auto R2 = janus::rotation_matrix_3d(theta, 2);
 
-TEST(GeometryTests, RotationsSymbolic) { test_rotations<janus::SymbolicScalar>(); }
+    EXPECT_NEAR(R0(1, 1), std::cos(theta), 1e-9);
+    EXPECT_NEAR(R1(0, 0), std::cos(theta), 1e-9);
+    EXPECT_NEAR(R2(0, 0), std::cos(theta), 1e-9);
+
+    // Invalid axis should throw
+    EXPECT_THROW(janus::rotation_matrix_3d(theta, 99), janus::InvalidArgument);
+}

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "../core/JanusError.hpp"
 #include "../core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <cmath>
-#include <stdexcept>
 #include <vector>
 
 namespace janus {
@@ -25,12 +25,13 @@ auto finite_difference_coefficients(const Eigen::MatrixBase<Derived> &x,
     using Scalar = typename Derived::Scalar;
 
     if (derivative_degree < 0) {
-        throw std::invalid_argument("derivative_degree must be >= 0");
+        throw InvalidArgument("finite_difference_coefficients: derivative_degree must be >= 0");
     }
 
     int n_points = x.size();
     if (n_points < derivative_degree + 1) {
-        throw std::invalid_argument("Need at least (derivative_degree + 1) grid points");
+        throw InvalidArgument(
+            "finite_difference_coefficients: need at least (derivative_degree + 1) grid points");
     }
 
     int N = n_points - 1;

@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Logic.hpp"
 #include "janus/math/Trig.hpp"
@@ -29,10 +30,10 @@ namespace janus {
  */
 template <typename T> auto softmax(const std::vector<T> &args, double softness = 1.0) {
     if (args.empty()) {
-        throw std::invalid_argument("softmax requires at least one argument");
+        throw InvalidArgument("softmax: requires at least one value");
     }
     if (softness <= 0.0) {
-        throw std::invalid_argument("softmax softness must be positive");
+        throw InvalidArgument("softmax: softness must be positive");
     }
 
     // 1. Find max element-wise
