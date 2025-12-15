@@ -50,75 +50,86 @@ class Function {
     }
 
   public:
-    /**
-     * @brief Evaluate function with arbitrary arguments (scalars or Eigen matrices)
-     *
-     * @tparam Args Argument types (automatically deduced)
-     * @param args Variadic arguments matching the function inputs
-     * @return std::vector<Eigen::MatrixXd> Vector of result matrices (one per output)
-     */
-    template <typename... Args> std::vector<Eigen::MatrixXd> operator()(Args &&...args) const {
-        std::vector<casadi::DM> dm_args;
-        dm_args.reserve(sizeof...(args));
-        (dm_args.push_back(to_dm(std::forward<Args>(args))), ...);
-
-        auto res_dm = fn_(dm_args);
-        return to_eigen_vector(res_dm);
-    }
-
-    /**
-     * @brief Evaluate function and return first output (for single-output functions)
-     *
-     * Cleaner syntax for single-output functions:
-     *   auto result = fn.eval(x, y);  // Returns MatrixXd directly
-     * instead of:
-     *   auto result = fn(x, y)[0];
-     *
-     * @tparam Args Argument types (automatically deduced)
-     * @param args Variadic arguments matching the function inputs
-     * @return Eigen::MatrixXd First output matrix
-     */
-    template <typename... Args> Eigen::MatrixXd eval(Args &&...args) const {
-        auto results = operator()(std::forward<Args>(args)...);
-        return results[0];
-    }
-
   private:
-    // Helper: Convert scalar (double/int) to DM
-    template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<std::decay_t<T>>>>
-    casadi::DM to_dm(T val) const {
-        return casadi::DM(static_cast<double>(val));
+    // Helper traits to detect symbolic arguments
+    template <typename T> struct is_symbolic_type : std::false_type {};
+    template <> struct is_symbolic_type<casadi::MX> : std::true_type {};
+
+    // Specialization for Eigen::Matrix
+    template <typename S, int R, int C, int O, int MR, int MC>
+    struct is_symbolic_type<Eigen::Matrix<S, R, C, O, MR, MC>>
+        : std::conditional_t<std::is_same_v<S, casadi::MX>, std::true_type, std::false_type> {};
+
+    // Helper to normalize input to MX
+    template <typename T> casadi::MX normalize_arg(const T &val) const {
+        if constexpr (std::is_arithmetic_v<std::decay_t<T>> ||
+                      std::is_same_v<std::decay_t<T>, casadi::MX> ||
+                      std::is_same_v<std::decay_t<T>, casadi::DM>) {
+            return casadi::MX(val);
+        } else {
+            return janus::to_mx(val);
+        }
     }
 
-    // Helper: Convert Eigen Matrix to DM
-    template <typename Derived> casadi::DM to_dm(const Eigen::MatrixBase<Derived> &val) const {
-        casadi::DM m(val.rows(), val.cols());
-        for (Eigen::Index i = 0; i < val.rows(); ++i) {
-            for (Eigen::Index j = 0; j < val.cols(); ++j) {
-                m(i, j) = val(i, j);
-            }
+    // Helper to normalize input to DM (strictly numeric)
+    template <typename T> casadi::DM normalize_arg_dm(const T &val) const {
+        using DecayT = std::decay_t<T>;
+        if constexpr (std::is_arithmetic_v<DecayT>) {
+            return casadi::DM(double(val));
+        } else if constexpr (std::is_same_v<DecayT, std::vector<double>>) {
+            return casadi::DM(val);
+        } else {
+            // Assume Eigen numeric matrix
+            casadi::DM m(val.rows(), val.cols());
+            for (int i = 0; i < val.rows(); ++i)
+                for (int j = 0; j < val.cols(); ++j)
+                    m(i, j) = double(val(i, j));
+            return m;
         }
-        return m;
     }
 
   public:
     /**
-     * @brief Evaluate function with vector of arguments (non-const lvalue)
-     * Resolves ambiguity with variadic template
+     * @brief Evaluate function with arbitrary arguments (scalars or Eigen matrices)
+     * Handles both numeric (double/MatrixXd) and symbolic (MX/SymbolicMatrix) inputs.
      *
-     * @param args Vector of input values
-     * @return std::vector<Eigen::MatrixXd> Vector of result matrices
+     * @tparam Args Argument types
+     * @param args Variadic arguments matching the function inputs
+     * @return Vector of result matrices (Eigen::MatrixXd or SymbolicMatrix)
      */
+    template <typename... Args> auto operator()(Args &&...args) const {
+        constexpr bool is_symbolic = (is_symbolic_type<std::decay_t<Args>>::value || ...);
+
+        if constexpr (is_symbolic) {
+            std::vector<casadi::MX> mx_args;
+            mx_args.reserve(sizeof...(args));
+            (mx_args.push_back(normalize_arg(std::forward<Args>(args))), ...);
+
+            std::vector<casadi::MX> res_mx = fn_(mx_args);
+            return to_eigen_vector<casadi::MX>(res_mx);
+        } else {
+            std::vector<casadi::DM> dm_args;
+            dm_args.reserve(sizeof...(args));
+            (dm_args.push_back(normalize_arg_dm(std::forward<Args>(args))), ...);
+
+            std::vector<casadi::DM> res_dm = fn_(dm_args);
+            return to_eigen_vector<double>(res_dm);
+        }
+    }
+
+    /**
+     * @brief Evaluate function and return first output
+     */
+    template <typename... Args> auto eval(Args &&...args) const {
+        auto results = operator()(std::forward<Args>(args)...);
+        return results[0];
+    }
+
+    // Explicit numeric vector overload
     std::vector<Eigen::MatrixXd> operator()(std::vector<double> &args) const {
         return operator()(const_cast<const std::vector<double> &>(args));
     }
 
-    /**
-     * @brief Evaluate function with vector of arguments (const lvalue)
-     *
-     * @param args Vector of input values
-     * @return std::vector<Eigen::MatrixXd> Vector of result matrices
-     */
     std::vector<Eigen::MatrixXd> operator()(const std::vector<double> &args) const {
         std::vector<casadi::DM> dm_args;
         dm_args.reserve(args.size());
@@ -127,31 +138,38 @@ class Function {
         }
 
         auto res_dm = fn_(dm_args);
-        return to_eigen_vector(res_dm);
+        return to_eigen_vector<double>(res_dm);
     }
 
-    // Allow evaluation with Eigen matrices if needed (phase 2 extension)
+    /**
+     * @brief Access the underlying CasADi function
+     * @return const reference to casadi::Function
+     */
+    const casadi::Function &casadi_function() const { return fn_; }
 
   private:
     casadi::Function fn_;
 
-    std::vector<Eigen::MatrixXd> to_eigen_vector(const std::vector<casadi::DM> &dms) const {
-        std::vector<Eigen::MatrixXd> ret;
+    template <typename Scalar, typename CasadiType>
+    std::vector<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>
+    to_eigen_vector(const std::vector<CasadiType> &dms) const {
+        std::vector<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>> ret;
         ret.reserve(dms.size());
         for (const auto &dm : dms) {
-            Eigen::MatrixXd mat(dm.size1(), dm.size2());
-            // Safe dense copy
-            // CasADi is column-major, Eigen is column-major by default.
-            std::vector<double> elements = static_cast<std::vector<double>>(dm);
-
-            // Map directly if possible, or memcpy
-            // elements gives column-major data
-            for (Eigen::Index j = 0; j < mat.cols(); ++j) {
-                for (Eigen::Index i = 0; i < mat.rows(); ++i) {
-                    mat(i, j) = elements[j * mat.rows() + i];
+            // Use generic converter if possible, or manual
+            if constexpr (std::is_same_v<CasadiType, casadi::MX>) {
+                ret.push_back(janus::to_eigen(dm));
+            } else {
+                using MatType = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
+                MatType mat(dm.size1(), dm.size2());
+                std::vector<double> elements = static_cast<std::vector<double>>(dm);
+                for (Eigen::Index j = 0; j < mat.cols(); ++j) {
+                    for (Eigen::Index i = 0; i < mat.rows(); ++i) {
+                        mat(i, j) = elements[j * mat.rows() + i];
+                    }
                 }
+                ret.push_back(mat);
             }
-            ret.push_back(mat);
         }
         return ret;
     }

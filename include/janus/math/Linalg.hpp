@@ -8,64 +8,7 @@
 namespace janus {
 
 // --- Conversion Helpers ---
-
-/**
- * @brief Convert Eigen matrix of MX to CasADi MX
- * @tparam Derived Eigen matrix type
- * @param e Input Eigen matrix
- * @return CasADi MX (dense)
- */
-template <typename Derived> casadi::MX to_mx(const Eigen::MatrixBase<Derived> &e) {
-    if (e.size() == 0)
-        return casadi::MX(e.rows(), e.cols());
-
-    // Create an MX of correct shape
-    casadi::MX m(e.rows(), e.cols());
-    // Fill it element-wise
-    for (Eigen::Index i = 0; i < e.rows(); ++i) {
-        for (Eigen::Index j = 0; j < e.cols(); ++j) {
-            m(static_cast<int>(i), static_cast<int>(j)) = e(i, j);
-        }
-    }
-    return m;
-}
-
-/**
- * @brief Convert CasADi MX to Eigen matrix of MX
- * @param m Input CasADi MX
- * @return Eigen matrix (dynamic size)
- */
-inline Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> to_eigen(const casadi::MX &m) {
-    Eigen::Matrix<casadi::MX, Eigen::Dynamic, Eigen::Dynamic> e(m.size1(), m.size2());
-    for (int i = 0; i < m.size1(); ++i) {
-        for (int j = 0; j < m.size2(); ++j) {
-            e(i, j) = m(i, j);
-        }
-    }
-    return e;
-}
-
-/**
- * @brief Convert CasADi MX vector to SymbolicVector (Eigen container of MX)
- *
- * This unpacks a CasADi MX (which internally represents a vector) into an
- * Eigen container where each element is an individual MX scalar.
- * Useful for passing symbolic vectors to templated functions that expect
- * JanusVector<Scalar> types.
- *
- * @param m Input CasADi MX (column vector)
- * @return SymbolicVector (Eigen::Matrix<casadi::MX, Dynamic, 1>)
- */
-inline SymbolicVector as_vector(const casadi::MX &m) {
-    SymbolicVector v(m.size1());
-    for (int i = 0; i < m.size1(); ++i) {
-        v(i) = m(i);
-    }
-    return v;
-}
-
-// Backwards compatibility alias
-inline SymbolicVector to_eigen_vec(const casadi::MX &m) { return as_vector(m); }
+// (Moved to JanusTypes.hpp: to_mx, to_eigen, as_vector)
 
 // --- solve(A, b) ---
 /**
