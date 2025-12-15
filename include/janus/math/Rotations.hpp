@@ -1,9 +1,9 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/Linalg.hpp"
 #include "janus/math/Trig.hpp"
-#include <Eigen/Dense>
 
 namespace janus {
 
@@ -15,11 +15,11 @@ namespace janus {
  * @param theta Rotation angle (radians)
  * @return 2x2 Rotation matrix
  */
-template <typename T> Eigen::Matrix<T, 2, 2> rotation_matrix_2d(const T &theta) {
+template <typename T> Mat2<T> rotation_matrix_2d(const T &theta) {
     T c = janus::cos(theta);
     T s = janus::sin(theta);
 
-    Eigen::Matrix<T, 2, 2> R;
+    Mat2<T> R;
     R(0, 0) = c;
     R(0, 1) = -s;
     R(1, 0) = s;
@@ -36,13 +36,13 @@ template <typename T> Eigen::Matrix<T, 2, 2> rotation_matrix_2d(const T &theta) 
  * @param axis Axis index (0=X, 1=Y, 2=Z)
  * @return 3x3 Rotation matrix
  */
-template <typename T> Eigen::Matrix<T, 3, 3> rotation_matrix_3d(const T &theta, int axis) {
+template <typename T> Mat3<T> rotation_matrix_3d(const T &theta, int axis) {
     T c = janus::cos(theta);
     T s = janus::sin(theta);
     T one = static_cast<T>(1.0);
     T zero = static_cast<T>(0.0);
 
-    Eigen::Matrix<T, 3, 3> R = Eigen::Matrix<T, 3, 3>::Identity();
+    Mat3<T> R = Mat3<T>::Identity();
 
     switch (axis) {
     case 0: // X-axis
@@ -82,8 +82,7 @@ template <typename T> Eigen::Matrix<T, 3, 3> rotation_matrix_3d(const T &theta, 
  * @return 3x3 Rotation matrix
  */
 template <typename T>
-Eigen::Matrix<T, 3, 3> rotation_matrix_from_euler_angles(const T &roll, const T &pitch,
-                                                         const T &yaw) {
+Mat3<T> rotation_matrix_from_euler_angles(const T &roll, const T &pitch, const T &yaw) {
     T sa = janus::sin(yaw);
     T ca = janus::cos(yaw);
     T sb = janus::sin(pitch);
@@ -91,7 +90,7 @@ Eigen::Matrix<T, 3, 3> rotation_matrix_from_euler_angles(const T &roll, const T 
     T sc = janus::sin(roll);
     T cc = janus::cos(roll);
 
-    Eigen::Matrix<T, 3, 3> R;
+    Mat3<T> R;
     // Row 0
     R(0, 0) = ca * cb;
     R(0, 1) = ca * sb * sc - sa * cc;

@@ -24,6 +24,7 @@ add_executable(test_math
     math/test_integrate_discrete.cpp
     math/test_integrate.cpp
     math/test_spacing.cpp
+    math/test_quaternion.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

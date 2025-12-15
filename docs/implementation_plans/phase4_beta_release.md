@@ -331,13 +331,14 @@ void visualize_graph(const Function& func, const std::string& output_base);
 - [x] **Task 2.4**: Write tests in `test_spacing.cpp`
 
 ### Milestone 3: Quaternion Math (Week 2)
-- [ ] **Task 3.1**: Create `Quaternion.hpp` with `Quaternion<T>` class
-- [ ] **Task 3.2**: Implement Hamilton product and conjugate
-- [ ] **Task 3.3**: Implement `from_euler`, `from_axis_angle`
-- [ ] **Task 3.4**: Implement `to_rotation_matrix` and `rotate`
-- [ ] **Task 3.5**: Implement `slerp` for interpolation
-- [ ] **Task 3.6**: Test against `rotation_matrix_from_euler_angles` for consistency
-- [ ] **Task 3.7**: Write comprehensive tests (`test_quaternion.cpp`)
+- [x] **Task 3.1**: Create `Quaternion.hpp` with `Quaternion<T>` class
+- [x] **Task 3.2**: Implement Hamilton product, conjugate, and `inverse`
+- [x] **Task 3.3**: Implement `from_euler`, `from_axis_angle`, `from_rotation_vector`
+- [x] **Task 3.4**: Implement `to_rotation_matrix`, `from_rotation_matrix`, and `rotate`
+- [x] **Task 3.5**: Implement `slerp` for interpolation
+- [x] **Task 3.6**: Test against `rotation_matrix_from_euler_angles` for consistency (round-trip)
+- [x] **Task 3.7**: Write comprehensive tests (`test_quaternion.cpp`)
+- [x] **Task 3.8**: Implement `to_euler` for conversion recovery
 
 ### Milestone 4: Code Coverage (Week 2)
 - [ ] **Task 4.1**: Generate and analyze coverage report

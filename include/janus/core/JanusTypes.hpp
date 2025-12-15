@@ -43,6 +43,19 @@ using JanusMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
 
 template <typename Scalar> using JanusVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
 
+// --- Fixed-Size Types ---
+/**
+ * Fixed-size vectors and matrices for performance-critical code.
+ * Stack-allocated, no heap overhead, SIMD-friendly.
+ */
+template <typename Scalar> using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
+template <typename Scalar> using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+template <typename Scalar> using Vec4 = Eigen::Matrix<Scalar, 4, 1>;
+
+template <typename Scalar> using Mat2 = Eigen::Matrix<Scalar, 2, 2>;
+template <typename Scalar> using Mat3 = Eigen::Matrix<Scalar, 3, 3>;
+template <typename Scalar> using Mat4 = Eigen::Matrix<Scalar, 4, 4>;
+
 // Numeric Backend
 using NumericScalar = double;
 using NumericMatrix = JanusMatrix<NumericScalar>; // Equivalent to Eigen::MatrixXd
