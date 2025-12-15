@@ -17,6 +17,7 @@
 #include "janus/math/Linalg.hpp"
 #include "janus/math/Logic.hpp"
 #include "janus/math/Quaternion.hpp"
+#include "janus/math/RootFinding.hpp"
 #include "janus/math/Rotations.hpp"
 #include "janus/math/Spacing.hpp"
 #include "janus/math/SurrogateModel.hpp"

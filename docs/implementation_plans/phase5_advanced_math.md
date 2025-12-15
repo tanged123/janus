@@ -363,9 +363,9 @@ Eigen::Matrix<Scalar, Eigen::Dynamic, 1> interpn_hermite(
 - [ ] **Task 5.4**: Write accuracy tests against known functions
 
 ### Milestone 5: Documentation & Polish (Week 3)
-- [ ] **Task 6.1**: Create `nd_interpolation_demo.cpp` example
-- [ ] **Task 6.2**: Create `rootfinding_demo.cpp` example
-- [ ] **Task 6.3**: Update `JanusMath.hpp` includes
+- [x] **Task 6.1**: Create `nd_interpolation_demo.cpp` example
+- [x] **Task 6.2**: Create `rootfinding_demo.cpp` example
+- [x] **Task 6.3**: Update `JanusMath.hpp` includes
 - [ ] **Task 6.4**: Update `docs/design_overview.md` with Phase 5 summary
 - [ ] **Task 6.5**: Update README with new feature highlights
 - [ ] **Task 6.6**: Run full test suite and coverage check

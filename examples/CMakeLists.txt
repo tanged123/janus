@@ -32,3 +32,10 @@ target_link_libraries(brachistochrone PRIVATE janus)
 
 add_executable(graph_visualization graph_visualization.cpp)
 target_link_libraries(graph_visualization PRIVATE janus)
+
+# Phase 5 Demonstrations
+add_executable(nd_interpolation_demo nd_interpolation_demo.cpp)
+target_link_libraries(nd_interpolation_demo PRIVATE janus)
+
+add_executable(rootfinding_demo rootfinding_demo.cpp)
+target_link_libraries(rootfinding_demo PRIVATE janus)
