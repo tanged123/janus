@@ -349,28 +349,20 @@ Eigen::Matrix<Scalar, Eigen::Dynamic, 1> interpn_hermite(
 - [x] **Task 2.5**: Test symbolic differentiation through bspline
 
 ### Milestone 3: Root Finding (Week 2)
-- [ ] **Task 3.1**: Create `RootFinding.hpp` with `RootFinderOptions`, `RootResult`
-- [ ] **Task 3.2**: Implement `rootfinder` using CasADi Newton solver
-- [ ] **Task 3.3**: Implement `create_implicit_function` for parametric problems
-- [ ] **Task 3.4**: Write tests for simple equations (quadratic, transcendental)
-- [ ] **Task 3.5**: Write tests for multi-dimensional root finding
-- [ ] **Task 3.6**: Test implicit function differentiation
+- [x] **Task 3.1**: Create `RootFinding.hpp` with `RootFinderOptions`, `RootResult`
+- [x] **Task 3.2**: Implement `rootfinder` function (numeric & symbolic)
+- [x] **Task 3.3**: Implement `create_implicit_function`
+- [ ] **Task 3.4**: Implement `NewtonSolver` wrapper class for fine control
+- [x] **Task 3.5**: Write tests for multi-dimensional root finding
+- [x] **Task 3.6**: Test implicit function differentiation
 
-### Milestone 4: C1 Hermite Gridded Interpolant (Week 2)
-- [ ] **Task 4.1**: Implement `HermiteSlopeMethod` enum and slope estimation functions
-- [ ] **Task 4.2**: Implement 1D Hermite cubic evaluation with Catmull-Rom slopes
-- [ ] **Task 4.3**: Add Akima and Monotone slope methods
-- [ ] **Task 4.4**: Extend to N-D via tensor-product interpolation
-- [ ] **Task 4.5**: Write tests verifying C1 continuity (derivative checks)
-- [ ] **Task 4.6**: Test monotonicity preservation for PCHIP method
-
-### Milestone 5: Enhanced 1D Natural Cubic Spline (Week 2)
+### Milestone 4: Enhanced 1D Natural Cubic Spline (Week 2)
 - [ ] **Task 5.1**: Implement `CubicSplineInterpolator` class
 - [ ] **Task 5.2**: Compute spline coefficients via tridiagonal solve
 - [ ] **Task 5.3**: Implement symbolic evaluation (or numeric-only if complex)
 - [ ] **Task 5.4**: Write accuracy tests against known functions
 
-### Milestone 6: Documentation & Polish (Week 3)
+### Milestone 5: Documentation & Polish (Week 3)
 - [ ] **Task 6.1**: Create `nd_interpolation_demo.cpp` example
 - [ ] **Task 6.2**: Create `rootfinding_demo.cpp` example
 - [ ] **Task 6.3**: Update `JanusMath.hpp` includes
