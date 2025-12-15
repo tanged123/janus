@@ -56,6 +56,90 @@ inline casadi::Dict opts_to_dict(const RootFinderOptions &opts) {
 } // namespace detail
 
 /**
+ * @brief Persistent Newton Solver
+ *
+ * Wrapper around CasADi's rootfinder for efficient re-use.
+ * Useful when solving the same problem multiple times with different initial guesses.
+ */
+class NewtonSolver {
+  public:
+    /**
+     * @brief Construct a new Newton Solver
+     *
+     * @param F Function F(x) = 0 to solve
+     * @param opts Solver options
+     */
+    NewtonSolver(const janus::Function &F, const RootFinderOptions &opts = {}) {
+        casadi::Function f_casadi = F.casadi_function();
+        // Check dimensions (strictly F(x) -> residual)
+        if (f_casadi.n_in() != 1 || f_casadi.n_out() != 1) {
+            throw JanusError("NewtonSolver: Function F must have 1 input and 1 output");
+        }
+        try {
+            solver_ =
+                casadi::rootfinder("rf_solver", "newton", f_casadi, detail::opts_to_dict(opts));
+        } catch (const std::exception &e) {
+            throw JanusError(std::string("NewtonSolver creation failed: ") + e.what());
+        }
+    }
+
+    /**
+     * @brief Solve F(x) = 0 from initial guess x0
+     */
+    template <typename Scalar>
+    RootResult<Scalar> solve(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> &x0) const {
+        RootResult<Scalar> result;
+        int n_x = static_cast<int>(x0.size());
+
+        if constexpr (std::is_floating_point_v<Scalar>) {
+            // Numeric execution
+            std::vector<double> x0_vec(x0.data(), x0.data() + x0.size());
+
+            std::vector<casadi::DM> args;
+            args.push_back(casadi::DM(x0_vec));
+            if (solver_.n_in() > 1) {
+                args.push_back(casadi::DM(0, 0));
+            }
+
+            try {
+                std::vector<casadi::DM> res_vec = solver_(args);
+
+                std::vector<double> x_sol = std::vector<double>(res_vec[0]);
+                result.x.resize(n_x);
+                for (int i = 0; i < n_x; ++i)
+                    result.x(i) = x_sol[i];
+
+                result.converged = true;
+                result.iterations = -1;
+                result.message = "Solved successfully";
+            } catch (const std::exception &e) {
+                result.converged = false;
+                result.message = e.what();
+                result.x = x0;
+            }
+        } else {
+            // Symbolic execution
+            casadi::MX x0_mx = janus::to_mx(x0);
+
+            std::vector<casadi::MX> args;
+            args.push_back(x0_mx);
+            if (solver_.n_in() > 1) {
+                args.push_back(casadi::MX(0, 0));
+            }
+            std::vector<casadi::MX> res = solver_(args);
+
+            result.x = janus::to_eigen(res[0]);
+            result.converged = true;
+            result.message = "Symbolic graph generated";
+        }
+        return result;
+    }
+
+  private:
+    casadi::Function solver_;
+};
+
+/**
  * @brief Solve F(x) = 0 for x given an initial guess
  *
  * Uses Newton's method. The function F must take x as input and return
@@ -71,90 +155,8 @@ template <typename Scalar>
 RootResult<Scalar> rootfinder(const janus::Function &F,
                               const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> &x0,
                               const RootFinderOptions &opts = {}) {
-    // Prepare dimensions
-    int n_x = static_cast<int>(x0.size());
-
-    // Create CasADi rootfinder instance
-    // F describes the residual. CasADi rootfinder expects an implicit function definition:
-    // G(x, p) = 0.
-    // Here we have F(x) = 0 (no parameters p).
-    // We need to wrap F into the format expected by start-up.
-
-    // Getting the underlying CasADi function
-    casadi::Function f_casadi = F.casadi_function();
-
-    // Check dimensions
-    if (f_casadi.n_in() != 1 || f_casadi.n_out() != 1) {
-        throw JanusError("Rootfinder: Function F must have 1 input and 1 output");
-    }
-
-    // Create rootfinder
-    // Name, Solver ("newton"), Implicit Function defining residual (f_casadi), Options
-    // Note: The implicit function passed to rootfinder defines the residual.
-    // For "newton", it expects a function [x, p] -> [residual]
-    // Since our F takes [x], we might need an adapter if F doesn't accept p.
-    // Actually, CasADi handles this: if n_in=1, it assumes p is empty.
-
-    casadi::Function solver;
-    try {
-        solver = casadi::rootfinder("rf_solver", "newton", f_casadi, detail::opts_to_dict(opts));
-    } catch (const std::exception &e) {
-        throw JanusError(std::string("Rootfinder creation failed: ") + e.what());
-    }
-
-    RootResult<Scalar> result;
-
-    if constexpr (std::is_floating_point_v<Scalar>) {
-        // Numeric execution
-        std::vector<double> x0_vec(x0.data(), x0.data() + x0.size());
-
-        // Inputs: initial guess (x0), parameters (p - if expected)
-        std::vector<casadi::DM> args;
-        args.push_back(casadi::DM(x0_vec));
-
-        if (solver.n_in() > 1) {
-            args.push_back(casadi::DM(0, 0));
-        }
-
-        try {
-            std::vector<casadi::DM> res_vec = solver(args);
-
-            // Extract solution (first output)
-            std::vector<double> x_sol = std::vector<double>(res_vec[0]);
-            result.x.resize(n_x);
-            for (int i = 0; i < n_x; ++i)
-                result.x(i) = x_sol[i];
-
-            // Diagnostics
-            result.converged = true;
-            result.iterations = -1; // Unknown from simple call
-            result.message = "Solved successfully";
-
-        } catch (const std::exception &e) {
-            result.converged = false;
-            result.message = e.what();
-            result.x = x0; // Return guess on failure
-        }
-    } else {
-        // Symbolic execution (MX)
-        // Convert x0 to MX
-        casadi::MX x0_mx = janus::to_mx(x0);
-
-        // Call solver symbolically
-        std::vector<casadi::MX> args;
-        args.push_back(x0_mx);
-        if (solver.n_in() > 1) {
-            args.push_back(casadi::MX(0, 0));
-        }
-        std::vector<casadi::MX> res = solver(args);
-
-        // Result is the first output
-        result.x = janus::to_eigen(res[0]);
-        result.converged = true; // Symbolic node assumed valid
-        result.message = "Symbolic graph generated";
-    }
-
-    return result;
+    NewtonSolver solver(F, opts);
+    return solver.solve(x0);
 }
 
 /**

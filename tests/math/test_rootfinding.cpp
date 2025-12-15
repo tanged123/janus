@@ -134,3 +134,25 @@ TEST(RootFindingTest, ImplicitFunctionDerivative) {
 
     EXPECT_NEAR(double(j_val[0]), 0.25, 1e-6);
 }
+
+TEST(RootFindingTest, NewtonSolverClass) {
+    auto x = sym("x");
+    auto f_expr = x * x - 9.0; // Roots at +/- 3
+    Function f("f", {x}, {f_expr});
+
+    // Create persistent solver
+    janus::NewtonSolver solver(f);
+
+    // Solve with first guess
+    Eigen::VectorXd x0(1);
+    x0 << 1.0;
+    auto res1 = solver.solve(x0);
+    EXPECT_TRUE(res1.converged);
+    EXPECT_NEAR(res1.x(0), 3.0, 1e-6);
+
+    // Solve with second guess
+    x0 << -1.0;
+    auto res2 = solver.solve(x0);
+    EXPECT_TRUE(res2.converged);
+    EXPECT_NEAR(res2.x(0), -3.0, 1e-6);
+}
