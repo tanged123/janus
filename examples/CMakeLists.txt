@@ -29,3 +29,6 @@ target_link_libraries(aircraft_attitudes PRIVATE janus)
 # Phase 4 Examples
 add_executable(brachistochrone brachistochrone.cpp)
 target_link_libraries(brachistochrone PRIVATE janus)
+
+add_executable(graph_visualization graph_visualization.cpp)
+target_link_libraries(graph_visualization PRIVATE janus)

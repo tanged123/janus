@@ -341,19 +341,20 @@ void visualize_graph(const Function& func, const std::string& output_base);
 - [x] **Task 3.8**: Implement `to_euler` for conversion recovery
 
 ### Milestone 4: Code Coverage (Week 2)
-- [ ] **Task 4.1**: Generate and analyze coverage report
-- [ ] **Task 4.2**: Add tests for uncovered Logic.hpp paths
-- [ ] **Task 4.3**: Add tests for uncovered Arithmetic.hpp paths
-- [ ] **Task 4.4**: Add tests for uncovered Linalg.hpp paths
-- [ ] **Task 4.5**: Add tests for uncovered Interpolate.hpp paths
-- [ ] **Task 4.6**: Verify 100% line coverage (or document intentional gaps)
+- [x] **Task 4.1**: Generate and analyze coverage report
+- [x] **Task 4.2**: Add tests for uncovered Logic.hpp paths
+- [x] **Task 4.3**: Add tests for uncovered Arithmetic.hpp paths
+- [x] **Task 4.4**: Add tests for uncovered Linalg.hpp paths
+- [x] **Task 4.5**: Add tests for uncovered Interpolate.hpp paths
+- [x] **Task 4.6**: Verify 100% line coverage (or document intentional gaps)
 
-### Milestone 5: Graph Visualization (Week 3)
-- [ ] **Task 5.1**: Extend `JanusIO.hpp` with `export_graph_dot`
-- [ ] **Task 5.2**: Implement `render_graph` (Graphviz wrapper)
-- [ ] **Task 5.3**: Add `visualize_graph` convenience function
-- [ ] **Task 5.4**: Create example demonstrating graph visualization
-- [ ] **Task 5.5**: Document usage in README or user guide
+### Milestone 5: Graph Visualization (Week 3) ✅ COMPLETE
+- [x] **Task 5.1**: Extend `JanusIO.hpp` with `export_graph_dot`
+- [x] **Task 5.2**: Implement `render_graph` (Graphviz wrapper)
+- [x] **Task 5.3**: Add `visualize_graph` convenience function
+- [x] **Task 5.4**: Create example demonstrating graph visualization
+- [x] **Task 5.5**: Write tests for graph visualization (6 tests)
+
 
 ### Milestone 6: Beta 1.0 Polish (Week 3)
 - [ ] **Task 6.1**: Update `JanusMath.hpp` to include all new headers
