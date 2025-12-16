@@ -2,8 +2,9 @@
 
 **Goal**: Implement sparsity introspection, higher-order symbolic derivatives, and optimization extensions to complete the Janus core math library.
 
-**Status**: Planning Draft  
+**Status**: In Progress
 **Created**: 2025-12-16
+**Last Updated**: 2025-12-16
 
 ---
 
@@ -136,6 +137,7 @@ SparsityPattern get_jacobian_sparsity(const Function& fn);
 - Wrap `casadi::Sparsity` class
 - Use `casadi::MX::jacobian_sparsity()` for efficient pattern extraction
 - ASCII spy plot: iterate nonzeros and print `*` vs `.`
+- **COMPLETED**: Implemented `SparsityPattern` in `include/janus/core/Sparsity.hpp`. Refactored to use `janus::SymbolicScalar` and `janus::NumericMatrix` native types. Added `visualize_spy` for PDF generation using Graphviz HTML tables. Added `examples/intro/sparsity_intro.cpp` with 2D Laplacian example.
 
 ---
 
@@ -435,21 +437,23 @@ SparseMatrix sparse_from_triplets(
 
 ## Task Breakdown & Milestones
 
-### Milestone 7.1: Sparsity Introspection (2-3 days)
+### Milestone 7.1: Sparsity Introspection (Completed)
 
-- [ ] Create `include/janus/core/Sparsity.hpp`
-- [ ] Implement `SparsityPattern` class with query methods
-- [ ] Implement `jacobian_sparsity()`, `hessian_sparsity()`
-- [ ] Implement ASCII spy plot visualization
-- [ ] Create `tests/core/test_sparsity.cpp`
+- [x] Create `include/janus/core/Sparsity.hpp`
+- [x] Implement `SparsityPattern` class with query methods
+- [x] Implement `jacobian_sparsity()`, `hessian_sparsity()`
+- [x] Implement ASCII spy plot visualization
+- [x] Create `tests/core/test_sparsity.cpp`
+- [x] Create `examples/intro/sparsity_intro.cpp` (2D Laplacian example added)
+- [x] Add PDF visualization support (`visualize_spy`)
 
-### Milestone 7.2: Higher-Order Derivatives (1-2 days)
+### Milestone 7.2: Higher-Order Derivatives (Completed)
 
-- [ ] Add `sym_gradient()` to AutoDiff.hpp
-- [ ] Add `hessian()` to AutoDiff.hpp
-- [ ] Add `hessian_lagrangian()` to AutoDiff.hpp
-- [ ] Create `tests/math/test_autodiff.cpp` for Hessian tests
-- [ ] Document distinction from numerical `gradient()` in Calculus.hpp
+- [x] Add `sym_gradient()` to AutoDiff.hpp
+- [x] Add `hessian()` to AutoDiff.hpp
+- [x] Add `hessian_lagrangian()` to AutoDiff.hpp
+- [x] Create `tests/math/test_autodiff.cpp` for Hessian tests
+- [x] Document distinction from numerical `gradient()` in Calculus.hpp
 
 ### Milestone 7.3: Variable Freezing (2-3 days)
 
@@ -538,9 +542,9 @@ SparseMatrix sparse_from_triplets(
 
 ## Success Criteria
 
-1. ☐ `SparsityPattern` class implemented with full query API
-2. ☐ `jacobian_sparsity()` and `hessian_sparsity()` working
-3. ☐ `sym_gradient()` and `hessian()` implemented
+1. [x] `SparsityPattern` class implemented with full query API
+2. [x] `jacobian_sparsity()` and `hessian_sparsity()` working
+3. [x] `sym_gradient()` and `hessian()` implemented
 4. ☐ Variable freezing functional for partial optimization
 5. ☐ Solution caching saves/loads correctly
 6. ☐ `solve_sweep()` runs parametric studies
