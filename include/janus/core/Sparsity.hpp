@@ -44,7 +44,7 @@ class SparsityPattern {
     /**
      * @brief Construct from CasADi MX (extracts its sparsity)
      */
-    explicit SparsityPattern(const casadi::MX &mx) : sp_(mx.sparsity()) {}
+    explicit SparsityPattern(const SymbolicScalar &mx) : sp_(mx.sparsity()) {}
 
     // === Query Interface ===
 

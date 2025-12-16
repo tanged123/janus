@@ -116,8 +116,8 @@ TEST(SparsityTests, JacobianSparsity_Linear) {
     // f = A*x where A is 2x3
     // Jacobian df/dx = A, which is dense 2x3
     auto x = sym("x", 3);
-    casadi::MX A = casadi::DM({{1, 2, 3}, {4, 5, 6}});
-    auto f = casadi::MX::mtimes(A, x);
+    SymbolicScalar A = to_mx(Eigen::MatrixXd{{1, 2, 3}, {4, 5, 6}});
+    auto f = SymbolicScalar::mtimes(A, x);
 
     auto sp = sparsity_of_jacobian(f, x);
 
@@ -148,7 +148,7 @@ TEST(SparsityTests, JacobianSparsity_Scalar) {
     // f = x*y, Jacobian [y, x]
     auto x = sym("x");
     auto y = sym("y");
-    auto vars = casadi::MX::vertcat({x, y});
+    auto vars = SymbolicScalar::vertcat({x, y});
     auto f = x * y;
 
     auto sp = sparsity_of_jacobian(f, vars);
@@ -168,7 +168,7 @@ TEST(SparsityTests, HessianSparsity_Quadratic) {
     auto x = sym("x");
     auto y = sym("y");
     auto z = sym("z");
-    auto vars = casadi::MX::vertcat({x, y, z});
+    auto vars = SymbolicScalar::vertcat({x, y, z});
     auto f = x * x + y * y + z * z;
 
     auto sp = sparsity_of_hessian(f, vars);
@@ -188,7 +188,7 @@ TEST(SparsityTests, HessianSparsity_CrossTerms) {
     // Hessian = [[0, 1], [1, 0]]
     auto x = sym("x");
     auto y = sym("y");
-    auto vars = casadi::MX::vertcat({x, y});
+    auto vars = SymbolicScalar::vertcat({x, y});
     auto f = x * y;
 
     auto sp = sparsity_of_hessian(f, vars);

@@ -25,7 +25,7 @@ int main() {
     // f(x) = [x0^2, x0*x1, x2]
     {
         auto x = sym("x", 3);
-        auto f = casadi::MX::vertcat({
+        auto f = SymbolicScalar::vertcat({
             x(0) * x(0), // Depends only on x0
             x(0) * x(1), // Depends on x0 and x1
             x(2)         // Depends only on x2
@@ -70,11 +70,11 @@ int main() {
         auto y = sym("y", N);
 
         // System 1 depends only on x, System 2 depends only on y
-        auto sys1 = casadi::MX::mtimes(casadi::DM::rand(N, N), x);
-        auto sys2 = casadi::MX::mtimes(casadi::DM::rand(N, N), y);
+        auto sys1 = SymbolicScalar::mtimes(to_mx(NumericMatrix::Random(N, N)), x);
+        auto sys2 = SymbolicScalar::mtimes(to_mx(NumericMatrix::Random(N, N)), y);
 
-        auto combined_out = casadi::MX::vertcat({sys1, sys2});
-        auto combined_in = casadi::MX::vertcat({x, y});
+        auto combined_out = SymbolicScalar::vertcat({sys1, sys2});
+        auto combined_in = SymbolicScalar::vertcat({x, y});
 
         auto sp = sparsity_of_jacobian(combined_out, combined_in);
 
@@ -101,7 +101,7 @@ int main() {
         // Use sym_vec_pair to get both the vector for indexing and the raw MX for function
         // definition
         auto [x_vec, x_mx] = janus::sym_vec_pair("x", n_vars);
-        std::vector<janus::SymbolicScalar> eqs(n_vars);
+        std::vector<SymbolicScalar> eqs(n_vars);
 
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j < N; ++j) {
@@ -121,7 +121,7 @@ int main() {
         }
 
         // Pass the raw MX symbol (x_mx) as the input
-        janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
+        janus::Function f_pde({x_mx}, {SymbolicScalar::vertcat(eqs)});
         auto sp = janus::get_jacobian_sparsity(f_pde, 0, 0);
 
         std::cout << "Sparsity: " << sp.n_rows() << "x" << sp.n_cols() << ", nnz=" << sp.nnz()
