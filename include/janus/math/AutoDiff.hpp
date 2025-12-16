@@ -19,13 +19,13 @@ namespace janus {
  */
 template <typename Expr, typename... Vars>
 auto jacobian(const Expr &expression, const Vars &...variables) {
-    if constexpr (std::is_same_v<Expr, casadi::MX>) {
+    if constexpr (std::is_same_v<Expr, SymbolicScalar>) {
         // Collect pack into a vector of MX
-        std::vector<casadi::MX> vars;
+        std::vector<SymbolicScalar> vars;
         (vars.push_back(variables), ...);
 
-        casadi::MX v_cat = casadi::MX::vertcat(vars);
-        return casadi::MX::jacobian(expression, v_cat);
+        SymbolicScalar v_cat = SymbolicScalar::vertcat(vars);
+        return SymbolicScalar::jacobian(expression, v_cat);
     } else {
         // Fallback or static_assert for non-symbolic types
         // Ideally we would support numeric autodiff here later
@@ -37,8 +37,8 @@ auto jacobian(const Expr &expression, const Vars &...variables) {
 
 // Helper to separate implementation
 namespace detail {
-inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg> &args) {
-    std::vector<casadi::MX> ret;
+inline std::vector<SymbolicScalar> to_mx_vector(const std::vector<SymbolicArg> &args) {
+    std::vector<SymbolicScalar> ret;
     ret.reserve(args.size());
     for (const auto &arg : args)
         ret.push_back(arg.get());
@@ -55,9 +55,9 @@ inline std::vector<casadi::MX> to_mx_vector(const std::vector<SymbolicArg> &args
  */
 inline auto jacobian(const std::vector<SymbolicArg> &expressions,
                      const std::vector<SymbolicArg> &variables) {
-    casadi::MX expr_cat = casadi::MX::vertcat(detail::to_mx_vector(expressions));
-    casadi::MX var_cat = casadi::MX::vertcat(detail::to_mx_vector(variables));
-    return casadi::MX::jacobian(expr_cat, var_cat);
+    SymbolicScalar expr_cat = SymbolicScalar::vertcat(detail::to_mx_vector(expressions));
+    SymbolicScalar var_cat = SymbolicScalar::vertcat(detail::to_mx_vector(variables));
+    return SymbolicScalar::jacobian(expr_cat, var_cat);
 }
 
 } // namespace janus

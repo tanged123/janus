@@ -446,7 +446,7 @@ interpn(const std::vector<Eigen::VectorXd> &points, const Eigen::VectorXd &value
         // Symbolic evaluation
         // Build query matrix for batch evaluation
         // CasADi expects shape (n_dims, n_points)
-        casadi::MX xi_mx = janus::to_mx(xi_work.transpose());
+        SymbolicScalar xi_mx = janus::to_mx(xi_work.transpose());
 
         // Handle bounds checking with fill_value using where
         if (fill_value.has_value()) {
@@ -674,9 +674,9 @@ class Interp1D {
                     "Interp1D: Hermite method not supported for symbolic types");
             }
             // Symbolic: Convert -> Call -> Convert
-            casadi::MX q_mx = janus::to_mx(query);
-            std::vector<casadi::MX> args = {q_mx};
-            std::vector<casadi::MX> res = m_casadi_fn(args);
+            SymbolicScalar q_mx = janus::to_mx(query);
+            std::vector<SymbolicScalar> args = {q_mx};
+            std::vector<SymbolicScalar> res = m_casadi_fn(args);
             return janus::to_eigen(res[0]);
         }
     }
@@ -709,10 +709,10 @@ class Interp1D {
         return static_cast<double>(res[0]);
     }
 
-    casadi::MX eval_symbolic(const casadi::MX &query) const {
+    SymbolicScalar eval_symbolic(const SymbolicScalar &query) const {
         // Clamp to bounds
-        casadi::MX clamped = casadi::MX::fmax(query, m_x.front());
-        clamped = casadi::MX::fmin(clamped, m_x.back());
+        SymbolicScalar clamped = SymbolicScalar::fmax(query, m_x.front());
+        clamped = SymbolicScalar::fmin(clamped, m_x.back());
 
         std::vector<casadi::MX> args = {clamped};
         std::vector<casadi::MX> res = m_casadi_fn(args);

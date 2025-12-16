@@ -1,5 +1,6 @@
 #pragma once
 #include "janus/core/JanusError.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 #include <cstdlib>
@@ -52,9 +53,9 @@ void disp(const std::string &label, const Eigen::MatrixBase<Derived> &mat) {
  */
 template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         // Flatten to MX, evaluate, map back
-        casadi::MX flat = casadi::MX::zeros(mat.rows(), mat.cols());
+        SymbolicScalar flat = SymbolicScalar::zeros(mat.rows(), mat.cols());
         for (int i = 0; i < mat.rows(); ++i) {
             for (int j = 0; j < mat.cols(); ++j) {
                 flat(i, j) = mat(i, j);
@@ -66,7 +67,7 @@ template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
             auto res = f(std::vector<casadi::DM>{});
             casadi::DM res_dm = res[0];
 
-            Eigen::MatrixXd res_eigen(mat.rows(), mat.cols());
+            NumericMatrix res_eigen(mat.rows(), mat.cols());
             for (int i = 0; i < mat.rows(); ++i) {
                 for (int j = 0; j < mat.cols(); ++j) {
                     res_eigen(i, j) = static_cast<double>(res_dm(i, j));
@@ -82,8 +83,8 @@ template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
     }
 }
 
-// Explicit overload for casadi::MX scalar
-inline double eval(const casadi::MX &val) {
+// Explicit overload for SymbolicScalar scalar
+inline double eval(const SymbolicScalar &val) {
     try {
         casadi::Function f("f", {}, {val});
         auto res = f(std::vector<casadi::DM>{});
@@ -146,7 +147,7 @@ inline std::string escape_dot_label(const std::string &s) {
 /**
  * @brief Get a short description of an MX operation type
  */
-inline std::string get_op_name(const casadi::MX &mx) {
+inline std::string get_op_name(const SymbolicScalar &mx) {
     if (mx.is_symbolic()) {
         std::ostringstream ss;
         mx.disp(ss, false);
@@ -199,10 +200,10 @@ inline std::string get_op_name(const casadi::MX &mx) {
  * @param filename Output filename (without extension, .dot will be added)
  * @param name Optional graph name for DOT file
  */
-inline void export_graph_dot(const casadi::MX &expr, const std::string &filename,
+inline void export_graph_dot(const SymbolicScalar &expr, const std::string &filename,
                              const std::string &name = "expression") {
     // Get all free variables
-    std::vector<casadi::MX> free_vars = casadi::MX::symvar(expr);
+    std::vector<SymbolicScalar> free_vars = SymbolicScalar::symvar(expr);
 
     // Build DOT file
     std::string dot_filename = filename + ".dot";
@@ -229,11 +230,11 @@ inline void export_graph_dot(const casadi::MX &expr, const std::string &filename
     int node_counter = 0;
 
     // BFS traversal to collect all nodes
-    std::vector<casadi::MX> queue = {expr};
+    std::vector<SymbolicScalar> queue = {expr};
     std::map<const void *, int> ptr_to_id;
 
     while (!queue.empty()) {
-        casadi::MX current = queue.back();
+        SymbolicScalar current = queue.back();
         queue.pop_back();
 
         const void *ptr = current.get();
@@ -247,7 +248,7 @@ inline void export_graph_dot(const casadi::MX &expr, const std::string &filename
         // Get dependencies
         casadi_int n = current.n_dep();
         for (casadi_int i = 0; i < n; ++i) {
-            casadi::MX dep = current.dep(i);
+            SymbolicScalar dep = current.dep(i);
             queue.push_back(dep);
         }
     }
@@ -257,7 +258,7 @@ inline void export_graph_dot(const casadi::MX &expr, const std::string &filename
     queue = {expr};
 
     while (!queue.empty()) {
-        casadi::MX current = queue.back();
+        SymbolicScalar current = queue.back();
         queue.pop_back();
 
         const void *ptr = current.get();
@@ -288,7 +289,7 @@ inline void export_graph_dot(const casadi::MX &expr, const std::string &filename
         // Add edges from dependencies
         casadi_int n = current.n_dep();
         for (casadi_int i = 0; i < n; ++i) {
-            casadi::MX dep = current.dep(i);
+            SymbolicScalar dep = current.dep(i);
             const void *dep_ptr = dep.get();
             int dep_id = ptr_to_id[dep_ptr];
             out << "  node_" << dep_id << " -> node_" << current_id << ";\n";
@@ -351,7 +352,7 @@ inline bool render_graph(const std::string &dot_file, const std::string &output_
  * @param output_base Base filename (creates output_base.dot and output_base.pdf)
  * @return true if both export and render succeeded
  */
-inline bool visualize_graph(const casadi::MX &expr, const std::string &output_base) {
+inline bool visualize_graph(const SymbolicScalar &expr, const std::string &output_base) {
     try {
         export_graph_dot(expr, output_base);
         return render_graph(output_base + ".dot", output_base + ".pdf");

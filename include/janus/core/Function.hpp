@@ -95,7 +95,7 @@ class Function {
      *
      * @tparam Args Argument types
      * @param args Variadic arguments matching the function inputs
-     * @return Vector of result matrices (Eigen::MatrixXd or SymbolicMatrix)
+     * @return Vector of result matrices (NumericMatrix or SymbolicMatrix)
      */
     template <typename... Args> auto operator()(Args &&...args) const {
         constexpr bool is_symbolic = (is_symbolic_type<std::decay_t<Args>>::value || ...);
@@ -126,11 +126,11 @@ class Function {
     }
 
     // Explicit numeric vector overload
-    std::vector<Eigen::MatrixXd> operator()(std::vector<double> &args) const {
+    std::vector<NumericMatrix> operator()(std::vector<double> &args) const {
         return operator()(const_cast<const std::vector<double> &>(args));
     }
 
-    std::vector<Eigen::MatrixXd> operator()(const std::vector<double> &args) const {
+    std::vector<NumericMatrix> operator()(const std::vector<double> &args) const {
         std::vector<casadi::DM> dm_args;
         dm_args.reserve(args.size());
         for (double val : args) {
@@ -151,16 +151,15 @@ class Function {
     casadi::Function fn_;
 
     template <typename Scalar, typename CasadiType>
-    std::vector<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>
-    to_eigen_vector(const std::vector<CasadiType> &dms) const {
-        std::vector<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>> ret;
+    std::vector<JanusMatrix<Scalar>> to_eigen_vector(const std::vector<CasadiType> &dms) const {
+        std::vector<JanusMatrix<Scalar>> ret;
         ret.reserve(dms.size());
         for (const auto &dm : dms) {
             // Use generic converter if possible, or manual
             if constexpr (std::is_same_v<CasadiType, casadi::MX>) {
                 ret.push_back(janus::to_eigen(dm));
             } else {
-                using MatType = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
+                using MatType = JanusMatrix<Scalar>;
                 MatType mat(dm.size1(), dm.size2());
                 std::vector<double> elements = static_cast<std::vector<double>>(dm);
                 for (Eigen::Index j = 0; j < mat.cols(); ++j) {

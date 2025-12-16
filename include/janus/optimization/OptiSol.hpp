@@ -58,12 +58,12 @@ class OptiSol {
      * @param var Symbolic matrix from opti operations
      * @return Optimized numeric matrix
      */
-    Eigen::MatrixXd value(const SymbolicMatrix &var) const {
+    NumericMatrix value(const SymbolicMatrix &var) const {
         casadi::MX mx_var = janus::to_mx(var);
         casadi::DM result = cas_sol_.value(mx_var);
 
         std::vector<double> elements = static_cast<std::vector<double>>(result);
-        Eigen::MatrixXd mat(result.size1(), result.size2());
+        NumericMatrix mat(result.size1(), result.size2());
 
         // CasADi uses column-major (Fortran) order
         for (casadi_int j = 0; j < result.size2(); ++j) {

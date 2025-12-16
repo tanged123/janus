@@ -72,8 +72,8 @@ class Opti {
         double s = scale.value_or(std::abs(init_guess) > 0 ? std::abs(init_guess) : 1.0);
 
         // Create scaled variable
-        casadi::MX raw_var = opti_.variable();
-        casadi::MX scaled_var = s * raw_var;
+        SymbolicScalar raw_var = opti_.variable();
+        SymbolicScalar scaled_var = s * raw_var;
 
         // Set initial guess
         opti_.set_initial(raw_var, init_guess / s);
@@ -107,8 +107,8 @@ class Opti {
         double s = scale.value_or(std::abs(init_guess) > 0 ? std::abs(init_guess) : 1.0);
 
         // Create scaled variable
-        casadi::MX raw_var = opti_.variable(n_vars, 1);
-        casadi::MX scaled_var = s * raw_var;
+        SymbolicScalar raw_var = opti_.variable(n_vars, 1);
+        SymbolicScalar scaled_var = s * raw_var;
 
         // Set initial guess (constant vector)
         opti_.set_initial(raw_var, init_guess / s);
@@ -144,8 +144,8 @@ class Opti {
         double s = scale.value_or(mean_abs > 0 ? mean_abs : 1.0);
 
         // Create scaled variable
-        casadi::MX raw_var = opti_.variable(n_vars, 1);
-        casadi::MX scaled_var = s * raw_var;
+        SymbolicScalar raw_var = opti_.variable(n_vars, 1);
+        SymbolicScalar scaled_var = s * raw_var;
 
         // Set initial guess (convert Eigen to std::vector)
         std::vector<double> init_vec(init_guess.data(), init_guess.data() + init_guess.size());
@@ -178,7 +178,7 @@ class Opti {
      * @return Symbolic scalar representing the parameter
      */
     SymbolicScalar parameter(double value) {
-        casadi::MX param = opti_.parameter();
+        SymbolicScalar param = opti_.parameter();
         opti_.set_value(param, value);
         return param;
     }
@@ -191,7 +191,7 @@ class Opti {
      */
     SymbolicVector parameter(const NumericVector &value) {
         int n = static_cast<int>(value.size());
-        casadi::MX param = opti_.parameter(n, 1);
+        SymbolicScalar param = opti_.parameter(n, 1);
         std::vector<double> vals(value.data(), value.data() + value.size());
         opti_.set_value(param, vals);
         return janus::to_eigen(param);

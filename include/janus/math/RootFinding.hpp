@@ -119,14 +119,14 @@ class NewtonSolver {
             }
         } else {
             // Symbolic execution
-            casadi::MX x0_mx = janus::to_mx(x0);
+            SymbolicScalar x0_mx = janus::to_mx(x0);
 
-            std::vector<casadi::MX> args;
+            std::vector<SymbolicScalar> args;
             args.push_back(x0_mx);
             if (solver_.n_in() > 1) {
-                args.push_back(casadi::MX(0, 0));
+                args.push_back(SymbolicScalar(0, 0));
             }
-            std::vector<casadi::MX> res = solver_(args);
+            std::vector<SymbolicScalar> res = solver_(args);
 
             result.x = janus::to_eigen(res[0]);
             result.converged = true;
@@ -145,7 +145,7 @@ class NewtonSolver {
  * Uses Newton's method. The function F must take x as input and return
  * a residual vector of the same dimension.
  *
- * @tparam Scalar double (numeric) or casadi::MX (symbolic)
+ * @tparam Scalar double (numeric) or SymbolicScalar (symbolic)
  * @param F Function mapping x -> residual (must be janus::Function)
  * @param x0 Initial guess
  * @param opts Solver options
@@ -188,13 +188,13 @@ inline janus::Function create_implicit_function(const janus::Function &G,
     int n_p = g_casadi.n_in() > 1 ? g_casadi.size2_in(1) : 0; // Assuming 2nd input is p
     int n_x = x_guess.size();
 
-    casadi::MX p = casadi::MX::sym("p", n_p);
+    SymbolicScalar p = SymbolicScalar::sym("p", n_p);
     casadi::MX x0 =
         casadi::DM(std::vector<double>(x_guess.data(), x_guess.data() + x_guess.size()));
 
     // Call solver
     // Inputs: x0, p
-    casadi::MX x_sol = solver(std::vector<casadi::MX>{x0, p})[0];
+    SymbolicScalar x_sol = solver(std::vector<SymbolicScalar>{x0, p})[0];
 
     // Create janus::Function
     // Input: p, Output: x_sol
