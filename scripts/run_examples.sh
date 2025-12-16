@@ -29,6 +29,14 @@ echo "[intro/2] Numeric Intro"
 ./build/examples/numeric_intro
 echo ""
 
+echo "[intro/3] Print Intro"
+./build/examples/print_example
+echo ""
+
+echo "[intro/4] Sparsity Intro"
+./build/examples/sparsity_intro
+echo ""
+
 # =============================================================================
 # Math Examples
 # =============================================================================

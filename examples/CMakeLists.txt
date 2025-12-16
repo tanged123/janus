@@ -10,6 +10,9 @@ target_link_libraries(energy_intro PRIVATE janus)
 add_executable(print_example intro/print_example.cpp)
 target_link_libraries(print_example PRIVATE janus)
 
+add_executable(sparsity_intro intro/sparsity_intro.cpp)
+target_link_libraries(sparsity_intro PRIVATE janus)
+
 # =============================================================================
 # Math Examples
 # =============================================================================

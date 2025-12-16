@@ -173,3 +173,91 @@ TEST(AutoDiffTests, JacobianMatrixSymbolicArg) {
     EXPECT_NEAR(J(0, 0), 2.0, 1e-10);
     EXPECT_NEAR(J(0, 1), 4.0, 1e-10);
 }
+
+// ============================================================================
+// Higher-Order Derivatives Tests (Phase 7)
+// ============================================================================
+
+TEST(AutoDiffTests, SymbolicGradient) {
+    // f(x, y) = x^2 * y
+    // grad(f) = [2xy, x^2] (column vector)
+    auto x = janus::sym("x");
+    auto y = janus::sym("y");
+    auto f = janus::pow(x, 2.0) * y;
+
+    // Compute symbolic gradient
+    auto g_sym = janus::sym_gradient(f, {x, y});
+
+    // Verify it's a column vector
+    EXPECT_EQ(g_sym.cols(), 1);
+    EXPECT_EQ(g_sym.rows(), 2);
+
+    // Evaluate
+    janus::Function g_fun({x, y}, {g_sym});
+    auto g_val = g_fun.eval(3.0, 2.0); // x=3, y=2
+
+    // grad = [2*3*2, 3^2] = [12, 9]
+    EXPECT_NEAR(g_val(0), 12.0, 1e-10);
+    EXPECT_NEAR(g_val(1), 9.0, 1e-10);
+}
+
+TEST(AutoDiffTests, HessianMatrix) {
+    // f(x, y) = x^2 + 3xy + y^3
+    // grad(f) = [2x + 3y, 3x + 3y^2]
+    // H(f) = [[2, 3],
+    //         [3, 6y]]
+    auto x = janus::sym("x");
+    auto y = janus::sym("y");
+    auto f = janus::pow(x, 2.0) + 3.0 * x * y + janus::pow(y, 3.0);
+
+    auto H_sym = janus::hessian(f, {x, y});
+
+    // Verify dimensions
+    EXPECT_EQ(H_sym.rows(), 2);
+    EXPECT_EQ(H_sym.cols(), 2);
+
+    // Evaluate
+    janus::Function H_fun({x, y}, {H_sym});
+    auto H_val = H_fun.eval(1.0, 2.0); // y=2
+
+    // H = [[2, 3], [3, 6*2]] = [[2, 3], [3, 12]]
+    EXPECT_NEAR(H_val(0, 0), 2.0, 1e-10);
+    EXPECT_NEAR(H_val(0, 1), 3.0, 1e-10);
+    EXPECT_NEAR(H_val(1, 0), 3.0, 1e-10);
+    EXPECT_NEAR(H_val(1, 1), 12.0, 1e-10);
+}
+
+TEST(AutoDiffTests, HessianLagrangian) {
+    // Minimize f(x) = x^2 subject to g(x) = x - 1 = 0
+    // L = x^2 + lambda * (x - 1)
+    // H_L = d^2L/dx^2 = 2
+
+    auto x = janus::sym("x");
+    auto lam = janus::sym("lam");
+
+    auto obj = janus::pow(x, 2.0);
+    auto constr = x - 1.0;
+
+    auto HL_sym = janus::hessian_lagrangian(obj, constr, x, lam);
+
+    janus::Function HL_fun({x, lam}, {HL_sym});
+    auto HL_val = HL_fun.eval(0.0, 0.0);
+
+    EXPECT_NEAR(HL_val(0, 0), 2.0, 1e-10);
+
+    // Case 2: Multi-dimensional
+    // f = x^2 + y^2, g = x+y
+    // L = x^2 + y^2 + lam*(x+y)
+    // H_L = diag(2, 2)
+    auto y = janus::sym("y");
+    auto obj2 = janus::pow(x, 2.0) + janus::pow(y, 2.0);
+    auto constr2 = x + y;
+
+    auto HL2_sym = janus::hessian_lagrangian(obj2, constr2, {x, y}, lam);
+    janus::Function HL2_fun({x, y, lam}, {HL2_sym});
+    auto HL2_val = HL2_fun.eval(0.0, 0.0, 0.0);
+
+    EXPECT_NEAR(HL2_val(0, 0), 2.0, 1e-10);
+    EXPECT_NEAR(HL2_val(1, 1), 2.0, 1e-10);
+    EXPECT_NEAR(HL2_val(0, 1), 0.0, 1e-10);
+}
