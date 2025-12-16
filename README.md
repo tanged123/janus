@@ -149,10 +149,15 @@ janus/
 │           ├── Linalg.hpp           # Linear algebra extensions
 │           ├── Logic.hpp            # Logical ops & branching (where)
 │           ├── Quaternion.hpp       # Quaternion algebra
+│           ├── RootFinding.hpp      # Root finding algorithms
 │           ├── Rotations.hpp        # 2D/3D rotations
 │           ├── Spacing.hpp          # Grid generation
 │           ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, etc)
-│           └── Trig.hpp             # Trigonometry
+│           ├── Trig.hpp             # Trigonometry
+│       ├── optimization/       # Optimization Layer (Phase 6)
+│       │   ├── Opti.hpp             # Main solver interface
+│       │   ├── OptiOptions.hpp      # Solver configuration
+│       │   └── OptiSol.hpp          # Solution wrappers
 ├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
