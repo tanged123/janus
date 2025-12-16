@@ -158,3 +158,14 @@ janus/
 └── flake.nix           # Nix Environment Definition
 ```
 
+## Inspiration & Credits
+
+Janus is heavily inspired by **AeroSandbox**, Peter Sharpe's Python-based design optimization framework. Janus serves as a C++ implementation and extension of the "Code Transformations" paradigm pioneered by Sharpe.
+
+*   **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
+*   **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
+
+Janus is built upon the shoulders of giants:
+*   **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
+*   **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
+

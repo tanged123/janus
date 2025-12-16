@@ -5,10 +5,10 @@
 // Physics model: Drag Coefficient
 // Cd = Cd0 + k * (Cl - Cl0)^2
 // Drag = 0.5 * rho * v^2 * S * Cd
-
-template <typename Scalar>
-Scalar compute_drag(const Scalar &rho, const Scalar &v, const Scalar &S, const Scalar &Cd0,
-                    const Scalar &k, const Scalar &Cl, const Scalar &Cl0) {
+//
+// C++20 "Abbreviated Function Template" (auto params)
+// Allows implicit mixing of double constants and Symbolic variables!
+auto compute_drag(auto rho, auto v, auto S, auto Cd0, auto k, auto Cl, auto Cl0) {
     auto q = 0.5 * rho * janus::pow(v, 2.0);
     auto Cd = Cd0 + k * janus::pow(Cl - Cl0, 2.0);
     return q * S * Cd;
@@ -31,14 +31,9 @@ int main() {
     auto v_sym = janus::sym("v");
     auto Cl_sym = janus::sym("Cl");
 
-    // Constants for symbolic evaluation
-    janus::SymbolicScalar rho_s = rho;
-    janus::SymbolicScalar S_s = S;
-    janus::SymbolicScalar Cd0_s = Cd0;
-    janus::SymbolicScalar k_s = k;
-    janus::SymbolicScalar Cl0_s = Cl0;
-
-    auto drag_sym = compute_drag(rho_s, v_sym, S_s, Cd0_s, k_s, Cl_sym, Cl0_s);
+    // Call with mixed types (double constants + Symbolic variables)
+    // No explicit casts needed thanks to 'auto' params!
+    auto drag_sym = compute_drag(rho, v_sym, S, Cd0, k, Cl_sym, Cl0);
 
     // Create function: f(v, Cl) -> drag
     janus::Function drag_fun({v_sym, Cl_sym}, {drag_sym});
