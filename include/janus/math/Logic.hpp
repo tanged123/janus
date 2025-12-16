@@ -12,8 +12,8 @@ template <typename T> struct BooleanType {
     using type = bool;
 };
 
-template <> struct BooleanType<casadi::MX> {
-    using type = casadi::MX;
+template <> struct BooleanType<SymbolicScalar> {
+    using type = SymbolicScalar;
 };
 
 template <typename T> using BooleanType_t = typename BooleanType<T>::type;
@@ -53,7 +53,7 @@ template <typename DerivedCond, typename DerivedTrue, typename DerivedFalse>
 auto where(const Eigen::ArrayBase<DerivedCond> &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
            const Eigen::MatrixBase<DerivedFalse> &if_false) {
     using Scalar = typename DerivedTrue::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         // Manual element-wise select for generic types/CasADi
         // Assuming if_true and if_false have same dimensions as cond
         Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> res(if_true.rows(), if_true.cols());
@@ -98,7 +98,7 @@ template <JanusScalar T1, JanusScalar T2> auto min(const T1 &a, const T2 &b) {
 template <typename Derived>
 auto min(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         Eigen::Matrix<Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime> res(a.rows(),
                                                                                           a.cols());
         for (Eigen::Index i = 0; i < a.rows(); ++i) {
@@ -138,7 +138,7 @@ template <JanusScalar T1, JanusScalar T2> auto max(const T1 &a, const T2 &b) {
 template <typename Derived>
 auto max(const Eigen::MatrixBase<Derived> &a, const Eigen::MatrixBase<Derived> &b) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         Eigen::Matrix<Scalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime> res(a.rows(),
                                                                                           a.cols());
         for (Eigen::Index i = 0; i < a.rows(); ++i) {
@@ -178,7 +178,7 @@ auto clamp(const T &val, const TLow &low, const THigh &high) {
 template <typename Derived, typename Scalar>
 auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scalar &high) {
     using MatrixScalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<MatrixScalar, casadi::MX>) {
+    if constexpr (std::is_same_v<MatrixScalar, SymbolicScalar>) {
         return val.unaryExpr([=](const auto &x) { return janus::clamp(x, low, high); });
     } else {
         return val.cwiseMax(low).cwiseMin(high);
@@ -203,7 +203,7 @@ auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scala
 template <typename DerivedA, typename DerivedB>
 auto lt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x < y; });
     } else {
         return (a.array() < b.array());
@@ -222,7 +222,7 @@ auto lt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 template <typename DerivedA, typename DerivedB>
 auto gt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x > y; });
     } else {
         return (a.array() > b.array());
@@ -241,7 +241,7 @@ auto gt(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 template <typename DerivedA, typename DerivedB>
 auto le(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x <= y; });
     } else {
         return (a.array() <= b.array());
@@ -260,7 +260,7 @@ auto le(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 template <typename DerivedA, typename DerivedB>
 auto ge(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x >= y; });
     } else {
         return (a.array() >= b.array());
@@ -279,7 +279,7 @@ auto ge(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 template <typename DerivedA, typename DerivedB>
 auto eq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x == y; });
     } else {
         return (a.array() == b.array());
@@ -298,7 +298,7 @@ auto eq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> 
 template <typename DerivedA, typename DerivedB>
 auto neq(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x != y; });
     } else {
         return (a.array() != b.array());
@@ -361,7 +361,7 @@ template <JanusScalar T1, JanusScalar T2> auto logical_and(const T1 &x1, const T
 template <typename DerivedA, typename DerivedB>
 auto logical_and(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x && y; });
     } else {
         // Ensure boolean context for Eigen arrays
@@ -383,7 +383,7 @@ template <JanusScalar T1, JanusScalar T2> auto logical_or(const T1 &x1, const T2
 template <typename DerivedA, typename DerivedB>
 auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.binaryExpr(b, [](const auto &x, const auto &y) { return x || y; });
     } else {
         return ((a.array() != 0) || (b.array() != 0));
@@ -400,7 +400,7 @@ template <JanusScalar T> auto logical_not(const T &x) { return !x; }
 
 template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         return a.unaryExpr([](const auto &x) { return !x; });
     } else {
         return (a.array() == 0);
@@ -415,10 +415,9 @@ template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a
  */
 template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         // all is true if norm_inf(1 - a) == 0 (all a are 1)
-        using casadi::norm_inf;
-        return norm_inf(1.0 - to_mx(a)) == 0;
+        return SymbolicScalar::norm_inf(1.0 - to_mx(a)) == 0;
     } else {
         return (a.array() != 0).all();
     }
@@ -432,10 +431,9 @@ template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
  */
 template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
-    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+    if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
         // any is true if norm_inf(a) > 0 (at least one non-zero)
-        using casadi::norm_inf;
-        return norm_inf(to_mx(a)) != 0;
+        return SymbolicScalar::norm_inf(to_mx(a)) != 0;
     } else {
         return (a.array() != 0).any();
     }

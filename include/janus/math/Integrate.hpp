@@ -183,10 +183,10 @@ inline QuadResult<SymbolicScalar> quad(const SymbolicScalar &expr, const Symboli
     }
 
     // Build parameter vector
-    casadi::MX p = casadi::MX::vertcat(parameters);
+    SymbolicScalar p = SymbolicScalar::vertcat(parameters);
 
     // Create dummy state variable (integral accumulator)
-    casadi::MX dummy_x = casadi::MX::sym("__quad_x");
+    SymbolicScalar dummy_x = SymbolicScalar::sym("__quad_x");
 
     // Build integrator
     // The ODE is: dx/dt = expr, where t is the variable of integration
@@ -341,11 +341,11 @@ OdeResult<SymbolicScalar> solve_ivp_symbolic(Func &&fun, std::pair<double, doubl
     int n_state = y0.size();
 
     // Create symbolic variables for the ODE
-    casadi::MX t_var = casadi::MX::sym("t");
-    casadi::MX y_var = casadi::MX::sym("y", n_state, 1);
+    SymbolicScalar t_var = SymbolicScalar::sym("t");
+    SymbolicScalar y_var = SymbolicScalar::sym("y", n_state, 1);
 
     // Evaluate the ODE function symbolically
-    casadi::MX ode_expr;
+    SymbolicScalar ode_expr;
     if constexpr (std::is_invocable_v<Func, casadi::MX, casadi::MX>) {
         ode_expr = fun(t_var, y_var);
     } else {
@@ -434,18 +434,19 @@ OdeResult<SymbolicScalar> solve_ivp_symbolic(Func &&fun, std::pair<double, doubl
  * @param reltol Relative tolerance
  * @return OdeResult containing numeric time and solution values
  */
-inline OdeResult<double> solve_ivp_expr(const casadi::MX &ode_expr, const casadi::MX &t_var,
-                                        const casadi::MX &y_var, std::pair<double, double> t_span,
-                                        const NumericVector &y0, int n_eval = 100,
-                                        double abstol = 1e-8, double reltol = 1e-6) {
+inline OdeResult<double> solve_ivp_expr(const SymbolicScalar &ode_expr, const SymbolicScalar &t_var,
+                                        const SymbolicScalar &y_var,
+                                        std::pair<double, double> t_span, const NumericVector &y0,
+                                        int n_eval = 100, double abstol = 1e-8,
+                                        double reltol = 1e-6) {
     double t0 = t_span.first;
     double tf = t_span.second;
     int n_state = y0.size();
 
     // Normalize time to [0, 1]
-    casadi::MX t_normalized = casadi::MX::sym("t_norm");
-    casadi::MX ode_normalized =
-        casadi::MX::substitute(ode_expr, t_var, t0 + (tf - t0) * t_normalized) * (tf - t0);
+    SymbolicScalar t_normalized = SymbolicScalar::sym("t_norm");
+    SymbolicScalar ode_normalized =
+        SymbolicScalar::substitute(ode_expr, t_var, t0 + (tf - t0) * t_normalized) * (tf - t0);
 
     // Create evaluation time grid (normalized)
     std::vector<double> t_eval_normalized(n_eval);

@@ -98,7 +98,7 @@ template <typename DerivedF, typename Spacing = double>
 auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int edge_order = 1,
               int n = 1) {
     using Scalar = typename DerivedF::Scalar;
-    using Vector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+    using Vector = JanusVector<Scalar>;
 
     Eigen::Index N = f.size();
     Vector grad(N);

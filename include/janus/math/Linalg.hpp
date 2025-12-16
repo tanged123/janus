@@ -27,11 +27,11 @@ auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<Derived
         // Numeric: Use reliable QR solver
         return A.colPivHouseholderQr().solve(b).eval();
     } else {
-        // Symbolic: Use casadi::solve
-        casadi::MX A_mx = to_mx(A);
-        casadi::MX b_mx = to_mx(b);
-        // casadi::solve(A, b) returns MX
-        casadi::MX x_mx = casadi::MX::solve(A_mx, b_mx);
+        // Symbolic: Use SymbolicScalar::solve
+        SymbolicScalar A_mx = to_mx(A);
+        SymbolicScalar b_mx = to_mx(b);
+        // SymbolicScalar::solve(A, b) returns SymbolicScalar
+        SymbolicScalar x_mx = SymbolicScalar::solve(A_mx, b_mx);
         return to_eigen(x_mx);
     }
 }
@@ -89,8 +89,8 @@ template <typename Derived> auto inv(const Eigen::MatrixBase<Derived> &A) {
     if constexpr (std::is_floating_point_v<Scalar>) {
         return A.inverse().eval();
     } else {
-        casadi::MX A_mx = to_mx(A);
-        casadi::MX inv_mx = inv(A_mx);
+        SymbolicScalar A_mx = to_mx(A);
+        SymbolicScalar inv_mx = inv(A_mx);
         return to_eigen(inv_mx);
     }
 }
@@ -106,7 +106,7 @@ template <typename Derived> auto det(const Eigen::MatrixBase<Derived> &A) {
     if constexpr (std::is_floating_point_v<Scalar>) {
         return A.determinant();
     } else {
-        casadi::MX A_mx = to_mx(A);
+        SymbolicScalar A_mx = to_mx(A);
         return det(A_mx);
     }
 }
@@ -134,8 +134,8 @@ template <typename Derived> auto pinv(const Eigen::MatrixBase<Derived> &A) {
     if constexpr (std::is_floating_point_v<Scalar>) {
         return A.completeOrthogonalDecomposition().pseudoInverse();
     } else {
-        casadi::MX A_mx = to_mx(A);
-        casadi::MX pinv_mx = casadi::MX::pinv(A_mx);
+        SymbolicScalar A_mx = to_mx(A);
+        SymbolicScalar pinv_mx = SymbolicScalar::pinv(A_mx);
         return to_eigen(pinv_mx);
     }
 }
@@ -168,18 +168,18 @@ auto norm(const Eigen::MatrixBase<Derived> &x, NormType type = NormType::L2) {
             return x.norm();
         }
     } else {
-        casadi::MX x_mx = to_mx(x);
+        SymbolicScalar x_mx = to_mx(x);
         switch (type) {
         case NormType::L1:
-            return casadi::MX::norm_1(x_mx);
+            return SymbolicScalar::norm_1(x_mx);
         case NormType::L2:
-            return casadi::MX::norm_2(x_mx);
+            return SymbolicScalar::norm_2(x_mx);
         case NormType::Inf:
-            return casadi::MX::norm_inf(x_mx);
+            return SymbolicScalar::norm_inf(x_mx);
         case NormType::Frobenius:
-            return casadi::MX::norm_fro(x_mx);
+            return SymbolicScalar::norm_fro(x_mx);
         default:
-            return casadi::MX::norm_2(x_mx);
+            return SymbolicScalar::norm_2(x_mx);
         }
     }
 }
