@@ -5,3 +5,4 @@
 #include "core/JanusIO.hpp"
 #include "core/JanusTypes.hpp"
 #include "math/JanusMath.hpp"
+#include "optimization/Opti.hpp"

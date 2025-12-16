@@ -88,38 +88,41 @@ Write physics models once using `janus` math functions, and execute them in both
 
 ```cpp
 #include <janus/janus.hpp>
+#include <iostream>
 
-// 1. Define a generic physics model
-template <typename Scalar>
-Scalar compute_energy(const Scalar& v, const Scalar& m) {
-    // Use janus:: math functions for dual-backend support
-    return 0.5 * m * janus::pow(v, 2.0);
+// 1. Define Physics (Write Once)
+// Use C++20 'auto' to support both double and Symbolic types automatically.
+// This single function drives both simulation and optimization!
+auto compute_drag(auto rho, auto v, auto S, auto Cd) {
+    return 0.5 * rho * janus::pow(v, 2) * S * Cd;
 }
 
 int main() {
-    // 2. Numeric Mode (Fast Standard Execution)
-    double v = 10.0, m = 2.0;
-    double E = compute_energy(v, m); // Returns 100.0
+    // 2. Numeric Mode (Fast Simulation)
+    // Compiles to standard optimized C++ machine code
+    double D = compute_drag(1.225, 50.0, 10.0, 0.02); 
+    std::cout << "Drag: " << D << " N" << std::endl;
 
-    // 3. Symbolic Mode (Graph Generation & Derivatives)
-    auto v_sym = janus::sym("v");
-    auto m_sym = janus::sym("m");
-    auto E_sym = compute_energy(v_sym, m_sym);
-
-    // Automatic Differentiation (Compute dE/dv)
-    auto dE_dv = janus::jacobian({E_sym}, {v_sym}); 
+    // 3. Symbolic Mode (Optimization)
+    // Same function builds a computational graph for the solver
+    janus::Opti opti;
+    auto v = opti.variable(50.0);       // Decision Variable
     
-    // Create Callable Function (wraps CasADi)
-    janus::Function f_grad({v_sym, m_sym}, {dE_dv});
+    // Mix doubles and symbols seamlessly (no casting required!)
+    auto D_sym = compute_drag(1.225, v, 10.0, 0.02); 
     
-    // Evaluate derivatives numerically
-    auto dE_dv_result = f_grad.eval(10.0, 2.0); // Returns 1x1 matrix with dE/dv = m*v = 20
+    opti.minimize(D_sym);               // Minimize Drag
+    opti.subject_to_bounds(v, 10, 100); // Speed limit constraint
+    
+    auto sol = opti.solve();            // Solve with IPOPT
+    std::cout << "Optimal V: " << sol.value(v) << " m/s" << std::endl;
 }
 ```
 
-For more details, see the [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) or check `examples/drag_coefficient.cpp`.
-
-For high-performance numeric simulations, see the [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
+For more details:
+*   **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
+*   **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/drag_coefficient.cpp`.
+*   **Optimization**: [Optimization Guide](docs/user_guides/optimization.md) and `examples/optimization/drag_optimization.cpp`.
 
 ## Project Structure
 
@@ -149,12 +152,28 @@ janus/
 │           ├── Linalg.hpp           # Linear algebra extensions
 │           ├── Logic.hpp            # Logical ops & branching (where)
 │           ├── Quaternion.hpp       # Quaternion algebra
+│           ├── RootFinding.hpp      # Root finding algorithms
 │           ├── Rotations.hpp        # 2D/3D rotations
 │           ├── Spacing.hpp          # Grid generation
 │           ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, etc)
-│           └── Trig.hpp             # Trigonometry
+│           ├── Trig.hpp             # Trigonometry
+│       ├── optimization/       # Optimization Layer (Phase 6)
+│       │   ├── Opti.hpp             # Main solver interface
+│       │   ├── OptiOptions.hpp      # Solver configuration
+│       │   └── OptiSol.hpp          # Solution wrappers
 ├── scripts/            # Build, Test & Verify Scripts
 ├── tests/              # GoogleTest Suite
 └── flake.nix           # Nix Environment Definition
 ```
+
+## Inspiration & Credits
+
+Janus is heavily inspired by **AeroSandbox**, Peter Sharpe's Python-based design optimization framework. Janus serves as a C++ implementation and extension of the "Code Transformations" paradigm pioneered by Sharpe.
+
+*   **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
+*   **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
+
+Janus is built upon the shoulders of giants:
+*   **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
+*   **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
 

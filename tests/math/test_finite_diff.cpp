@@ -97,3 +97,239 @@ template <typename Scalar> void test_finite_difference() {
 
 TEST(FiniteDiffTests, Numeric) { test_finite_difference<double>(); }
 TEST(FiniteDiffTests, Symbolic) { test_finite_difference<janus::SymbolicScalar>(); }
+
+// =============================================================================
+// Parse Integration Method Tests
+// =============================================================================
+
+TEST(FiniteDiffTests, ParseIntegrationMethod_Trapezoidal) {
+    EXPECT_EQ(janus::parse_integration_method("trapezoidal"),
+              janus::IntegrationMethod::Trapezoidal);
+    EXPECT_EQ(janus::parse_integration_method("trapezoid"), janus::IntegrationMethod::Trapezoidal);
+    EXPECT_EQ(janus::parse_integration_method("midpoint"), janus::IntegrationMethod::Trapezoidal);
+}
+
+TEST(FiniteDiffTests, ParseIntegrationMethod_ForwardEuler) {
+    EXPECT_EQ(janus::parse_integration_method("forward_euler"),
+              janus::IntegrationMethod::ForwardEuler);
+    EXPECT_EQ(janus::parse_integration_method("forward euler"),
+              janus::IntegrationMethod::ForwardEuler);
+}
+
+TEST(FiniteDiffTests, ParseIntegrationMethod_BackwardEuler) {
+    EXPECT_EQ(janus::parse_integration_method("backward_euler"),
+              janus::IntegrationMethod::BackwardEuler);
+    EXPECT_EQ(janus::parse_integration_method("backward euler"),
+              janus::IntegrationMethod::BackwardEuler);
+    EXPECT_EQ(janus::parse_integration_method("backwards_euler"),
+              janus::IntegrationMethod::BackwardEuler);
+    EXPECT_EQ(janus::parse_integration_method("backwards euler"),
+              janus::IntegrationMethod::BackwardEuler);
+}
+
+TEST(FiniteDiffTests, ParseIntegrationMethod_Invalid) {
+    EXPECT_THROW(janus::parse_integration_method("unknown"), janus::InvalidArgument);
+    EXPECT_THROW(janus::parse_integration_method("runge_kutta"), janus::InvalidArgument);
+}
+
+// =============================================================================
+// Weight Function Tests
+// =============================================================================
+
+TEST(FiniteDiffTests, ForwardEulerWeights) {
+    auto [w0, w1] = janus::forward_euler_weights(0.1);
+    EXPECT_NEAR(w0, -10.0, 1e-10);
+    EXPECT_NEAR(w1, 10.0, 1e-10);
+}
+
+TEST(FiniteDiffTests, BackwardEulerWeights) {
+    auto [w0, w1] = janus::backward_euler_weights(0.5);
+    EXPECT_NEAR(w0, -2.0, 1e-10);
+    EXPECT_NEAR(w1, 2.0, 1e-10);
+}
+
+TEST(FiniteDiffTests, CentralDifferenceWeights) {
+    auto [wm, wp] = janus::central_difference_weights(1.0);
+    EXPECT_NEAR(wm, -0.5, 1e-10);
+    EXPECT_NEAR(wp, 0.5, 1e-10);
+}
+
+TEST(FiniteDiffTests, TrapezoidalWeights) {
+    auto [w0, w1] = janus::trapezoidal_weights(2.0);
+    EXPECT_NEAR(w0, 1.0, 1e-10);
+    EXPECT_NEAR(w1, 1.0, 1e-10);
+}
+
+// =============================================================================
+// Difference Function Tests
+// =============================================================================
+
+TEST(FiniteDiffTests, ForwardDifference) {
+    janus::NumericVector f(4);
+    f << 0.0, 1.0, 4.0, 9.0; // f(x) = x^2 at x = 0, 1, 2, 3
+
+    janus::NumericVector x(4);
+    x << 0.0, 1.0, 2.0, 3.0;
+
+    auto df = janus::forward_difference(f, x);
+
+    EXPECT_EQ(df.size(), 3);
+    EXPECT_NEAR(df(0), 1.0, 1e-10); // (1-0)/(1-0)
+    EXPECT_NEAR(df(1), 3.0, 1e-10); // (4-1)/(2-1)
+    EXPECT_NEAR(df(2), 5.0, 1e-10); // (9-4)/(3-2)
+}
+
+TEST(FiniteDiffTests, ForwardDifference_SizeMismatch) {
+    janus::NumericVector f(3);
+    f << 0.0, 1.0, 4.0;
+
+    janus::NumericVector x(4);
+    x << 0.0, 1.0, 2.0, 3.0;
+
+    EXPECT_THROW(janus::forward_difference(f, x), janus::InvalidArgument);
+}
+
+TEST(FiniteDiffTests, ForwardDifference_TooFewPoints) {
+    janus::NumericVector f(1);
+    f << 0.0;
+
+    janus::NumericVector x(1);
+    x << 0.0;
+
+    EXPECT_THROW(janus::forward_difference(f, x), janus::InvalidArgument);
+}
+
+TEST(FiniteDiffTests, BackwardDifference) {
+    janus::NumericVector f(3);
+    f << 1.0, 2.0, 5.0;
+
+    janus::NumericVector x(3);
+    x << 0.0, 1.0, 3.0;
+
+    auto df = janus::backward_difference(f, x);
+
+    EXPECT_EQ(df.size(), 2);
+    EXPECT_NEAR(df(0), 1.0, 1e-10); // (2-1)/(1-0)
+    EXPECT_NEAR(df(1), 1.5, 1e-10); // (5-2)/(3-1)
+}
+
+TEST(FiniteDiffTests, CentralDifference) {
+    janus::NumericVector f(5);
+    f << 0.0, 1.0, 4.0, 9.0, 16.0; // f(x) = x^2
+
+    janus::NumericVector x(5);
+    x << 0.0, 1.0, 2.0, 3.0, 4.0;
+
+    auto df = janus::central_difference(f, x);
+
+    EXPECT_EQ(df.size(), 3);
+    EXPECT_NEAR(df(0), 2.0, 1e-10); // (4-0)/(2-0)
+    EXPECT_NEAR(df(1), 4.0, 1e-10); // (9-1)/(3-1)
+    EXPECT_NEAR(df(2), 6.0, 1e-10); // (16-4)/(4-2)
+}
+
+TEST(FiniteDiffTests, CentralDifference_SizeMismatch) {
+    janus::NumericVector f(3);
+    f << 0.0, 1.0, 4.0;
+
+    janus::NumericVector x(5);
+    x << 0.0, 1.0, 2.0, 3.0, 4.0;
+
+    EXPECT_THROW(janus::central_difference(f, x), janus::InvalidArgument);
+}
+
+TEST(FiniteDiffTests, CentralDifference_TooFewPoints) {
+    janus::NumericVector f(2);
+    f << 0.0, 1.0;
+
+    janus::NumericVector x(2);
+    x << 0.0, 1.0;
+
+    EXPECT_THROW(janus::central_difference(f, x), janus::InvalidArgument);
+}
+
+// =============================================================================
+// Integration Defects Tests
+// =============================================================================
+
+TEST(FiniteDiffTests, IntegrationDefects_Trapezoidal) {
+    // Test: x(t) = t^2, xdot(t) = 2t
+    janus::NumericVector t(4);
+    t << 0.0, 1.0, 2.0, 3.0;
+
+    janus::NumericVector x(4);
+    x << 0.0, 1.0, 4.0, 9.0;
+
+    janus::NumericVector xdot(4);
+    xdot << 0.0, 2.0, 4.0, 6.0;
+
+    auto defects = janus::integration_defects(x, xdot, t, janus::IntegrationMethod::Trapezoidal);
+
+    EXPECT_EQ(defects.size(), 3);
+    // Trapezoidal should be exact for linear xdot integrated
+    EXPECT_NEAR(defects(0), 0.0, 1e-10);
+    EXPECT_NEAR(defects(1), 0.0, 1e-10);
+    EXPECT_NEAR(defects(2), 0.0, 1e-10);
+}
+
+TEST(FiniteDiffTests, IntegrationDefects_ForwardEuler) {
+    // x(t) = t, xdot(t) = 1
+    janus::NumericVector t(3);
+    t << 0.0, 1.0, 2.0;
+
+    janus::NumericVector x(3);
+    x << 0.0, 1.0, 2.0;
+
+    janus::NumericVector xdot(3);
+    xdot << 1.0, 1.0, 1.0;
+
+    auto defects = janus::integration_defects(x, xdot, t, janus::IntegrationMethod::ForwardEuler);
+
+    EXPECT_EQ(defects.size(), 2);
+    EXPECT_NEAR(defects(0), 0.0, 1e-10);
+    EXPECT_NEAR(defects(1), 0.0, 1e-10);
+}
+
+TEST(FiniteDiffTests, IntegrationDefects_BackwardEuler) {
+    // x(t) = t, xdot(t) = 1
+    janus::NumericVector t(3);
+    t << 0.0, 1.0, 2.0;
+
+    janus::NumericVector x(3);
+    x << 0.0, 1.0, 2.0;
+
+    janus::NumericVector xdot(3);
+    xdot << 1.0, 1.0, 1.0;
+
+    auto defects = janus::integration_defects(x, xdot, t, janus::IntegrationMethod::BackwardEuler);
+
+    EXPECT_EQ(defects.size(), 2);
+    EXPECT_NEAR(defects(0), 0.0, 1e-10);
+    EXPECT_NEAR(defects(1), 0.0, 1e-10);
+}
+
+TEST(FiniteDiffTests, IntegrationDefects_SizeMismatch) {
+    janus::NumericVector t(3);
+    t << 0.0, 1.0, 2.0;
+
+    janus::NumericVector x(4);
+    x << 0.0, 1.0, 2.0, 3.0;
+
+    janus::NumericVector xdot(3);
+    xdot << 1.0, 1.0, 1.0;
+
+    EXPECT_THROW(janus::integration_defects(x, xdot, t), janus::InvalidArgument);
+}
+
+TEST(FiniteDiffTests, IntegrationDefects_TooFewPoints) {
+    janus::NumericVector t(1);
+    t << 0.0;
+
+    janus::NumericVector x(1);
+    x << 0.0;
+
+    janus::NumericVector xdot(1);
+    xdot << 1.0;
+
+    EXPECT_THROW(janus::integration_defects(x, xdot, t), janus::InvalidArgument);
+}

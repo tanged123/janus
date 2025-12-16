@@ -64,7 +64,8 @@ Standard C++ `if/else` cannot branch on symbolic types because symbols do not ev
 - [x] **Phase 3**: AeroSandbox Numerical Parity (Logic, Calculus, Surrogate Models, Discrete Integration)
 - [x] **Phase 4**: Beta 1.0 Release (ODE Integration, Extended Spacing, Quaternions, Graph Visualization, Full Coverage)
 - [x] **Phase 5**: Advanced Math Utilities (N-Dimensional Interpolation, Root Finding, B-Splines)
-- [ ] **Phase 6**: Optimization Engines & Strategies (IPOPT/SNOPT Interface, NaN Propagation Sparsity)
+- [x] **Phase 6**: Optimization Framework (Opti Interface, Trajectory Optimization, JIT Compilation, IPOPT Integration)
+- [ ] **Phase 7**: Advanced Control & Estimation (Kalman Filters, MPC)
 
 ## 5. API Reference Example
 

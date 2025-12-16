@@ -16,6 +16,13 @@ cmake -B "$BUILD_DIR" -S . -DENABLE_COVERAGE=ON -G Ninja
 cmake --build "$BUILD_DIR"
 CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target test
 
+# 2b. Run Examples (Treating them as Integration Tests)
+echo "Running examples to capture integration coverage..."
+find "$BUILD_DIR/examples" -maxdepth 1 -type f -executable | while read -r example; do
+    echo "Running $example..."
+    "$example" > /dev/null 2>&1 || echo "Warning: $example failed"
+done
+
 # Determine GCOV tool
 GCOV_TOOL=""
 # Prioritize llvm-cov for Clang builds (common in Nix/LLVM environments)
@@ -38,13 +45,12 @@ lcov --capture --directory "$BUILD_DIR" --output-file "$BUILD_DIR/coverage.info"
 
 # 4. Filter Usage
 # Remove external libraries (Eigen, CasADi) and test files from potential coverage
+# NOTE: Kept examples in the report as requested!
 echo "Filtering coverage data..."
 lcov --remove "$BUILD_DIR/coverage.info" \
     '/nix/*' \
     '/usr/*' \
     '*/tests/*' \
-    '*/examples/*' \
-    '*/examples/*' \
     '*/build/*' \
     --output-file "$BUILD_DIR/coverage_clean.info" \
     --ignore-errors mismatch,inconsistent,unsupported,format,unused
