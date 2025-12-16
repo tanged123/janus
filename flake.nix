@@ -31,7 +31,7 @@
       {
         packages.default = stdenv.mkDerivation {
           pname = "janus";
-          version = "1.0.0-beta.1";
+          version = "1.1.0";
           src = ./.;
 
           nativeBuildInputs = [
