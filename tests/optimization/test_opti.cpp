@@ -471,3 +471,198 @@ TEST(OptiIntegration, SharedSymbolicExpressions) {
 
     EXPECT_NEAR(obj_at_opt(0, 0), 0.5, 1e-6); // x=y=0.5, obj = 0.25 + 0.25 = 0.5
 }
+
+// =============================================================================
+// Vector Parameter Tests
+// =============================================================================
+
+TEST(OptiTest, VectorParameter) {
+    janus::Opti opti;
+
+    // Create a vector parameter
+    janus::NumericVector p_vals(3);
+    p_vals << 1.0, 2.0, 3.0;
+    auto p = opti.parameter(p_vals);
+
+    auto x = opti.variable(0.0);
+
+    // Constraint using vector parameter: x >= p[0] + p[1] + p[2] = 6
+    opti.subject_to(x >= p(0) + p(1) + p(2));
+    opti.minimize(x * x);
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), 6.0, 1e-6);
+}
+
+// =============================================================================
+// Scalar Bounds Tests
+// =============================================================================
+
+TEST(OptiTest, ScalarBounds_Lower) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to_lower(x, 3.0); // x >= 3
+    opti.minimize(x);              // Minimize x
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), 3.0, 1e-6);
+}
+
+TEST(OptiTest, ScalarBounds_Upper) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to_upper(x, -2.0); // x <= -2
+    opti.maximize(x);               // Maximize x
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), -2.0, 1e-6);
+}
+
+TEST(OptiTest, ScalarBounds_Both) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to_bounds(x, -1.0, 1.0); // -1 <= x <= 1
+    opti.minimize(x);
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), -1.0, 1e-6);
+}
+
+// =============================================================================
+// Derivative Constraint Method Tests
+// =============================================================================
+
+TEST(OptiTest, ConstrainDerivative_ForwardEuler) {
+    constexpr int N = 10;
+    janus::Opti opti;
+
+    janus::NumericVector t = janus::linspace(0.0, 1.0, N);
+    auto x = opti.variable(N, 0.0);
+    auto v = opti.variable(N, 1.0);
+
+    // Use Forward Euler method
+    opti.constrain_derivative(v, x, t, "forward_euler");
+
+    opti.subject_to(x(0) == 0);
+    opti.subject_to(x(N - 1) == 1);
+
+    janus::SymbolicScalar obj = 0;
+    for (int i = 0; i < N; ++i) {
+        obj = obj + (v(i) - 1.0) * (v(i) - 1.0);
+    }
+    opti.minimize(obj);
+
+    auto sol = opti.solve({.verbose = false});
+
+    // x should go from 0 to 1 linearly
+    janus::NumericVector x_opt = sol.value(x);
+    EXPECT_NEAR(x_opt(0), 0.0, 1e-4);
+    EXPECT_NEAR(x_opt(N - 1), 1.0, 1e-4);
+}
+
+TEST(OptiTest, ConstrainDerivative_BackwardEuler) {
+    constexpr int N = 10;
+    janus::Opti opti;
+
+    janus::NumericVector t = janus::linspace(0.0, 1.0, N);
+    auto x = opti.variable(N, 0.0);
+    auto v = opti.variable(N, 1.0);
+
+    // Use Backward Euler method
+    opti.constrain_derivative(v, x, t, "backward_euler");
+
+    opti.subject_to(x(0) == 0);
+    opti.subject_to(x(N - 1) == 1);
+
+    janus::SymbolicScalar obj = 0;
+    for (int i = 0; i < N; ++i) {
+        obj = obj + (v(i) - 1.0) * (v(i) - 1.0);
+    }
+    opti.minimize(obj);
+
+    auto sol = opti.solve({.verbose = false});
+
+    janus::NumericVector x_opt = sol.value(x);
+    EXPECT_NEAR(x_opt(0), 0.0, 1e-4);
+    EXPECT_NEAR(x_opt(N - 1), 1.0, 1e-4);
+}
+
+// =============================================================================
+// Solver Options Tests
+// =============================================================================
+
+TEST(OptiTest, SolverOptions_DetectBounds) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to_bounds(x, 0.0, 10.0);
+    opti.minimize((x - 5) * (x - 5));
+
+    auto sol = opti.solve({.verbose = false, .detect_simple_bounds = true});
+
+    EXPECT_NEAR(sol.value(x), 5.0, 1e-6);
+}
+
+// =============================================================================
+// Error Path Tests
+// =============================================================================
+
+TEST(OptiTest, DerivativeOf_SizeMismatch) {
+    janus::Opti opti;
+
+    janus::NumericVector t = janus::linspace(0.0, 1.0, 10);
+    auto x = opti.variable(5, 0.0); // Size 5, but t is size 10
+
+    EXPECT_THROW(opti.derivative_of(x, t, 0.0), std::invalid_argument);
+}
+
+TEST(OptiTest, VectorBounds_Combined) {
+    janus::Opti opti;
+
+    auto x = opti.variable(5, 0.5);
+
+    // Apply combined bounds to vector
+    opti.subject_to_bounds(x, 0.0, 1.0);
+
+    // Objective: minimize sum(x)
+    janus::SymbolicScalar obj = 0;
+    for (int i = 0; i < 5; ++i) {
+        obj = obj + x(i);
+    }
+    opti.minimize(obj);
+
+    auto sol = opti.solve({.verbose = false});
+
+    // All elements should be at lower bound
+    janus::NumericVector x_opt = sol.value(x);
+    for (int i = 0; i < 5; ++i) {
+        EXPECT_NEAR(x_opt(i), 0.0, 1e-6);
+    }
+}
+
+TEST(OptiTest, VectorBounds_Upper) {
+    janus::Opti opti;
+
+    auto x = opti.variable(3, 0.0);
+    opti.subject_to_upper(x, 2.0); // All x[i] <= 2
+
+    janus::SymbolicScalar obj = 0;
+    for (int i = 0; i < 3; ++i) {
+        obj = obj - x(i); // Maximize sum(x)
+    }
+    opti.minimize(obj);
+
+    auto sol = opti.solve({.verbose = false});
+
+    janus::NumericVector x_opt = sol.value(x);
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_NEAR(x_opt(i), 2.0, 1e-6);
+    }
+}
