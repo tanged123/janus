@@ -65,7 +65,7 @@ Standard C++ `if/else` cannot branch on symbolic types because symbols do not ev
 - [x] **Phase 4**: Beta 1.0 Release (ODE Integration, Extended Spacing, Quaternions, Graph Visualization, Full Coverage)
 - [x] **Phase 5**: Advanced Math Utilities (N-Dimensional Interpolation, Root Finding, B-Splines)
 - [x] **Phase 6**: Optimization Framework (Opti Interface, Trajectory Optimization, JIT Compilation, IPOPT Integration)
-- [ ] **Phase 7**: Advanced Control & Estimation (Kalman Filters, MPC)
+- [ ] **Phase 7**: Advanced Introspection & Optimization Extensions (Sparsity, Hessian, Variable Freezing, Caching)
 
 ## 5. API Reference Example
 
