@@ -244,6 +244,37 @@ class Opti {
         }
     }
 
+    // ---- Scalar Constraint Helpers ----
+
+    /**
+     * @brief Apply lower bound to a scalar variable
+     * @param scalar Symbolic scalar
+     * @param lower_bound Lower bound
+     */
+    void subject_to_lower(const SymbolicScalar &scalar, double lower_bound) {
+        opti_.subject_to(scalar >= lower_bound);
+    }
+
+    /**
+     * @brief Apply upper bound to a scalar variable
+     * @param scalar Symbolic scalar
+     * @param upper_bound Upper bound
+     */
+    void subject_to_upper(const SymbolicScalar &scalar, double upper_bound) {
+        opti_.subject_to(scalar <= upper_bound);
+    }
+
+    /**
+     * @brief Apply both lower and upper bounds to a scalar variable
+     * @param scalar Symbolic scalar
+     * @param lower_bound Lower bound
+     * @param upper_bound Upper bound
+     */
+    void subject_to_bounds(const SymbolicScalar &scalar, double lower_bound, double upper_bound) {
+        subject_to_lower(scalar, lower_bound);
+        subject_to_upper(scalar, upper_bound);
+    }
+
     // ---- Vector Constraint Helpers ----
 
     /**

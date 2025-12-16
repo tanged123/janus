@@ -11,55 +11,109 @@ fi
 ninja -C build
 
 echo "========================================"
-echo "Running Examples"
+echo "Running Janus Examples"
 echo "========================================"
 
-echo "[1/12] Drag Coefficient"
-./build/examples/drag_coefficient
+# =============================================================================
+# Intro Examples
+# =============================================================================
+echo ""
+echo "=== INTRO EXAMPLES ==="
 echo ""
 
-echo "[2/12] Energy Intro"
+echo "[intro/1] Energy Intro"
 ./build/examples/energy_intro
 echo ""
 
-echo "[3/12] Numeric Intro"
+echo "[intro/2] Numeric Intro"
 ./build/examples/numeric_intro
 echo ""
 
-echo "[4/12] Branching Logic"
+# =============================================================================
+# Math Examples
+# =============================================================================
+echo ""
+echo "=== MATH EXAMPLES ==="
+echo ""
+
+echo "[math/1] Branching Logic"
 ./build/examples/branching_logic
 echo ""
 
-echo "[5/12] Loop Patterns"
+echo "[math/2] Loop Patterns"
 ./build/examples/loop_patterns
 echo ""
 
-echo "[6/12] Hybrid Simulation"
-./build/examples/hybrid_sim
-echo ""
-
-echo "[7/12] Smooth Trajectory (Phase 3)"
-./build/examples/smooth_trajectory
-echo ""
-
-echo "[8/12] Aircraft Attitudes (Phase 3)"
-./build/examples/aircraft_attitudes
-echo ""
-
-echo "[9/12] Brachistochrone ODE (Phase 4)"
-./build/examples/brachistochrone
-echo ""
-
-echo "[10/12] Graph Visualization (Phase 4)"
+echo "[math/3] Graph Visualization"
 ./build/examples/graph_visualization
 echo ""
 
-echo "[11/12] N-Dimensional Interpolation (Phase 5)"
+# =============================================================================
+# Interpolation Examples
+# =============================================================================
+echo ""
+echo "=== INTERPOLATION EXAMPLES ==="
+echo ""
+
+echo "[interp/1] N-Dimensional Interpolation"
 ./build/examples/nd_interpolation_demo
 echo ""
 
-echo "[12/12] Root Finding (Phase 5)"
+echo "[interp/2] Root Finding"
 ./build/examples/rootfinding_demo
 echo ""
 
-echo "All examples ran successfully."
+# =============================================================================
+# Simulation Examples
+# =============================================================================
+echo ""
+echo "=== SIMULATION EXAMPLES ==="
+echo ""
+
+echo "[sim/1] Drag Coefficient"
+./build/examples/drag_coefficient
+echo ""
+
+echo "[sim/2] Hybrid Simulation"
+./build/examples/hybrid_sim
+echo ""
+
+echo "[sim/3] Smooth Trajectory"
+./build/examples/smooth_trajectory
+echo ""
+
+echo "[sim/4] Aircraft Attitudes"
+./build/examples/aircraft_attitudes
+echo ""
+
+echo "[sim/5] Brachistochrone ODE"
+./build/examples/brachistochrone
+echo ""
+
+# =============================================================================
+# Optimization Examples
+# =============================================================================
+echo ""
+echo "=== OPTIMIZATION EXAMPLES ==="
+echo ""
+
+echo "[opt/1] Rosenbrock Benchmark"
+./build/examples/rosenbrock
+echo ""
+
+echo "[opt/2] Brachistochrone Trajectory Optimization"
+./build/examples/brachistochrone_opti
+echo ""
+
+echo "[opt/3] Beam Deflection (Structural)"
+./build/examples/beam_deflection
+echo ""
+
+echo "[opt/4] Drag Optimization (Aerodynamics)"
+./build/examples/drag_optimization
+echo ""
+
+echo "========================================"
+echo "All examples ran successfully!"
+echo "========================================"
+
