@@ -211,4 +211,87 @@ std::tuple<T, T, T, T, T, T> inv_symmetric_3x3_explicit(const T &m11, const T &m
     return {a11, a22, a33, a12, a23, a13};
 }
 
+// --- Sparse Matrix Utilities ---
+// NOTE: Sparse matrices are for NUMERIC data only. CasADi MX handles sparsity internally.
+// For symbolic sparsity analysis, use janus::SparsityPattern.
+
+/**
+ * @brief Compile-time check for numeric scalar types
+ *
+ * This prevents confusing errors when someone tries to use sparse matrices
+ * with symbolic types in templated code.
+ */
+template <typename Scalar>
+constexpr bool is_numeric_scalar_v = std::is_floating_point_v<Scalar> || std::is_integral_v<Scalar>;
+
+/**
+ * @brief Create sparse matrix from triplets
+ *
+ * Triplets specify (row, col, value) entries. Duplicate entries are summed.
+ *
+ * @code
+ * std::vector<janus::SparseTriplet> triplets;
+ * triplets.emplace_back(0, 0, 1.0);
+ * triplets.emplace_back(1, 1, 2.0);
+ * auto sp = janus::sparse_from_triplets(2, 2, triplets);
+ * @endcode
+ *
+ * @param rows Number of rows
+ * @param cols Number of columns
+ * @param triplets Vector of (row, col, value) triplets
+ * @return Compressed sparse matrix
+ */
+inline SparseMatrix sparse_from_triplets(int rows, int cols,
+                                         const std::vector<SparseTriplet> &triplets) {
+    SparseMatrix m(rows, cols);
+    m.setFromTriplets(triplets.begin(), triplets.end());
+    return m;
+}
+
+/**
+ * @brief Convert dense matrix to sparse
+ *
+ * Elements with absolute value <= tol are treated as zero.
+ *
+ * @param dense Dense numeric matrix
+ * @param tol Tolerance for zero (default 0.0 = exact zeros only)
+ * @return Sparse matrix
+ */
+inline SparseMatrix to_sparse(const NumericMatrix &dense, double tol = 0.0) {
+    std::vector<SparseTriplet> triplets;
+    triplets.reserve(static_cast<size_t>(dense.size()) / 4); // Heuristic
+
+    for (int j = 0; j < dense.cols(); ++j) {
+        for (int i = 0; i < dense.rows(); ++i) {
+            double val = dense(i, j);
+            if (std::abs(val) > tol) {
+                triplets.emplace_back(i, j, val);
+            }
+        }
+    }
+
+    return sparse_from_triplets(static_cast<int>(dense.rows()), static_cast<int>(dense.cols()),
+                                triplets);
+}
+
+/**
+ * @brief Convert sparse matrix to dense
+ *
+ * @param sparse Sparse matrix
+ * @return Dense numeric matrix
+ */
+inline NumericMatrix to_dense(const SparseMatrix &sparse) { return NumericMatrix(sparse); }
+
+/**
+ * @brief Create identity sparse matrix
+ *
+ * @param n Size (n x n)
+ * @return Sparse identity matrix
+ */
+inline SparseMatrix sparse_identity(int n) {
+    SparseMatrix I(n, n);
+    I.setIdentity();
+    return I;
+}
+
 } // namespace janus

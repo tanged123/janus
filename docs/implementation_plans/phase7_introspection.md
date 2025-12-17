@@ -486,13 +486,11 @@ SparseMatrix sparse_from_triplets(
 - [x] Support warm-starting between solves
 - [x] Test with parameter sweep examples
 
-### Milestone 7.7: Sparse Matrix Types (1-2 days)
+### Milestone 7.7: Sparse Matrix Types (Completed)
 
-- [ ] Add sparse type aliases to JanusTypes.hpp
-- [ ] Implement `to_sparse()` conversion
-- [ ] Implement `sparse_from_triplets()`
-- [ ] Update CMakeLists.txt if needed
-- [ ] Add sparse matrix tests
+- [x] Add sparse type aliases to JanusTypes.hpp
+- [x] Add `to_sparse()`, `sparse_from_triplets()` to Linalg.hpp
+- [x] Add `is_numeric_scalar_v` trait for compile-time checks
 
 ---
 

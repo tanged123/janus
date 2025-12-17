@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <casadi/casadi.hpp>
 #include <limits>
 
@@ -65,6 +66,16 @@ using NumericVector = JanusVector<NumericScalar>; // Equivalent to Eigen::Vector
 using SymbolicScalar = casadi::MX;
 using SymbolicMatrix = JanusMatrix<SymbolicScalar>;
 using SymbolicVector = JanusVector<SymbolicScalar>;
+
+// --- Sparse Numeric Types ---
+/**
+ * Sparse matrix types for efficient storage of large, sparse numeric data.
+ *
+ * @note These are for NUMERIC data only. For symbolic sparsity analysis,
+ *       use janus::SparsityPattern (see <janus/core/Sparsity.hpp>).
+ */
+using SparseMatrix = Eigen::SparseMatrix<double>;
+using SparseTriplet = Eigen::Triplet<double>;
 
 // --- Symbolic Variable Creation ---
 
