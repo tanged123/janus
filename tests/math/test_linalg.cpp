@@ -156,3 +156,76 @@ TEST(LinalgTests, CoverageEdges) {
     auto n_def = janus::norm(vs, static_cast<janus::NormType>(999));
     EXPECT_DOUBLE_EQ(janus::eval(n_def), 3.0);
 }
+
+// =============================================================================
+// Sparse Matrix Tests
+// =============================================================================
+
+TEST(LinalgTests, SparseFromTriplets) {
+    std::vector<janus::SparseTriplet> triplets;
+    triplets.emplace_back(0, 0, 1.0);
+    triplets.emplace_back(1, 1, 2.0);
+    triplets.emplace_back(2, 2, 3.0);
+
+    auto sp = janus::sparse_from_triplets(3, 3, triplets);
+
+    EXPECT_EQ(sp.rows(), 3);
+    EXPECT_EQ(sp.cols(), 3);
+    EXPECT_EQ(sp.nonZeros(), 3);
+    EXPECT_DOUBLE_EQ(sp.coeff(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(sp.coeff(1, 1), 2.0);
+    EXPECT_DOUBLE_EQ(sp.coeff(2, 2), 3.0);
+    EXPECT_DOUBLE_EQ(sp.coeff(0, 1), 0.0);
+}
+
+TEST(LinalgTests, ToSparse) {
+    janus::NumericMatrix dense(3, 3);
+    dense << 1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0;
+
+    auto sp = janus::to_sparse(dense);
+
+    EXPECT_EQ(sp.nonZeros(), 3);
+    EXPECT_DOUBLE_EQ(sp.coeff(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(sp.coeff(1, 1), 2.0);
+    EXPECT_DOUBLE_EQ(sp.coeff(2, 2), 3.0);
+}
+
+TEST(LinalgTests, ToSparseWithTolerance) {
+    janus::NumericMatrix dense(2, 2);
+    dense << 1.0, 1e-10, 1e-10, 1.0;
+
+    // With tol=0, small values are kept
+    auto sp1 = janus::to_sparse(dense, 0.0);
+    EXPECT_EQ(sp1.nonZeros(), 4);
+
+    // With tol=1e-9, small values are ignored
+    auto sp2 = janus::to_sparse(dense, 1e-9);
+    EXPECT_EQ(sp2.nonZeros(), 2);
+}
+
+TEST(LinalgTests, ToDense) {
+    std::vector<janus::SparseTriplet> triplets;
+    triplets.emplace_back(0, 0, 5.0);
+    triplets.emplace_back(1, 1, 10.0);
+
+    auto sp = janus::sparse_from_triplets(2, 2, triplets);
+    auto dense = janus::to_dense(sp);
+
+    EXPECT_EQ(dense.rows(), 2);
+    EXPECT_EQ(dense.cols(), 2);
+    EXPECT_DOUBLE_EQ(dense(0, 0), 5.0);
+    EXPECT_DOUBLE_EQ(dense(1, 1), 10.0);
+    EXPECT_DOUBLE_EQ(dense(0, 1), 0.0);
+}
+
+TEST(LinalgTests, SparseIdentity) {
+    auto I = janus::sparse_identity(4);
+
+    EXPECT_EQ(I.rows(), 4);
+    EXPECT_EQ(I.cols(), 4);
+    EXPECT_EQ(I.nonZeros(), 4);
+
+    for (int i = 0; i < 4; ++i) {
+        EXPECT_DOUBLE_EQ(I.coeff(i, i), 1.0);
+    }
+}

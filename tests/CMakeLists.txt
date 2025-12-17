@@ -5,6 +5,7 @@ add_executable(test_core
     core/test_janus_io.cpp
     core/test_janus_types.cpp
     core/test_io_coverage.cpp
+    core/test_sparsity.cpp
 )
 target_link_libraries(test_core PRIVATE janus GTest::gtest_main)
 
@@ -38,6 +39,7 @@ gtest_discover_tests(test_math)
 
 add_executable(test_opti
     optimization/test_opti.cpp
+    optimization/test_opti_cache.cpp
 )
 target_link_libraries(test_opti PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_opti)

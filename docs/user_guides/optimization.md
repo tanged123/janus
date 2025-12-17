@@ -133,4 +133,74 @@ auto vec = opti.variable(10, 0.0);
 opti.subject_to_bounds(vec, -5.0, 5.0);
 ```
 
+
 For more details on vector operations and trajectory optimization, see the [Brachistochrone Example](../../examples/optimization/brachistochrone_opti.cpp).
+
+---
+
+## 5. Solution Persistence & Warm Starting
+
+Janus allowed you to save optimization results to JSON and use them to warm-start subsequent runs. This is crucial for complex problems where a good initial guess can significantly reduce solve time.
+
+### Saving Results
+Use `.save()` on the solution object to persist variable values:
+
+```cpp
+auto sol = opti.solve();
+
+// Save specific variables to a JSON file
+std::map<std::string, janus::SymbolicScalar> vars;
+vars["x"] = x;
+vars["y"] = y;
+sol.save("solution.json", vars);
+```
+
+### Loading & Warm Starting
+Use `janus::OptiCache::load()` to retrieve previous results. You can use these values to initialize variables in a new optimization run.
+
+```cpp
+// Load cache
+try {
+    auto cache = janus::OptiCache::load("solution.json");
+    
+    // Check if variable exists in cache
+    double x_init = cache.count("x") ? cache["x"][0] : 0.0;
+    
+    // Create variable with cached value as initial guess
+    auto x = opti.variable(x_init);
+} catch (...) {
+    // Handle cold start (file not found, etc.)
+}
+```
+
+---
+
+## 6. Parametric Sweeps
+
+Run the same optimization across a range of parameter values with automatic warm-starting:
+
+```cpp
+janus::Opti opti;
+
+// Create a parameter (can be changed between solves)
+auto rho = opti.parameter(1.225);  // Air density
+auto V = opti.variable(50.0);
+
+// Define problem using parameter
+auto drag = 0.5 * rho * V * V * S * Cd0;
+opti.minimize(drag);
+opti.subject_to(V >= 10.0);
+
+// Sweep parameter across values
+std::vector<double> rho_values = {1.2, 1.0, 0.8, 0.6};
+auto result = opti.solve_sweep(rho, rho_values);
+
+// Access results
+for (size_t i = 0; i < result.size(); ++i) {
+    std::cout << "rho=" << result.param_values[i]
+              << " V*=" << result.solutions[i].value(V) << "\n";
+}
+```
+
+See the full example: [`examples/optimization/parametric_sweep.cpp`](../../examples/optimization/parametric_sweep.cpp)
+

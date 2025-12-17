@@ -61,6 +61,7 @@ cmake-build-*/
 *.pdf
 *.png
 *.dot
+*.json
 
 # Ignore 
 !docs/images/*.png

@@ -29,6 +29,14 @@ echo "[intro/2] Numeric Intro"
 ./build/examples/numeric_intro
 echo ""
 
+echo "[intro/3] Print Intro"
+./build/examples/print_example
+echo ""
+
+echo "[intro/4] Sparsity Intro"
+./build/examples/sparsity_intro
+echo ""
+
 # =============================================================================
 # Math Examples
 # =============================================================================
@@ -111,6 +119,10 @@ echo ""
 
 echo "[opt/4] Drag Optimization (Aerodynamics)"
 ./build/examples/drag_optimization
+echo ""
+
+echo "[opt/5] Parametric Sweep"
+./build/examples/parametric_sweep
 echo ""
 
 echo "========================================"

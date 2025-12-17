@@ -49,15 +49,39 @@ int main() {
     double dx = x(1) - x(0);
 
     // =========================================================================
+    // Warm Start Setup
+    // =========================================================================
+    std::string cache_file = "beam_solution.json";
+    std::map<std::string, std::vector<double>> cache;
+    try {
+        cache = janus::OptiCache::load(cache_file);
+        std::cout << "Warm starting from " << cache_file << "\n";
+    } catch (...) {
+        std::cout << "Cold start (no cache found)\n";
+    }
+
+    auto get_init = [&](const std::string &name, int size) {
+        janus::NumericVector init = janus::NumericVector::Zero(size);
+        if (cache.count(name)) {
+            const auto &vec = cache[name];
+            if (vec.size() == static_cast<size_t>(size)) {
+                for (int i = 0; i < size; ++i)
+                    init(i) = vec[i];
+            }
+        }
+        return init;
+    };
+
+    // =========================================================================
     // Setup Optimization (solving beam equations as optimization)
     // =========================================================================
     janus::Opti opti;
 
     // State variables (unknowns)
-    auto V = opti.variable(N, 0.0);     // Shear force [N]
-    auto M = opti.variable(N, 0.0);     // Bending moment [N·m]
-    auto theta = opti.variable(N, 0.0); // Slope [rad]
-    auto w = opti.variable(N, 0.0);     // Deflection [m]
+    auto V = opti.variable(get_init("V", N));         // Shear force [N]
+    auto M = opti.variable(get_init("M", N));         // Bending moment [N·m]
+    auto theta = opti.variable(get_init("theta", N)); // Slope [rad]
+    auto w = opti.variable(get_init("w", N));         // Deflection [m]
 
     // =========================================================================
     // Beam Equations (trapezoidal integration from tip to base)
@@ -166,6 +190,15 @@ int main() {
     std::cout << "✓ Euler-Bernoulli beam equations solved via optimization\n";
     std::cout << "✓ Matches analytical solution: w = q/(24EI) * x² * (x² - 4Lx + 6L²)\n";
     std::cout << "✓ GPkit benchmark compatible\n";
+
+    // Save for warm start
+    std::map<std::string, janus::SymbolicVector> vars;
+    vars["V"] = V;
+    vars["M"] = M;
+    vars["theta"] = theta;
+    vars["w"] = w;
+    sol.save(cache_file, vars);
+    std::cout << "Solution saved to " << cache_file << "\n";
 
     return 0;
 }
