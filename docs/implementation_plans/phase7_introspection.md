@@ -455,20 +455,20 @@ SparseMatrix sparse_from_triplets(
 - [x] Create `tests/math/test_autodiff.cpp` for Hessian tests
 - [x] Document distinction from numerical `gradient()` in Calculus.hpp
 
-### Milestone 7.3: Variable Freezing (2-3 days)
+### Milestone 7.3: Variable Freezing (Completed)
+- [x] Add `VariableOptions` struct
+- [x] Modify `Opti::variable()` to accept options
+- [x] Implement category tracking with `std::map`
+- [x] Implement freezing methods (via creation-time parameter substitution)
+- [x] Add constructor with frozen categories
+- [x] Test partial optimization scenarios
 
-- [ ] Add `VariableOptions` struct
-- [ ] Modify `Opti::variable()` to accept options
-- [ ] Implement category tracking with `std::map`
-- [ ] Implement `freeze()` / `unfreeze()` methods
-- [ ] Add constructor with frozen categories
-- [ ] Test partial optimization scenarios
+### Milestone 7.4: Solution Caching (Completed)
 
-### Milestone 7.4: Solution Caching (1-2 days)
-
-- [ ] Add JSON dependency (nlohmann/json or custom lightweight)
-- [ ] Create `OptiCache.hpp` with save/load functions
-- [ ] Add `OptiSol::save()` method
+- [x] Create simple JSON read/write utility (`janus/utils/JsonUtils.hpp`)
+- [x] Add `save(filename, vars)` to `OptiSol`
+- [x] Create `OptiCache::load(filename)` helper
+- [x] Verify roundtrip persistence with testsave()` method
 - [ ] Test round-trip save/load
 - [ ] Document cache file format
 

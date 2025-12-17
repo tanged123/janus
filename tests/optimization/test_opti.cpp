@@ -666,3 +666,89 @@ TEST(OptiTest, VectorBounds_Upper) {
         EXPECT_NEAR(x_opt(i), 2.0, 1e-6);
     }
 }
+
+// =============================================================================
+// Variable Freezing & Category Tests
+// =============================================================================
+
+TEST(OptiTest, VariableFreezing_SingleVariable) {
+    janus::Opti opti;
+
+    // x is optimized, y is frozen at 2.0
+    auto x = opti.variable(0.0);
+    auto y = opti.variable(2.0, {.freeze = true});
+
+    // Minimize (x - 1)^2 + (y - x)^2
+    // If y were free, optimal is x=y=1 gives 0
+    // With y frozen at 2.0, optimal x minimizes (x-1)^2 + (2-x)^2
+    // d/dx = 2(x-1) - 2(2-x) = 0 => x-1 = 2-x => 2x = 3 => x = 1.5
+    opti.minimize(janus::pow(x - 1, 2) + janus::pow(y - x, 2));
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), 1.5, 1e-6);
+    EXPECT_NEAR(sol.value(y), 2.0, 1e-6); // Should remain at init guess
+}
+
+TEST(OptiTest, VariableFreezing_Category) {
+    // Freeze "Wing" category via constructor
+    janus::Opti opti({"Wing"});
+
+    // x is in "Wing" -> should be frozen
+    // y is in "Fuselage" -> should be free
+    auto x = opti.variable(10.0, {.category = "Wing"});
+    auto y = opti.variable(0.0, {.category = "Fuselage"});
+
+    // Minimize (x - 5)^2 + (y - 5)^2
+    // If both free: x=5, y=5
+    // With x frozen at 10: x=10, y=5
+    opti.minimize(janus::pow(x - 5, 2) + janus::pow(y - 5, 2));
+
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), 10.0, 1e-6); // Frozen
+    EXPECT_NEAR(sol.value(y), 5.0, 1e-6);  // Free
+}
+
+TEST(OptiTest, VariableFreezing_ExplicitOverride) {
+    // Freeze "Wing" category, but explicitly unfreeze one variable?
+    // Note: Current implementation is OR logic (freeze if opts.freeze OR category frozen)
+    // So we can only force freeze, not force unfreeze against category.
+    // Let's test force freeze in non-frozen category.
+
+    janus::Opti opti; // No categories frozen
+
+    // x is "Wing" (not frozen), but explicitly frozen
+    auto x = opti.variable(10.0, {.category = "Wing", .freeze = true});
+    auto y = opti.variable(0.0, {.category = "Wing"}); // Implicitly free
+
+    opti.minimize(janus::pow(x - 5, 2) + janus::pow(y - 5, 2));
+    auto sol = opti.solve({.verbose = false});
+
+    EXPECT_NEAR(sol.value(x), 10.0, 1e-6);
+    EXPECT_NEAR(sol.value(y), 5.0, 1e-6);
+}
+
+TEST(OptiTest, CategoryTracking) {
+    janus::Opti opti;
+
+    auto x = opti.variable(1.0, {.category = "A"});
+    auto y = opti.variable(2.0, {.category = "A"});
+    auto z = opti.variable(3.0, {.category = "B"});
+
+    auto cat_a = opti.get_category("A");
+    auto cat_b = opti.get_category("B");
+    auto cat_c = opti.get_category("C");
+
+    EXPECT_EQ(cat_a.size(), 2);
+    EXPECT_EQ(cat_b.size(), 1);
+    EXPECT_EQ(cat_c.size(), 0);
+
+    auto names = opti.get_category_names();
+    EXPECT_EQ(names.size(), 2);
+    // Use std::find for vectors
+    bool has_A = std::find(names.begin(), names.end(), "A") != names.end();
+    bool has_B = std::find(names.begin(), names.end(), "B") != names.end();
+    EXPECT_TRUE(has_A);
+    EXPECT_TRUE(has_B);
+}

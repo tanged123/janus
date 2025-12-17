@@ -1,16 +1,36 @@
 #pragma once
 
+#include "OptiCache.hpp"
 #include "OptiOptions.hpp"
 #include "OptiSol.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Calculus.hpp"
 #include "janus/math/FiniteDifference.hpp"
+#include <algorithm>
 #include <casadi/casadi.hpp>
+#include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
 namespace janus {
+
+/**
+ * @brief Options for variable creation
+ *
+ * Allows specifying category and freeze status for optimization variables.
+ *
+ * Example:
+ * @code
+ *   auto x = opti.variable(1.0, {.category = "Wing", .freeze = false});
+ *   auto y = opti.variable(2.0, {.category = "Wing", .freeze = true});  // Frozen at 2.0
+ * @endcode
+ */
+struct VariableOptions {
+    std::string category = "Uncategorized"; ///< Category for grouping variables
+    bool freeze = false;                    ///< If true, variable is fixed at init_guess
+};
 
 /**
  * @brief Main optimization environment class
@@ -48,7 +68,18 @@ class Opti {
     /**
      * @brief Construct a new optimization environment
      */
-    Opti() : opti_() {}
+    Opti() : opti_(), categories_to_freeze_(), categories_() {}
+
+    /**
+     * @brief Construct with frozen categories
+     *
+     * Variables created with a category in `categories_to_freeze` will be
+     * automatically frozen at their initial guess values.
+     *
+     * @param categories_to_freeze List of category names to freeze
+     */
+    explicit Opti(const std::vector<std::string> &categories_to_freeze)
+        : opti_(), categories_to_freeze_(categories_to_freeze), categories_() {}
 
     ~Opti() = default;
 
@@ -68,23 +99,55 @@ class Opti {
     SymbolicScalar variable(double init_guess = 0.0, std::optional<double> scale = std::nullopt,
                             std::optional<double> lower_bound = std::nullopt,
                             std::optional<double> upper_bound = std::nullopt) {
+        return variable(init_guess, VariableOptions{}, scale, lower_bound, upper_bound);
+    }
+
+    /**
+     * @brief Create a scalar decision variable with options
+     *
+     * @param init_guess Initial guess value (where optimizer starts)
+     * @param opts Variable options (category, freeze)
+     * @param scale Optional scale for numerical conditioning (default: |init_guess| or 1)
+     * @param lower_bound Optional lower bound constraint
+     * @param upper_bound Optional upper bound constraint
+     * @return Symbolic scalar representing the variable (or frozen parameter)
+     */
+    SymbolicScalar variable(double init_guess, const VariableOptions &opts,
+                            std::optional<double> scale = std::nullopt,
+                            std::optional<double> lower_bound = std::nullopt,
+                            std::optional<double> upper_bound = std::nullopt) {
+        // Check if variable should be frozen (explicit or via category)
+        bool should_freeze = opts.freeze || is_category_frozen(opts.category);
+
         // Determine scale
         double s = scale.value_or(std::abs(init_guess) > 0 ? std::abs(init_guess) : 1.0);
 
-        // Create scaled variable
-        SymbolicScalar raw_var = opti_.variable();
-        SymbolicScalar scaled_var = s * raw_var;
+        SymbolicScalar scaled_var;
 
-        // Set initial guess
-        opti_.set_initial(raw_var, init_guess / s);
+        if (should_freeze) {
+            // Create as parameter (not optimized)
+            SymbolicScalar param = opti_.parameter();
+            opti_.set_value(param, init_guess);
+            scaled_var = param;
+        } else {
+            // Create scaled variable
+            SymbolicScalar raw_var = opti_.variable();
+            scaled_var = s * raw_var;
 
-        // Apply bounds if specified
-        if (lower_bound.has_value()) {
-            opti_.subject_to(scaled_var >= lower_bound.value());
+            // Set initial guess
+            opti_.set_initial(raw_var, init_guess / s);
+
+            // Apply bounds if specified
+            if (lower_bound.has_value()) {
+                opti_.subject_to(scaled_var >= lower_bound.value());
+            }
+            if (upper_bound.has_value()) {
+                opti_.subject_to(scaled_var <= upper_bound.value());
+            }
         }
-        if (upper_bound.has_value()) {
-            opti_.subject_to(scaled_var <= upper_bound.value());
-        }
+
+        // Track in category
+        categories_[opts.category].push_back(scaled_var);
 
         return scaled_var;
     }
@@ -502,8 +565,51 @@ class Opti {
     casadi::Opti &casadi_opti() { return opti_; }
     const casadi::Opti &casadi_opti() const { return opti_; }
 
+    // =========================================================================
+    // Category & Freezing
+    // =========================================================================
+
+    /**
+     * @brief Get all variables in a category
+     *
+     * @param category Category name
+     * @return Vector of symbolic scalars in that category (empty if not found)
+     */
+    std::vector<SymbolicScalar> get_category(const std::string &category) const {
+        auto it = categories_.find(category);
+        if (it != categories_.end()) {
+            return it->second;
+        }
+        return {};
+    }
+
+    /**
+     * @brief Get all registered category names
+     * @return Vector of category names
+     */
+    std::vector<std::string> get_category_names() const {
+        std::vector<std::string> names;
+        names.reserve(categories_.size());
+        for (const auto &[name, _] : categories_) {
+            names.push_back(name);
+        }
+        return names;
+    }
+
+    /**
+     * @brief Check if a category is marked for freezing
+     * @param category Category name
+     * @return True if the category was specified in constructor to be frozen
+     */
+    bool is_category_frozen(const std::string &category) const {
+        return std::find(categories_to_freeze_.begin(), categories_to_freeze_.end(), category) !=
+               categories_to_freeze_.end();
+    }
+
   private:
     casadi::Opti opti_;
+    std::vector<std::string> categories_to_freeze_;
+    std::map<std::string, std::vector<SymbolicScalar>> categories_;
 };
 
 } // namespace janus

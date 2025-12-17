@@ -1,6 +1,7 @@
 #pragma once
 
 #include "janus/core/JanusTypes.hpp"
+#include "janus/utils/JsonUtils.hpp"
 #include <casadi/casadi.hpp>
 
 namespace janus {
@@ -106,6 +107,44 @@ class OptiSol {
      * @brief Access underlying CasADi solution
      */
     const casadi::OptiSol &casadi_sol() const { return cas_sol_; }
+
+    /**
+     * @brief Save solution to JSON file
+     *
+     * @param filename Output filename (e.g. "sol.json")
+     * @param named_vars Map of variable names to symbolic variables to save
+     */
+    void save(const std::string &filename,
+              const std::map<std::string, SymbolicScalar> &named_vars) const {
+        std::map<std::string, std::vector<double>> data;
+
+        for (const auto &[name, var] : named_vars) {
+            // Evaluate variable using helper
+            double val = value(var);
+            data[name] = {val};
+        }
+
+        janus::utils::write_json(filename, data);
+    }
+
+    /**
+     * @brief Save solution map of vectors to JSON file
+     */
+    void save(const std::string &filename,
+              const std::map<std::string, SymbolicVector> &named_vars) const {
+        std::map<std::string, std::vector<double>> data;
+
+        for (const auto &[name, var] : named_vars) {
+            // Evaluate variable using helper
+            NumericVector result = value(var);
+
+            // Convert Eigen Vector to std::vector
+            std::vector<double> elements(result.data(), result.data() + result.size());
+            data[name] = elements;
+        }
+
+        janus::utils::write_json(filename, data);
+    }
 
   private:
     casadi::OptiSol cas_sol_;
