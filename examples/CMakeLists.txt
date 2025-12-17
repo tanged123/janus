@@ -70,5 +70,5 @@ target_link_libraries(drag_optimization PRIVATE janus)
 add_executable(parametric_sweep optimization/parametric_sweep.cpp)
 target_link_libraries(parametric_sweep PRIVATE janus)
 
-
-
+add_executable(collocation_demo optimization/collocation_demo.cpp)
+target_link_libraries(collocation_demo PRIVATE janus)

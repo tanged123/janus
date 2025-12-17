@@ -277,8 +277,8 @@ class MultipleShooting {
 - [x] Add `solver_available()` utility
 
 ### Milestone 8.4: Transcription Methods — 7-10 days
-- [ ] Implement `DirectCollocation` class
-- [ ] Implement Hermite-Simpson scheme
+- [x] Implement `DirectCollocation` class
+- [x] Implement Hermite-Simpson scheme
 - [ ] Implement `MultipleShooting` class
 - [ ] Create comparison examples
 - [ ] Document trade-offs
