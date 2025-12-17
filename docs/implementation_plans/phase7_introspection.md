@@ -541,11 +541,11 @@ SparseMatrix sparse_from_triplets(
 1. [x] `SparsityPattern` class implemented with full query API
 2. [x] `jacobian_sparsity()` and `hessian_sparsity()` working
 3. [x] `sym_gradient()` and `hessian()` implemented
-4. ☐ Variable freezing functional for partial optimization
-5. ☐ Solution caching saves/loads correctly
-6. ☐ `solve_sweep()` runs parametric studies
-7. ☐ API streamlining reduces boilerplate in examples
-8. ☐ CI passes with >90% coverage maintained
+4. [x] Variable freezing functional for partial optimization
+5. [x] Solution caching saves/loads correctly
+6. [x] `solve_sweep()` runs parametric studies
+7. [x] API streamlining reduces boilerplate in examples
+8. [x] CI passes with >90% coverage maintained
 
 ---
 
