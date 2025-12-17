@@ -13,7 +13,9 @@ find_package(casadi REQUIRED)
 
 # --- Main Library ---
 add_library(janus INTERFACE)
-target_include_directories(janus INTERFACE include)
+target_include_directories(
+  janus INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # Link Dependencies
 target_link_libraries(janus INTERFACE Eigen3::Eigen casadi)
@@ -28,6 +30,23 @@ if(ENABLE_COVERAGE)
     message(WARNING "Coverage not supported for this compiler")
   endif()
 endif()
+
+# --- Install ---
+include(GNUInstallDirs)
+
+install(
+  TARGETS janus
+  EXPORT janusTargets
+  INCLUDES
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(
+  EXPORT janusTargets
+  FILE janusConfig.cmake
+  NAMESPACE janus::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/janus)
 
 # --- Testing ---
 enable_testing()
