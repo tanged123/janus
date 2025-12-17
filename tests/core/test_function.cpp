@@ -81,3 +81,72 @@ TEST(FunctionTests, JacobianWrapper) {
     auto res = f_J(3.0);
     EXPECT_NEAR(res[0](0, 0), 6.0, 1e-9);
 }
+
+// =============================================================================
+// Lambda-Style Function Tests (make_function)
+// =============================================================================
+
+TEST(FunctionTests, LambdaSingleInSingleOut) {
+    // f(x) = x^2
+    auto f = janus::make_function<1, 1>("square", [](auto x) { return x * x; });
+
+    auto res = f(3.0);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_NEAR(res[0](0, 0), 9.0, 1e-9);
+
+    // Also test with negative number
+    auto res2 = f(-4.0);
+    EXPECT_NEAR(res2[0](0, 0), 16.0, 1e-9);
+}
+
+TEST(FunctionTests, LambdaMultiInSingleOut) {
+    // f(x, y) = x + y
+    auto f = janus::make_function<2, 1>("sum", [](auto x, auto y) { return x + y; });
+
+    auto res = f(3.0, 7.0);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_NEAR(res[0](0, 0), 10.0, 1e-9);
+}
+
+TEST(FunctionTests, LambdaMultiInMultiOut) {
+    // f(x, y) = (x+y, x-y)
+    auto f = janus::make_function<2, 2>(
+        "add_sub", [](auto x, auto y) { return std::make_tuple(x + y, x - y); });
+
+    auto res = f(10.0, 3.0);
+    ASSERT_EQ(res.size(), 2);
+    EXPECT_NEAR(res[0](0, 0), 13.0, 1e-9); // x + y = 13
+    EXPECT_NEAR(res[1](0, 0), 7.0, 1e-9);  // x - y = 7
+}
+
+TEST(FunctionTests, LambdaNamedInputs) {
+    // f(x, y) = x * y using named inputs
+    auto f = janus::make_function<2>("product", {"x", "y"}, [](auto x, auto y) { return x * y; });
+
+    auto res = f(4.0, 5.0);
+    ASSERT_EQ(res.size(), 1);
+    EXPECT_NEAR(res[0](0, 0), 20.0, 1e-9);
+}
+
+TEST(FunctionTests, LambdaNamedMultiOut) {
+    // g(a, b, c) = (a+b+c, a*b*c) with named inputs
+    auto g = janus::make_function<3>("triple", {"a", "b", "c"}, [](auto a, auto b, auto c) {
+        return std::make_tuple(a + b + c, a * b * c);
+    });
+
+    auto res = g(2.0, 3.0, 4.0);
+    ASSERT_EQ(res.size(), 2);
+    EXPECT_NEAR(res[0](0, 0), 9.0, 1e-9);  // 2 + 3 + 4 = 9
+    EXPECT_NEAR(res[1](0, 0), 24.0, 1e-9); // 2 * 3 * 4 = 24
+}
+
+TEST(FunctionTests, LambdaWithJanusMath) {
+    // Test using janus:: math functions inside lambda
+    auto f = janus::make_function<1, 1>("exp_plus_one", [](auto x) { return janus::exp(x) + 1.0; });
+
+    auto res = f(0.0);
+    EXPECT_NEAR(res[0](0, 0), 2.0, 1e-9); // exp(0) + 1 = 2
+
+    auto res2 = f(1.0);
+    EXPECT_NEAR(res2[0](0, 0), std::exp(1.0) + 1.0, 1e-9);
+}

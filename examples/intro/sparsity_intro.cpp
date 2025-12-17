@@ -132,4 +132,56 @@ int main() {
         std::cout << "Exporting 'laplacian_2d.pdf'...\n";
         sp.visualize_spy("laplacian_2d");
     }
+
+    // Example 5: NaN-Propagation Sparsity (Black-Box Detection)
+    // ---------------------------------------------------------
+    // When you have a black-box function (e.g., external code, non-traceable ops),
+    // NaN-propagation detects sparsity by testing each input with NaN
+    {
+        print_section("NaN-Propagation Sparsity Detection");
+
+        std::cout << "Black-box function: f[i] = x[i]^2 (diagonal Jacobian)\n\n";
+
+        // Define a black-box numeric function
+        auto square_fn = [](const NumericVector &x) {
+            NumericVector y(x.size());
+            for (int i = 0; i < x.size(); ++i) {
+                y(i) = x(i) * x(i);
+            }
+            return y;
+        };
+
+        // Detect sparsity via NaN propagation
+        auto sp = nan_propagation_sparsity(square_fn, 4, 4);
+
+        std::cout << "Detected sparsity pattern:\n";
+        std::cout << sp.to_string() << "\n";
+
+        // Compare with symbolic detection
+        std::cout << "Comparison: Symbolic sparsity should match...\n";
+        auto x_sym = sym("x", 4);
+        auto f_sym = x_sym * x_sym;
+        auto sp_symbolic = sparsity_of_jacobian(f_sym, x_sym);
+
+        if (sp == sp_symbolic) {
+            std::cout << "✓ NaN-propagation matches symbolic sparsity!\n\n";
+        } else {
+            std::cout << "✗ Patterns differ (unexpected)\n\n";
+        }
+
+        // Another example: sparse coupling
+        std::cout << "Sparse coupling example:\n";
+        std::cout << "  f[0] = x[0] * x[1]  (depends on x0, x1)\n";
+        std::cout << "  f[1] = x[2]         (depends on x2 only)\n\n";
+
+        auto sparse_fn = [](const NumericVector &x) {
+            NumericVector y(2);
+            y(0) = x(0) * x(1);
+            y(1) = x(2);
+            return y;
+        };
+
+        auto sp_sparse = nan_propagation_sparsity(sparse_fn, 3, 2);
+        std::cout << sp_sparse.to_string() << "\n";
+    }
 }

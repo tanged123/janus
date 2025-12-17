@@ -263,18 +263,18 @@ class MultipleShooting {
 ## Task Breakdown
 
 ### Milestone 8.1: Lambda Functions — 2-3 days
-- [ ] Add `make_function<N,M>()` to Function.hpp
-- [ ] Implement tuple handling for multi-output
-- [ ] Add tests and example
+- [x] Add `make_function<N,M>()` to Function.hpp
+- [x] Implement tuple handling for multi-output
+- [x] Add tests and example
 
 ### Milestone 8.2: NaN-Propagation — 2-3 days
-- [ ] Implement `nan_propagation_sparsity()`
-- [ ] Add comparison tests with symbolic detection
+- [x] Implement `nan_propagation_sparsity()`
+- [x] Add comparison tests with symbolic detection
 
 ### Milestone 8.3: Alternative Solvers — 3-4 days
-- [ ] Add `Solver` enum and options
-- [ ] Implement solver dispatch
-- [ ] Add `solver_available()` utility
+- [x] Add `Solver` enum and options
+- [x] Implement solver dispatch
+- [x] Add `solver_available()` utility
 
 ### Milestone 8.4: Transcription Methods — 7-10 days
 - [ ] Implement `DirectCollocation` class
