@@ -67,5 +67,8 @@ target_link_libraries(beam_deflection PRIVATE janus)
 add_executable(drag_optimization optimization/drag_optimization.cpp)
 target_link_libraries(drag_optimization PRIVATE janus)
 
+add_executable(parametric_sweep optimization/parametric_sweep.cpp)
+target_link_libraries(parametric_sweep PRIVATE janus)
+
 
 

@@ -121,6 +121,10 @@ echo "[opt/4] Drag Optimization (Aerodynamics)"
 ./build/examples/drag_optimization
 echo ""
 
+echo "[opt/5] Parametric Sweep"
+./build/examples/parametric_sweep
+echo ""
+
 echo "========================================"
 echo "All examples ran successfully!"
 echo "========================================"

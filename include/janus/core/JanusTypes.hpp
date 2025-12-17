@@ -85,6 +85,30 @@ inline SymbolicScalar sym(const std::string &name) { return casadi::MX::sym(name
 inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
     return casadi::MX::sym(name, rows, cols);
 }
+
+/**
+ * @brief Create a named symbolic vector (returns SymbolicVector)
+ *
+ * Convenience overload that returns SymbolicVector (Eigen container) directly.
+ * This is syntactic sugar for `sym_vec(name, size)`.
+ *
+ * @code
+ * auto x = janus::sym_vector("x", 3);  // Returns SymbolicVector
+ * @endcode
+ *
+ * @param name Name of the variable
+ * @param size Number of elements
+ * @return SymbolicVector with MX elements
+ */
+inline SymbolicVector sym_vector(const std::string &name, int size) {
+    casadi::MX mx = casadi::MX::sym(name, size, 1);
+    SymbolicVector v(size);
+    for (int i = 0; i < size; ++i) {
+        v(i) = mx(i);
+    }
+    return v;
+}
+
 /**
  * @brief Create a symbolic vector as SymbolicVector (Eigen container of MX)
  *
@@ -105,15 +129,8 @@ inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
  * @return SymbolicVector with MX elements from single underlying vector
  */
 inline SymbolicVector sym_vec(const std::string &name, int size) {
-    // Create a single MX vector (this is the "true" symbolic primitive)
-    casadi::MX mx = casadi::MX::sym(name, size, 1);
-
-    // Unpack into SymbolicVector
-    SymbolicVector v(size);
-    for (int i = 0; i < size; ++i) {
-        v(i) = mx(i);
-    }
-    return v;
+    // Delegate to sym_vector - they are equivalent
+    return sym_vector(name, size);
 }
 
 /**

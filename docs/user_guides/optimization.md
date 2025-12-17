@@ -172,3 +172,35 @@ try {
     // Handle cold start (file not found, etc.)
 }
 ```
+
+---
+
+## 6. Parametric Sweeps
+
+Run the same optimization across a range of parameter values with automatic warm-starting:
+
+```cpp
+janus::Opti opti;
+
+// Create a parameter (can be changed between solves)
+auto rho = opti.parameter(1.225);  // Air density
+auto V = opti.variable(50.0);
+
+// Define problem using parameter
+auto drag = 0.5 * rho * V * V * S * Cd0;
+opti.minimize(drag);
+opti.subject_to(V >= 10.0);
+
+// Sweep parameter across values
+std::vector<double> rho_values = {1.2, 1.0, 0.8, 0.6};
+auto result = opti.solve_sweep(rho, rho_values);
+
+// Access results
+for (size_t i = 0; i < result.size(); ++i) {
+    std::cout << "rho=" << result.param_values[i]
+              << " V*=" << result.solutions[i].value(V) << "\n";
+}
+```
+
+See the full example: [`examples/optimization/parametric_sweep.cpp`](../../examples/optimization/parametric_sweep.cpp)
+

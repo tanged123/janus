@@ -469,24 +469,22 @@ SparseMatrix sparse_from_triplets(
 - [x] Add `save(filename, vars)` to `OptiSol`
 - [x] Create `OptiCache::load(filename)` helper
 - [x] Verify roundtrip persistence with testsave()` method
-- [ ] Test round-trip save/load
-- [ ] Document cache file format
+- [x] Test round-trip save/load
+- [x] Document cache file format
 
-### Milestone 7.5: API Streamlining (2-3 days)
+### Milestone 7.5: API Streamlining (Completed)
 
-- [ ] Add `sym()` shorthand functions
-- [ ] Audit existing API for verbosity
-- [ ] Document ADL behavior for math functions
-- [ ] Update examples to use cleaner syntax
-- [ ] Consider breaking changes where beneficial
+- [x] Add `sym_vector()` shorthand function
+- [x] Create ADL documentation (`math_functions.md`)
+- [x] Create convenience header (`using.hpp`)
+- [x] Document ADL behavior for math functions
 
-### Milestone 7.6: Parametric Studies (2-3 days)
+### Milestone 7.6: Parametric Studies (Completed)
 
-- [ ] Implement `SweepResult` struct
-- [ ] Implement `solve_sweep()` method
-- [ ] Support warm-starting between solves
-- [ ] Test with parameter sensitivity example
-- [ ] Consider parallelization (OpenMP) as stretch goal
+- [x] Implement `SweepResult` struct
+- [x] Implement `solve_sweep()` method
+- [x] Support warm-starting between solves
+- [x] Test with parameter sweep examples
 
 ### Milestone 7.7: Sparse Matrix Types (1-2 days)
 

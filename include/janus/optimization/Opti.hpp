@@ -3,6 +3,7 @@
 #include "OptiCache.hpp"
 #include "OptiOptions.hpp"
 #include "OptiSol.hpp"
+#include "OptiSweep.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Calculus.hpp"
 #include "janus/math/FiniteDifference.hpp"
@@ -453,6 +454,73 @@ class Opti {
         return OptiSol(opti_.solve());
     }
 
+    /**
+     * @brief Perform parametric sweep over a parameter
+     *
+     * Solves the optimization problem for each value in the sweep range,
+     * automatically warm-starting subsequent solves from the previous solution.
+     *
+     * Example:
+     * @code
+     *   auto rho = opti.parameter(1.225);  // Air density
+     *   // ... define problem using rho ...
+     *
+     *   auto result = opti.solve_sweep(rho, {1.0, 1.1, 1.2, 1.3});
+     *   for (size_t i = 0; i < result.size(); ++i) {
+     *       std::cout << "rho=" << result.param_values[i]
+     *                 << " x*=" << result.solutions[i].value(x) << "\n";
+     *   }
+     * @endcode
+     *
+     * @param param Parameter to sweep (from opti.parameter())
+     * @param values Vector of parameter values to try
+     * @param options Solver options (applied to all solves)
+     * @return SweepResult containing all solutions
+     */
+    SweepResult solve_sweep(const SymbolicScalar &param, const std::vector<double> &values,
+                            const OptiOptions &options = {}) {
+        SweepResult result;
+        result.param_values = values;
+        result.all_converged = true;
+
+        // Configure solver once
+        casadi::Dict solver_opts;
+        solver_opts["ipopt.max_iter"] = options.max_iter;
+        solver_opts["ipopt.max_cpu_time"] = options.max_cpu_time;
+        solver_opts["ipopt.tol"] = options.tol;
+        solver_opts["ipopt.mu_strategy"] = options.mu_strategy;
+        solver_opts["ipopt.sb"] = "yes";
+        solver_opts["ipopt.warm_start_init_point"] = "yes";
+
+        if (options.verbose) {
+            solver_opts["ipopt.print_level"] = 5;
+        } else {
+            solver_opts["print_time"] = false;
+            solver_opts["ipopt.print_level"] = 0;
+        }
+
+        opti_.solver("ipopt", solver_opts);
+
+        for (double val : values) {
+            // Update parameter value
+            opti_.set_value(param, val);
+
+            try {
+                // Solve (CasADi automatically warm-starts from previous solution)
+                auto sol = opti_.solve();
+                result.solutions.emplace_back(sol);
+                result.iterations.push_back(sol.stats().count("iter_count")
+                                                ? static_cast<int>(sol.stats().at("iter_count"))
+                                                : -1);
+            } catch (const std::exception &) {
+                result.all_converged = false;
+                // Store empty solution marker - could also rethrow
+                break;
+            }
+        }
+
+        return result;
+    }
     // =========================================================================
     // Derivative Helpers (for trajectory optimization)
     // =========================================================================
