@@ -47,6 +47,8 @@
 
           cmakeFlags = [
             "-DENABLE_COVERAGE=OFF"
+            "-DBUILD_TESTING=OFF"
+            "-DBUILD_EXAMPLES=OFF"
           ];
         };
 

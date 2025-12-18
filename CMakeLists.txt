@@ -49,8 +49,14 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/janus)
 
 # --- Testing ---
-enable_testing()
-add_subdirectory(tests)
+option(BUILD_TESTING "Build the testing tree" ON)
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 # --- Examples ---
-add_subdirectory(examples)
+option(BUILD_EXAMPLES "Build example programs" ON)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
