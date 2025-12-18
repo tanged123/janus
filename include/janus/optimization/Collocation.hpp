@@ -152,15 +152,15 @@ class DirectCollocation {
     }
 
     /**
-     * @brief Add defect constraints enforcing dynamics
+     * @brief Add dynamics constraints (unified API)
      *
      * Applies the selected collocation scheme to enforce dynamics consistency
-     * between adjacent nodes.
+     * between adjacent nodes. This is the preferred unified method name.
      */
-    void add_defect_constraints() {
+    void add_dynamics_constraints() {
         if (!dynamics_set_) {
             throw std::runtime_error(
-                "DirectCollocation: call set_dynamics() before add_defect_constraints()");
+                "DirectCollocation: call set_dynamics() before add_dynamics_constraints()");
         }
 
         SymbolicScalar dt = get_duration() / static_cast<double>(n_nodes_ - 1);
@@ -191,6 +191,20 @@ class DirectCollocation {
             }
         }
     }
+
+    /**
+     * @brief Add defect constraints enforcing dynamics (legacy alias)
+     *
+     * @deprecated Use add_dynamics_constraints() for unified API
+     */
+    void add_defect_constraints() { add_dynamics_constraints(); }
+
+    /**
+     * @brief Add continuity constraints (alias for unified API)
+     *
+     * Provided for API consistency with MultipleShooting.
+     */
+    void add_continuity_constraints() { add_dynamics_constraints(); }
 
     /**
      * @brief Constrain the initial state
@@ -251,6 +265,13 @@ class DirectCollocation {
      * @brief Get number of nodes
      */
     int n_nodes() const { return n_nodes_; }
+
+    /**
+     * @brief Get number of intervals (nodes - 1)
+     *
+     * Provided for API consistency with MultipleShooting.
+     */
+    int n_intervals() const { return n_nodes_ - 1; }
 
   private:
     Opti &opti_;

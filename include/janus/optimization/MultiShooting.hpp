@@ -110,7 +110,13 @@ class MultipleShooting {
         dynamics_set_ = true;
     }
 
-    void add_continuity_constraints() {
+    /**
+     * @brief Add dynamics constraints (unified API)
+     *
+     * Enforces continuity via numerical integration. This is the preferred
+     * unified method name for consistency with DirectCollocation.
+     */
+    void add_dynamics_constraints() {
         if (!dynamics_set_)
             throw std::runtime_error("Dynamics not set");
 
@@ -132,21 +138,30 @@ class MultipleShooting {
             // Integrator parameters: [u_k; dt]
             SymbolicScalar p = SymbolicScalar::vertcat({to_mx(u_k), dt});
 
-            // Call integrator
-            // Input: 'x0' -> state, 'p' -> params
-            // Output: 'xf' -> final state
-            // Call integrator using named arguments to avoid positional errors
-            // Inputs: x0 (initial state), p (parameters)
+            // Call integrator using named arguments
             casadi::MXDict args = {{"x0", to_mx(x_k)}, {"p", p}};
-
             casadi::MXDict res = integrator_(args);
 
-            SymbolicScalar x_integrated = res.at("xf"); // 'xf' is final state output
+            SymbolicScalar x_integrated = res.at("xf");
 
             // Continuity constraint: X[k+1] == Integrated(X[k])
             opti_.subject_to(to_mx(x_kp1) == x_integrated);
         }
     }
+
+    /**
+     * @brief Add continuity constraints (legacy alias)
+     *
+     * @deprecated Use add_dynamics_constraints() for unified API
+     */
+    void add_continuity_constraints() { add_dynamics_constraints(); }
+
+    /**
+     * @brief Add defect constraints (alias for unified API)
+     *
+     * Provided for API consistency with DirectCollocation.
+     */
+    void add_defect_constraints() { add_dynamics_constraints(); }
 
     // -- Standard Setters/Getters --
 
