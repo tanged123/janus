@@ -444,32 +444,27 @@ class Interpolator {
     }
 
     // ========================================================================
-    // Vector Query (N-D)
+    // N-D Point Query
     // ========================================================================
 
     /**
-     * @brief Evaluate interpolant at a single N-D point
+     * @brief Evaluate N-D interpolant at a single point
      *
-     * For N≥2 interpolators: the query vector contains coordinates for one point.
-     * For N=1 interpolators: use the scalar overload or batch query methods instead.
+     * For N≥2 interpolators, pass a vector of coordinates.
+     * For 1D, use scalar overload or batch query.
      *
      * @tparam Scalar Scalar type (double or SymbolicScalar)
      * @param query Query point (size must match dims())
-     * @return Interpolated value
+     * @return Interpolated scalar value
      */
     template <JanusScalar Scalar> Scalar operator()(const JanusVector<Scalar> &query) const {
         if (!m_valid)
             throw InterpolationError("Interpolator: not initialized");
 
-        // For 1D interpolators, a vector query is ambiguous:
-        // - Could be batch query (multiple 1D points) -> should return vector
-        // - Could be single N-D point (N=1) -> should return scalar
-        // We interpret as N-D point query, so size must match dims
         if (query.size() != m_dims) {
             throw InterpolationError("Interpolator: query size must match dims. Expected " +
                                      std::to_string(m_dims) + ", got " +
-                                     std::to_string(query.size()) +
-                                     ". For batch 1D queries, use eval_batch() method.");
+                                     std::to_string(query.size()));
         }
 
         if constexpr (std::is_floating_point_v<Scalar>) {
@@ -489,91 +484,86 @@ class Interpolator {
 
     /**
      * @brief Evaluate interpolant at multiple points
-     * @tparam Scalar Scalar type (double or SymbolicScalar)
-     * @param queries Matrix of query points, shape (n_points, n_dims)
+     *
+     * For 1D interpolators, pass a vector of query points.
+     * For N-D interpolators, pass (n_points, n_dims) matrix.
+     *
+     * @tparam Derived Eigen expression type
+     * @param queries Query points (vector for 1D, matrix for N-D)
      * @return Vector of interpolated values
      */
-    template <JanusScalar Scalar>
-    JanusVector<Scalar> operator()(const JanusMatrix<Scalar> &queries) const {
+    template <typename Derived>
+    auto operator()(const Eigen::MatrixBase<Derived> &queries) const
+        -> JanusVector<typename Derived::Scalar> {
+        using Scalar = typename Derived::Scalar;
+
         if (!m_valid)
             throw InterpolationError("Interpolator: not initialized");
 
-        // Handle shape: expect (n_points, n_dims) or (n_dims, n_points)
-        bool need_transpose = (queries.rows() == m_dims && queries.cols() != m_dims);
-        JanusMatrix<Scalar> xi_work;
-        if (need_transpose) {
-            xi_work = queries.transpose();
+        int n_points;
+        if (m_dims == 1) {
+            // 1D: flatten input and treat each element as a query point
+            n_points = static_cast<int>(queries.size());
         } else {
-            xi_work = queries;
+            // N-D: determine shape
+            bool is_transposed = (queries.rows() == m_dims && queries.cols() != m_dims);
+            n_points =
+                is_transposed ? static_cast<int>(queries.cols()) : static_cast<int>(queries.rows());
         }
 
-        if (xi_work.cols() != m_dims) {
-            throw InterpolationError("Interpolator: query cols must match dims. Expected " +
-                                     std::to_string(m_dims) + ", got " +
-                                     std::to_string(xi_work.cols()));
-        }
-
-        int n_points = static_cast<int>(xi_work.rows());
         JanusVector<Scalar> result(n_points);
 
         if constexpr (std::is_floating_point_v<Scalar>) {
-            for (int i = 0; i < n_points; ++i) {
-                JanusVector<Scalar> point = xi_work.row(i).transpose();
-                result(i) = eval_numeric_point(point);
+            if (m_dims == 1) {
+                // 1D: iterate over all elements using coefficient access
+                for (int i = 0; i < n_points; ++i) {
+                    // Use linear coefficient access (works for any Eigen expression)
+                    Scalar val;
+                    if (queries.cols() == 1) {
+                        val = queries(i, 0);
+                    } else {
+                        val = queries(0, i);
+                    }
+                    result(i) = eval_numeric_scalar(val);
+                }
+            } else {
+                // N-D: handle row/col orientation
+                bool is_transposed = (queries.rows() == m_dims && queries.cols() != m_dims);
+                for (int i = 0; i < n_points; ++i) {
+                    NumericVector point(m_dims);
+                    for (int d = 0; d < m_dims; ++d) {
+                        point(d) = is_transposed ? queries(d, i) : queries(i, d);
+                    }
+                    result(i) = eval_numeric_point(point);
+                }
             }
         } else {
             if (m_use_custom_hermite) {
                 throw InterpolationError(
                     "Interpolator: Hermite method not supported for symbolic types");
             }
-            for (int i = 0; i < n_points; ++i) {
-                JanusVector<Scalar> point = xi_work.row(i).transpose();
-                result(i) = eval_symbolic_point(point);
+            if (m_dims == 1) {
+                for (int i = 0; i < n_points; ++i) {
+                    Scalar val;
+                    if (queries.cols() == 1) {
+                        val = queries(i, 0);
+                    } else {
+                        val = queries(0, i);
+                    }
+                    result(i) = eval_symbolic_scalar(val);
+                }
+            } else {
+                bool is_transposed = (queries.rows() == m_dims && queries.cols() != m_dims);
+                for (int i = 0; i < n_points; ++i) {
+                    SymbolicVector point(m_dims);
+                    for (int d = 0; d < m_dims; ++d) {
+                        point(d) = is_transposed ? queries(d, i) : queries(i, d);
+                    }
+                    result(i) = eval_symbolic_point(point);
+                }
             }
         }
 
-        return result;
-    }
-
-    /**
-     * @brief Batch evaluate 1D interpolant at multiple points
-     *
-     * Explicit batch query method for 1D interpolators. This avoids ambiguity
-     * between vector-as-batch-query and vector-as-N-D-point.
-     *
-     * @param queries Vector of query points
-     * @return Vector of interpolated values
-     */
-    NumericVector eval_batch(const NumericVector &queries) const {
-        if (!m_valid)
-            throw InterpolationError("Interpolator: not initialized");
-        if (m_dims != 1)
-            throw InterpolationError("Interpolator: eval_batch only valid for 1D interpolators");
-
-        NumericVector result(queries.size());
-        for (Eigen::Index i = 0; i < queries.size(); ++i) {
-            result(i) = eval_numeric_scalar(queries(i));
-        }
-        return result;
-    }
-
-    /**
-     * @brief Batch evaluate 1D interpolant at multiple symbolic points
-     */
-    SymbolicVector eval_batch(const SymbolicVector &queries) const {
-        if (!m_valid)
-            throw InterpolationError("Interpolator: not initialized");
-        if (m_dims != 1)
-            throw InterpolationError("Interpolator: eval_batch only valid for 1D interpolators");
-        if (m_use_custom_hermite) {
-            throw InterpolationError(
-                "Interpolator: Hermite method not supported for symbolic types");
-        }
-
-        SymbolicVector result(queries.size());
-        for (Eigen::Index i = 0; i < queries.size(); ++i) {
-            result(i) = eval_symbolic_scalar(queries(i));
-        }
         return result;
     }
 
