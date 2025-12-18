@@ -60,14 +60,3 @@ ms.set_final_state(xf);
 opti.minimize(T);
 auto sol = opti.solve();
 ```
-
-## Performance Comparison
-
-Comparing Multiple Shooting (CVODES) vs Direct Collocation (Hermite-Simpson) on the Brachistochrone problem:
-
-| Method | Nodes/Intervals | Accuracy Error | Relative Accuracy |
-| :--- | :--- | :--- | :--- |
-| Direct Collocation (Hermite-Simpson) | 30 | ~3.5e-4 s | 1x |
-| Multiple Shooting (CVODES) | 20 | ~2.2e-4 s | **1.6x** |
-
-Multiple Shooting achieved higher accuracy with fewer decision variables, leveraging the high-order integrator.
