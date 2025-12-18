@@ -12,6 +12,7 @@ using namespace janus;
 // Double Integrator Tests (x'' = u)
 // ============================================================================
 
+namespace {
 /**
  * @brief Simple double integrator dynamics
  * state = [position, velocity]
@@ -24,6 +25,7 @@ SymbolicVector double_integrator_ode(const SymbolicVector &x, const SymbolicVect
     dxdt(1) = u(0); // dv/dt = u (acceleration)
     return dxdt;
 }
+} // namespace
 
 TEST(CollocationTests, TrapezoidalDoubleIntegrator) {
     // Move from x=0,v=0 to x=1,v=0 in fixed time T=2

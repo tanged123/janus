@@ -276,11 +276,10 @@ class MultipleShooting {
 - [x] Implement solver dispatch
 - [x] Add `solver_available()` utility
 
-### Milestone 8.4: Transcription Methods — 7-10 days
-- [x] Implement `DirectCollocation` class
-- [x] Implement Hermite-Simpson scheme
-- [ ] Implement `MultipleShooting` class
-- [ ] Create comparison examples
+###- [x] **Trajectory Transcription** (Milestone 8.4)
+  - [x] Implement `DirectCollocation` (Trapezoidal, Hermite-Simpson)
+  - [x] Implement `MultipleShooting` with CasADi integrators
+  - [x] Comparison examples
 - [ ] Document trade-offs
 
 ---
