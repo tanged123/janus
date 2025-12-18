@@ -10,9 +10,9 @@
 template <typename Scalar> void test_interp1d() {
     // x = [0, 1, 2]
     // y = [0, 10, 0]
-    Eigen::VectorXd x(3);
+    janus::NumericVector x(3);
     x << 0.0, 1.0, 2.0;
-    Eigen::VectorXd y(3);
+    janus::NumericVector y(3);
     y << 0.0, 10.0, 0.0;
 
     janus::Interp1D interp(x, y); // Default: Linear
@@ -43,25 +43,25 @@ TEST(Interp1DTests, Numeric) { test_interp1d<double>(); }
 TEST(Interp1DTests, Symbolic) { test_interp1d<janus::SymbolicScalar>(); }
 
 TEST(Interp1DTests, CoverageErrorChecks) {
-    Eigen::VectorXd x(3);
+    janus::NumericVector x(3);
     x << 0, 1, 2;
-    Eigen::VectorXd y(2);
+    janus::NumericVector y(2);
     y << 0, 1;
 
     // Mismatched size
     EXPECT_THROW(janus::Interp1D(x, y), janus::InterpolationError);
 
     // Size < 2
-    Eigen::VectorXd x1(1);
+    janus::NumericVector x1(1);
     x1 << 0;
-    Eigen::VectorXd y1(1);
+    janus::NumericVector y1(1);
     y1 << 0;
     EXPECT_THROW(janus::Interp1D(x1, y1), janus::InterpolationError);
 
     // Unsorted
-    Eigen::VectorXd xu(3);
+    janus::NumericVector xu(3);
     xu << 0, 2, 1;
-    Eigen::VectorXd yu(3);
+    janus::NumericVector yu(3);
     yu << 0, 0, 0;
     EXPECT_THROW(janus::Interp1D(xu, yu), janus::InterpolationError);
 
@@ -70,15 +70,15 @@ TEST(Interp1DTests, CoverageErrorChecks) {
     EXPECT_THROW(empty(1.0), janus::InterpolationError);
 
     // Uninitialized matrix use
-    Eigen::MatrixXd q(1, 1);
+    janus::NumericMatrix q(1, 1);
     q << 1.0;
     EXPECT_THROW(empty(q), janus::InterpolationError);
 }
 
 TEST(Interp1DTests, BoundsClamping) {
-    Eigen::VectorXd x(3);
+    janus::NumericVector x(3);
     x << 0, 1, 2;
-    Eigen::VectorXd y(3);
+    janus::NumericVector y(3);
     y << 0, 10, 20;
     janus::Interp1D interp(x, y);
 
@@ -89,9 +89,9 @@ TEST(Interp1DTests, BoundsClamping) {
 
 TEST(Interp1DTests, HermiteMethod) {
     // Test Hermite (C1) interpolation
-    Eigen::VectorXd x(4);
+    janus::NumericVector x(4);
     x << 0, 1, 2, 3;
-    Eigen::VectorXd y(4);
+    janus::NumericVector y(4);
     y << 0, 1, 4, 9; // y = x^2
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
@@ -105,9 +105,9 @@ TEST(Interp1DTests, HermiteMethod) {
 
 TEST(Interp1DTests, BSplineMethod) {
     // Test BSpline (C2) interpolation
-    Eigen::VectorXd x(4);
+    janus::NumericVector x(4);
     x << 0, 1, 2, 3;
-    Eigen::VectorXd y(4);
+    janus::NumericVector y(4);
     y << 1, 1, 1, 1; // Constant function
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::BSpline);
@@ -121,9 +121,9 @@ TEST(Interp1DTests, BSplineMethod) {
 
 TEST(Interp1DTests, BSplineRequires4Points) {
     // BSpline should fail with < 4 points
-    Eigen::VectorXd x(3);
+    janus::NumericVector x(3);
     x << 0, 1, 2;
-    Eigen::VectorXd y(3);
+    janus::NumericVector y(3);
     y << 0, 1, 2;
 
     EXPECT_THROW(janus::Interp1D(x, y, janus::InterpolationMethod::BSpline),
@@ -132,9 +132,9 @@ TEST(Interp1DTests, BSplineRequires4Points) {
 
 TEST(Interp1DTests, NearestMethod) {
     // Test Nearest neighbor
-    Eigen::VectorXd x(3);
+    janus::NumericVector x(3);
     x << 0, 1, 2;
-    Eigen::VectorXd y(3);
+    janus::NumericVector y(3);
     y << 0, 10, 20;
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::Nearest);
@@ -149,9 +149,9 @@ TEST(Interp1DTests, NearestMethod) {
 }
 
 TEST(Interp1DTests, HermiteSymbolicNotSupported) {
-    Eigen::VectorXd x(4);
+    janus::NumericVector x(4);
     x << 0, 1, 2, 3;
-    Eigen::VectorXd y(4);
+    janus::NumericVector y(4);
     y << 0, 1, 4, 9;
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
@@ -163,9 +163,9 @@ TEST(Interp1DTests, HermiteSymbolicNotSupported) {
 
 TEST(Interp1DTests, BSplineSymbolic) {
     // BSpline should work with symbolic
-    Eigen::VectorXd x(4);
+    janus::NumericVector x(4);
     x << 0, 1, 2, 3;
-    Eigen::VectorXd y(4);
+    janus::NumericVector y(4);
     y << 1, 1, 1, 1;
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::BSpline);
@@ -177,15 +177,16 @@ TEST(Interp1DTests, BSplineSymbolic) {
 }
 
 TEST(Interp1DTests, VectorizedQuery) {
-    // Test vectorized queries
-    Eigen::VectorXd x(3);
+    // Test vectorized queries - pass as matrix for batch evaluation
+    janus::NumericVector x(3);
     x << 0, 1, 2;
-    Eigen::VectorXd y(3);
+    janus::NumericVector y(3);
     y << 0, 10, 20;
 
     janus::Interp1D interp(x, y);
 
-    Eigen::VectorXd queries(3);
+    // Create as matrix (Nx1) for batch query
+    janus::NumericMatrix queries(3, 1);
     queries << 0.5, 1.0, 1.5;
 
     auto results = interp(queries);
@@ -203,19 +204,19 @@ TEST(InterpnTests, Numeric2DLinear) {
     // 2D grid: x = [0, 1], y = [0, 1]
     // Values: z(x, y) = x + y
     // z(0,0)=0, z(1,0)=1, z(0,1)=1, z(1,1)=2
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // Values in Fortran order: (0,0), (1,0), (0,1), (1,1) -> 0, 1, 1, 2
-    Eigen::VectorXd values(4);
+    janus::NumericVector values(4);
     values << 0.0, 1.0, 1.0, 2.0;
 
     // Query at (0.5, 0.5) - should get 1.0
-    Eigen::MatrixXd xi(1, 2);
+    janus::NumericMatrix xi(1, 2);
     xi << 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi, janus::InterpolationMethod::Linear);
@@ -226,20 +227,20 @@ TEST(InterpnTests, Numeric2DLinear) {
 TEST(InterpnTests, Numeric2DMultiplePoints) {
     // 3x3 grid: x = [0, 1, 2], y = [0, 1, 2]
     // Values: z(x, y) = x * y
-    Eigen::VectorXd x_pts(3);
+    janus::NumericVector x_pts(3);
     x_pts << 0.0, 1.0, 2.0;
-    Eigen::VectorXd y_pts(3);
+    janus::NumericVector y_pts(3);
     y_pts << 0.0, 1.0, 2.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // Values in Fortran order:
     // (0,0)=0, (1,0)=0, (2,0)=0, (0,1)=0, (1,1)=1, (2,1)=2, (0,2)=0, (1,2)=2, (2,2)=4
-    Eigen::VectorXd values(9);
+    janus::NumericVector values(9);
     values << 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 0.0, 2.0, 4.0;
 
     // Multiple query points
-    Eigen::MatrixXd xi(3, 2);
+    janus::NumericMatrix xi(3, 2);
     xi << 0.5, 0.5, // Should give ~0.25
         1.0, 1.0,   // Should give 1.0 exactly
         1.5, 1.5;   // Should give ~2.25
@@ -254,18 +255,18 @@ TEST(InterpnTests, Numeric2DMultiplePoints) {
 TEST(InterpnTests, Numeric2DBSpline) {
     // Test BSpline method - needs at least 4 points per dimension for cubic
     // 4x4 grid with constant function for easy verification
-    Eigen::VectorXd x_pts(4);
+    janus::NumericVector x_pts(4);
     x_pts << 0.0, 1.0, 2.0, 3.0;
-    Eigen::VectorXd y_pts(4);
+    janus::NumericVector y_pts(4);
     y_pts << 0.0, 1.0, 2.0, 3.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // Values: z = 1 (constant for easy verification)
-    Eigen::VectorXd values(16);
+    janus::NumericVector values(16);
     values.setConstant(1.0);
 
-    Eigen::MatrixXd xi(1, 2);
+    janus::NumericMatrix xi(1, 2);
     xi << 1.5, 1.5;
 
     auto result = janus::interpn<double>(points, values, xi, janus::InterpolationMethod::BSpline);
@@ -276,17 +277,17 @@ TEST(InterpnTests, Numeric2DBSpline) {
 
 TEST(InterpnTests, NumericFillValue) {
     // Test out-of-bounds with fill_value
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
-    Eigen::VectorXd values(4);
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(4);
     values << 0.0, 1.0, 1.0, 2.0;
 
     // Query outside bounds
-    Eigen::MatrixXd xi(2, 2);
+    janus::NumericMatrix xi(2, 2);
     xi << 0.5, 0.5, // In bounds
         2.0, 0.5;   // Out of bounds in x
 
@@ -299,17 +300,17 @@ TEST(InterpnTests, NumericFillValue) {
 
 TEST(InterpnTests, NumericExtrapolation) {
     // Without fill_value, should clamp to bounds
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
-    Eigen::VectorXd values(4);
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(4);
     values << 0.0, 1.0, 1.0, 2.0;
 
     // Query outside bounds - should clamp
-    Eigen::MatrixXd xi(1, 2);
+    janus::NumericMatrix xi(1, 2);
     xi << 2.0, 0.5; // x=2 should clamp to x=1
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -320,15 +321,15 @@ TEST(InterpnTests, NumericExtrapolation) {
 
 TEST(InterpnTests, Symbolic2DLinear) {
     // 2D grid symbolic test
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // z(x,y) = x + y
-    Eigen::VectorXd values(4);
+    janus::NumericVector values(4);
     values << 0.0, 1.0, 1.0, 2.0;
 
     // Symbolic query - use fixed numeric values for simplicity
@@ -345,23 +346,23 @@ TEST(InterpnTests, Symbolic2DLinear) {
 
 TEST(InterpnTests, Numeric3D) {
     // 3D interpolation: 2x2x2 grid
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
-    Eigen::VectorXd z_pts(2);
+    janus::NumericVector z_pts(2);
     z_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts, z_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts, z_pts};
 
     // Values: f(x,y,z) = x + y + z
     // Fortran order: iterate x fastest, then y, then z
     // (0,0,0)=0, (1,0,0)=1, (0,1,0)=1, (1,1,0)=2, (0,0,1)=1, (1,0,1)=2, (0,1,1)=2, (1,1,1)=3
-    Eigen::VectorXd values(8);
+    janus::NumericVector values(8);
     values << 0.0, 1.0, 1.0, 2.0, 1.0, 2.0, 2.0, 3.0;
 
     // Query at center (0.5, 0.5, 0.5) -> should give 1.5
-    Eigen::MatrixXd xi(1, 3);
+    janus::NumericMatrix xi(1, 3);
     xi << 0.5, 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -371,14 +372,14 @@ TEST(InterpnTests, Numeric3D) {
 
 TEST(InterpnTests, Numeric4D) {
     // 4D interpolation: 2^4 = 16 grid points
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {pts, pts, pts, pts};
+    std::vector<janus::NumericVector> points = {pts, pts, pts, pts};
 
     // Values: f(x1, x2, x3, x4) = x1 + x2 + x3 + x4
     // 2^4 = 16 values in Fortran order
-    Eigen::VectorXd values(16);
+    janus::NumericVector values(16);
     int idx = 0;
     for (int i4 = 0; i4 < 2; ++i4) {
         for (int i3 = 0; i3 < 2; ++i3) {
@@ -391,7 +392,7 @@ TEST(InterpnTests, Numeric4D) {
     }
 
     // Query at center (0.5, 0.5, 0.5, 0.5) -> should give 2.0
-    Eigen::MatrixXd xi(1, 4);
+    janus::NumericMatrix xi(1, 4);
     xi << 0.5, 0.5, 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -401,13 +402,13 @@ TEST(InterpnTests, Numeric4D) {
 
 TEST(InterpnTests, Numeric5D) {
     // 5D interpolation: 2^5 = 32 grid points
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {pts, pts, pts, pts, pts};
+    std::vector<janus::NumericVector> points = {pts, pts, pts, pts, pts};
 
     // Values: f = sum of all coordinates
-    Eigen::VectorXd values(32);
+    janus::NumericVector values(32);
     int idx = 0;
     for (int i5 = 0; i5 < 2; ++i5) {
         for (int i4 = 0; i4 < 2; ++i4) {
@@ -422,7 +423,7 @@ TEST(InterpnTests, Numeric5D) {
     }
 
     // Query at center -> should give 2.5
-    Eigen::MatrixXd xi(1, 5);
+    janus::NumericMatrix xi(1, 5);
     xi << 0.5, 0.5, 0.5, 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -432,13 +433,13 @@ TEST(InterpnTests, Numeric5D) {
 
 TEST(InterpnTests, Numeric6D) {
     // 6D interpolation: 2^6 = 64 grid points
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {pts, pts, pts, pts, pts, pts};
+    std::vector<janus::NumericVector> points = {pts, pts, pts, pts, pts, pts};
 
     // Values: f = sum of all coordinates
-    Eigen::VectorXd values(64);
+    janus::NumericVector values(64);
     int idx = 0;
     for (int i6 = 0; i6 < 2; ++i6) {
         for (int i5 = 0; i5 < 2; ++i5) {
@@ -455,7 +456,7 @@ TEST(InterpnTests, Numeric6D) {
     }
 
     // Query at center -> should give 3.0
-    Eigen::MatrixXd xi(1, 6);
+    janus::NumericMatrix xi(1, 6);
     xi << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -465,13 +466,13 @@ TEST(InterpnTests, Numeric6D) {
 
 TEST(InterpnTests, Numeric7D) {
     // 7D interpolation: 2^7 = 128 grid points
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {pts, pts, pts, pts, pts, pts, pts};
+    std::vector<janus::NumericVector> points = {pts, pts, pts, pts, pts, pts, pts};
 
     // Values: f = sum of all coordinates
-    Eigen::VectorXd values(128);
+    janus::NumericVector values(128);
     int idx = 0;
     for (int i7 = 0; i7 < 2; ++i7) {
         for (int i6 = 0; i6 < 2; ++i6) {
@@ -490,7 +491,7 @@ TEST(InterpnTests, Numeric7D) {
     }
 
     // Query at center -> should give 3.5
-    Eigen::MatrixXd xi(1, 7);
+    janus::NumericMatrix xi(1, 7);
     xi << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -499,38 +500,38 @@ TEST(InterpnTests, Numeric7D) {
 }
 
 TEST(InterpnTests, ErrorEmptyPoints) {
-    std::vector<Eigen::VectorXd> points;
-    Eigen::VectorXd values(1);
+    std::vector<janus::NumericVector> points;
+    janus::NumericVector values(1);
     values << 1.0;
-    Eigen::MatrixXd xi(1, 1);
+    janus::NumericMatrix xi(1, 1);
     xi << 0.5;
 
     EXPECT_THROW(janus::interpn<double>(points, values, xi), janus::InterpolationError);
 }
 
 TEST(InterpnTests, ErrorUnsortedPoints) {
-    Eigen::VectorXd x_pts(3);
+    janus::NumericVector x_pts(3);
     x_pts << 0.0, 2.0, 1.0; // Not sorted!
-    std::vector<Eigen::VectorXd> points = {x_pts};
-    Eigen::VectorXd values(3);
+    std::vector<janus::NumericVector> points = {x_pts};
+    janus::NumericVector values(3);
     values << 1.0, 2.0, 3.0;
-    Eigen::MatrixXd xi(1, 1);
+    janus::NumericMatrix xi(1, 1);
     xi << 0.5;
 
     EXPECT_THROW(janus::interpn<double>(points, values, xi), janus::InterpolationError);
 }
 
 TEST(InterpnTests, ErrorValuesSizeMismatch) {
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // Wrong size: should be 4, not 3
-    Eigen::VectorXd values(3);
+    janus::NumericVector values(3);
     values << 1.0, 2.0, 3.0;
-    Eigen::MatrixXd xi(1, 2);
+    janus::NumericMatrix xi(1, 2);
     xi << 0.5, 0.5;
 
     EXPECT_THROW(janus::interpn<double>(points, values, xi), janus::InterpolationError);
@@ -542,22 +543,22 @@ TEST(InterpnTests, ErrorValuesSizeMismatch) {
 
 TEST(InterpnTests, QueryAtGridPoints2D) {
     // Query exactly at grid points should return exact values
-    Eigen::VectorXd x_pts(3);
+    janus::NumericVector x_pts(3);
     x_pts << 0.0, 1.0, 2.0;
-    Eigen::VectorXd y_pts(3);
+    janus::NumericVector y_pts(3);
     y_pts << 0.0, 1.0, 2.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // z = x + 2*y
     // Fortran order: iterate x fastest
-    Eigen::VectorXd values(9);
+    janus::NumericVector values(9);
     values << 0, 1, 2, // y=0: (0,0)=0, (1,0)=1, (2,0)=2
         2, 3, 4,       // y=1: (0,1)=2, (1,1)=3, (2,1)=4
         4, 5, 6;       // y=2: (0,2)=4, (1,2)=5, (2,2)=6
 
     // Query all grid points
-    Eigen::MatrixXd xi(9, 2);
+    janus::NumericMatrix xi(9, 2);
     xi << 0, 0, 1, 0, 2, 0, 0, 1, 1, 1, 2, 1, 0, 2, 1, 2, 2, 2;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -569,21 +570,21 @@ TEST(InterpnTests, QueryAtGridPoints2D) {
 
 TEST(InterpnTests, QueryAtEdges2D) {
     // Query along edges (one coordinate at boundary)
-    Eigen::VectorXd x_pts(3);
+    janus::NumericVector x_pts(3);
     x_pts << 0.0, 1.0, 2.0;
-    Eigen::VectorXd y_pts(3);
+    janus::NumericVector y_pts(3);
     y_pts << 0.0, 1.0, 2.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // z = x + y (simple to verify)
-    Eigen::VectorXd values(9);
+    janus::NumericVector values(9);
     values << 0, 1, 2, // y=0
         1, 2, 3,       // y=1
         2, 3, 4;       // y=2
 
     // Query along bottom edge (y=0), top edge (y=2), left edge (x=0), right edge (x=2)
-    Eigen::MatrixXd xi(8, 2);
+    janus::NumericMatrix xi(8, 2);
     xi << 0.5, 0.0, // bottom edge
         1.5, 0.0,   // bottom edge
         0.5, 2.0,   // top edge
@@ -607,17 +608,17 @@ TEST(InterpnTests, QueryAtEdges2D) {
 
 TEST(InterpnTests, QueryAtCorners2D) {
     // Query exactly at all four corners
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
-    Eigen::VectorXd values(4);
+    janus::NumericVector values(4);
     values << 1.0, 2.0, 3.0, 4.0; // corners: (0,0)=1, (1,0)=2, (0,1)=3, (1,1)=4
 
-    Eigen::MatrixXd xi(4, 2);
+    janus::NumericMatrix xi(4, 2);
     xi << 0, 0, 1, 0, 0, 1, 1, 1;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -634,19 +635,19 @@ TEST(InterpnTests, QueryAtCorners2D) {
 
 TEST(InterpnTests, ExtrapolationAllDirections2D) {
     // Test extrapolation (clamping) in all directions
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // z = x + y
-    Eigen::VectorXd values(4);
+    janus::NumericVector values(4);
     values << 0, 1, 1, 2; // (0,0)=0, (1,0)=1, (0,1)=1, (1,1)=2
 
     // Query outside in all directions (will be clamped)
-    Eigen::MatrixXd xi(8, 2);
+    janus::NumericMatrix xi(8, 2);
     xi << -1.0, 0.5, // left of grid
         2.0, 0.5,    // right of grid
         0.5, -1.0,   // below grid
@@ -671,17 +672,17 @@ TEST(InterpnTests, ExtrapolationAllDirections2D) {
 
 TEST(InterpnTests, FillValueAllDirections2D) {
     // Test fill_value in all out-of-bounds directions
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
-    Eigen::VectorXd values(4);
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(4);
     values << 0, 1, 1, 2;
 
     // Mix of in-bounds and out-of-bounds
-    Eigen::MatrixXd xi(5, 2);
+    janus::NumericMatrix xi(5, 2);
     xi << 0.5, 0.5, // in bounds
         -0.5, 0.5,  // out left
         1.5, 0.5,   // out right
@@ -705,15 +706,15 @@ TEST(InterpnTests, FillValueAllDirections2D) {
 
 TEST(InterpnTests, NonUniformGrid2D) {
     // Non-uniformly spaced grid
-    Eigen::VectorXd x_pts(4);
+    janus::NumericVector x_pts(4);
     x_pts << 0.0, 0.1, 0.5, 1.0; // Clustered near 0
-    Eigen::VectorXd y_pts(3);
+    janus::NumericVector y_pts(3);
     y_pts << 0.0, 0.8, 1.0; // Clustered near 1
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     // z = x * y
-    Eigen::VectorXd values(12);
+    janus::NumericVector values(12);
     int idx = 0;
     for (int j = 0; j < 3; ++j) {
         for (int i = 0; i < 4; ++i) {
@@ -722,7 +723,7 @@ TEST(InterpnTests, NonUniformGrid2D) {
     }
 
     // Query at various points
-    Eigen::MatrixXd xi(3, 2);
+    janus::NumericMatrix xi(3, 2);
     xi << 0.05, 0.4, // in first x-cell
         0.75, 0.9,   // in last x-cell, second y-cell
         0.25, 0.5;   // between cells
@@ -737,17 +738,17 @@ TEST(InterpnTests, NonUniformGrid2D) {
 
 TEST(InterpnTests, NonUniformGrid3D) {
     // Non-uniform 3D grid
-    Eigen::VectorXd x_pts(3);
+    janus::NumericVector x_pts(3);
     x_pts << 0.0, 0.2, 1.0;
-    Eigen::VectorXd y_pts(3);
+    janus::NumericVector y_pts(3);
     y_pts << 0.0, 0.5, 1.0;
-    Eigen::VectorXd z_pts(2);
+    janus::NumericVector z_pts(2);
     z_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts, z_pts};
+    std::vector<janus::NumericVector> points = {x_pts, y_pts, z_pts};
 
     // z = x + y + z_coord
-    Eigen::VectorXd values(18); // 3*3*2 = 18
+    janus::NumericVector values(18); // 3*3*2 = 18
     int idx = 0;
     for (int k = 0; k < 2; ++k) {
         for (int j = 0; j < 3; ++j) {
@@ -758,7 +759,7 @@ TEST(InterpnTests, NonUniformGrid3D) {
     }
 
     // Query
-    Eigen::MatrixXd xi(1, 3);
+    janus::NumericMatrix xi(1, 3);
     xi << 0.1, 0.25, 0.5;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -772,13 +773,13 @@ TEST(InterpnTests, NonUniformGrid3D) {
 
 TEST(InterpnTests, HighDimEdgeQuery5D) {
     // Query at edge of 5D hypercube
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(5, pts);
+    std::vector<janus::NumericVector> points(5, pts);
 
     // f = sum of coordinates
-    Eigen::VectorXd values(32);
+    janus::NumericVector values(32);
     for (int i = 0; i < 32; ++i) {
         int sum = 0;
         int temp = i;
@@ -790,7 +791,7 @@ TEST(InterpnTests, HighDimEdgeQuery5D) {
     }
 
     // Query at edge: (0.5, 0.5, 0.5, 0.5, 0) - last dim at boundary
-    Eigen::MatrixXd xi(1, 5);
+    janus::NumericMatrix xi(1, 5);
     xi << 0.5, 0.5, 0.5, 0.5, 0.0;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -800,13 +801,13 @@ TEST(InterpnTests, HighDimEdgeQuery5D) {
 
 TEST(InterpnTests, HighDimCornerQuery6D) {
     // Query at corner of 6D hypercube
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(6, pts);
+    std::vector<janus::NumericVector> points(6, pts);
 
     // f = sum of coordinates
-    Eigen::VectorXd values(64);
+    janus::NumericVector values(64);
     for (int i = 0; i < 64; ++i) {
         int sum = 0;
         int temp = i;
@@ -818,7 +819,7 @@ TEST(InterpnTests, HighDimCornerQuery6D) {
     }
 
     // Query at all-ones corner
-    Eigen::MatrixXd xi(1, 6);
+    janus::NumericMatrix xi(1, 6);
     xi << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -828,13 +829,13 @@ TEST(InterpnTests, HighDimCornerQuery6D) {
 
 TEST(InterpnTests, HighDimExtrapolation4D) {
     // Test extrapolation in 4D
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(4, pts);
+    std::vector<janus::NumericVector> points(4, pts);
 
     // f = x1 + x2 + x3 + x4
-    Eigen::VectorXd values(16);
+    janus::NumericVector values(16);
     for (int i = 0; i < 16; ++i) {
         int sum = 0;
         int temp = i;
@@ -846,7 +847,7 @@ TEST(InterpnTests, HighDimExtrapolation4D) {
     }
 
     // Query outside grid (should clamp)
-    Eigen::MatrixXd xi(1, 4);
+    janus::NumericMatrix xi(1, 4);
     xi << 2.0, 2.0, 2.0, 2.0; // All out of bounds
 
     auto result = janus::interpn<double>(points, values, xi);
@@ -860,13 +861,13 @@ TEST(InterpnTests, HighDimExtrapolation4D) {
 
 TEST(InterpnTests, BatchQuery100Points3D) {
     // Test with many query points
-    Eigen::VectorXd pts(3);
+    janus::NumericVector pts(3);
     pts << 0.0, 0.5, 1.0;
 
-    std::vector<Eigen::VectorXd> points(3, pts);
+    std::vector<janus::NumericVector> points(3, pts);
 
     // f = x + y + z
-    Eigen::VectorXd values(27); // 3^3
+    janus::NumericVector values(27); // 3^3
     int idx = 0;
     for (int k = 0; k < 3; ++k) {
         for (int j = 0; j < 3; ++j) {
@@ -877,7 +878,7 @@ TEST(InterpnTests, BatchQuery100Points3D) {
     }
 
     // 100 random-ish query points
-    Eigen::MatrixXd xi(100, 3);
+    janus::NumericMatrix xi(100, 3);
     for (int i = 0; i < 100; ++i) {
         double t = static_cast<double>(i) / 99.0;
         xi(i, 0) = t;
@@ -896,17 +897,17 @@ TEST(InterpnTests, BatchQuery100Points3D) {
 
 TEST(InterpnTests, TransposedXiInput) {
     // Test that transposed xi input works (n_dims x n_points instead of n_points x n_dims)
-    Eigen::VectorXd x_pts(2);
+    janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
-    Eigen::VectorXd y_pts(2);
+    janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points = {x_pts, y_pts};
-    Eigen::VectorXd values(4);
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(4);
     values << 0, 1, 1, 2; // z = x + y
 
     // xi as (n_dims, n_points) = (2, 3)
-    Eigen::MatrixXd xi(2, 3);
+    janus::NumericMatrix xi(2, 3);
     xi << 0.5, 0.0, 1.0, // x values
         0.5, 0.0, 1.0;   // y values
 
@@ -923,13 +924,13 @@ TEST(InterpnTests, TransposedXiInput) {
 
 TEST(InterpnTests, Symbolic3DLinear) {
     // 3D symbolic interpolation
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(3, pts);
+    std::vector<janus::NumericVector> points(3, pts);
 
     // f = x + y + z
-    Eigen::VectorXd values(8);
+    janus::NumericVector values(8);
     values << 0, 1, 1, 2, 1, 2, 2, 3; // Fortran order
 
     // Symbolic query at fixed point
@@ -946,13 +947,13 @@ TEST(InterpnTests, Symbolic3DLinear) {
 
 TEST(InterpnTests, Symbolic4DLinear) {
     // 4D symbolic interpolation
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(4, pts);
+    std::vector<janus::NumericVector> points(4, pts);
 
     // f = sum of coordinates
-    Eigen::VectorXd values(16);
+    janus::NumericVector values(16);
     for (int i = 0; i < 16; ++i) {
         int sum = 0;
         int temp = i;
@@ -978,13 +979,13 @@ TEST(InterpnTests, Symbolic4DLinear) {
 
 TEST(InterpnTests, Symbolic5DCorner) {
     // 5D symbolic at corner
-    Eigen::VectorXd pts(2);
+    janus::NumericVector pts(2);
     pts << 0.0, 1.0;
 
-    std::vector<Eigen::VectorXd> points(5, pts);
+    std::vector<janus::NumericVector> points(5, pts);
 
     // f = sum of coordinates
-    Eigen::VectorXd values(32);
+    janus::NumericVector values(32);
     for (int i = 0; i < 32; ++i) {
         int sum = 0;
         int temp = i;
@@ -1008,13 +1009,13 @@ TEST(InterpnTests, Symbolic5DCorner) {
 
 TEST(InterpnTests, SymbolicBSpline4D) {
     // 4D B-spline symbolic interpolation (requires 4+ points per dim)
-    Eigen::VectorXd pts(4);
+    janus::NumericVector pts(4);
     pts << 0.0, 1.0, 2.0, 3.0;
 
-    std::vector<Eigen::VectorXd> points(4, pts);
+    std::vector<janus::NumericVector> points(4, pts);
 
     // f = 1 (constant for easy verification)
-    Eigen::VectorXd values(256); // 4^4 = 256
+    janus::NumericVector values(256); // 4^4 = 256
     values.setConstant(1.0);
 
     // Symbolic query at center
@@ -1034,7 +1035,7 @@ TEST(InterpnTests, SymbolicBSpline4D) {
 // ============================================================================
 
 TEST(InterpnTests, JanusTypesNumeric3D) {
-    // Demonstrate using janus::NumericVector instead of Eigen::VectorXd
+    // Demonstrate using janus::NumericVector instead of janus::NumericVector
     janus::NumericVector x_pts(3);
     x_pts << 0.0, 1.0, 2.0;
     janus::NumericVector y_pts(3);
