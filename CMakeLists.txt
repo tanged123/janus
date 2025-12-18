@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(
   janus
-  VERSION 1.4.0
+  VERSION 1.4.1
   LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
