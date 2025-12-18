@@ -177,7 +177,7 @@ TEST(Interp1DTests, BSplineSymbolic) {
 }
 
 TEST(Interp1DTests, VectorizedQuery) {
-    // Test vectorized queries
+    // Test vectorized queries using eval_batch
     Eigen::VectorXd x(3);
     x << 0, 1, 2;
     Eigen::VectorXd y(3);
@@ -188,7 +188,7 @@ TEST(Interp1DTests, VectorizedQuery) {
     Eigen::VectorXd queries(3);
     queries << 0.5, 1.0, 1.5;
 
-    auto results = interp(queries);
+    auto results = interp.eval_batch(queries);
 
     EXPECT_NEAR(results(0), 5.0, 1e-10);
     EXPECT_NEAR(results(1), 10.0, 1e-10);
