@@ -125,6 +125,14 @@ echo "[opt/5] Parametric Sweep"
 ./build/examples/parametric_sweep
 echo ""
 
+echo "[opt/6] Collocation Demo"
+./build/examples/collocation_demo
+echo ""
+
+echo "[opt/7] Direct Collocation vs Multiple Shooting"
+./build/examples/multishoot_comparison
+echo ""
+
 echo "========================================"
 echo "All examples ran successfully!"
 echo "========================================"

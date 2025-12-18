@@ -3,6 +3,8 @@
 #include "JanusIO.hpp"
 #include "JanusTypes.hpp"
 #include <casadi/casadi.hpp>
+#include <cmath>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -340,6 +342,139 @@ inline SparsityPattern get_sparsity_in(const Function &fn, int input_idx = 0) {
 inline SparsityPattern get_sparsity_out(const Function &fn, int output_idx = 0) {
     casadi::Sparsity sp = fn.casadi_function().sparsity_out(output_idx);
     return SparsityPattern(sp);
+}
+
+// =============================================================================
+// NaN-Propagation Sparsity Detection
+// =============================================================================
+
+/**
+ * @brief Options for NaN-propagation sparsity detection
+ */
+struct NaNSparsityOptions {
+    NumericVector reference_point; ///< Point to evaluate at (default: zeros)
+    double perturbation = 1e-7;    ///< Reserved for future finite-difference methods
+};
+
+/**
+ * @brief Detect Jacobian sparsity using NaN propagation
+ *
+ * This provides black-box sparsity detection for functions where symbolic
+ * sparsity analysis is not available. The algorithm:
+ *
+ * 1. Evaluate f(x) at a reference point to get baseline outputs
+ * 2. For each input i: set x[i] = NaN, evaluate f(x_perturbed)
+ * 3. If output[j] becomes NaN, then df[j]/dx[i] ≠ 0 (structurally)
+ *
+ * @note This is a conservative estimate - it may report false positives
+ *       if NaN propagates through unused code paths, but won't miss
+ *       actual dependencies.
+ *
+ * @code
+ * // Detect sparsity of element-wise function
+ * auto sp = janus::nan_propagation_sparsity(
+ *     [](const NumericVector& x) {
+ *         NumericVector y(x.size());
+ *         for (int i = 0; i < x.size(); ++i) y(i) = x(i) * x(i);
+ *         return y;
+ *     },
+ *     3, 3);  // 3 inputs, 3 outputs
+ *
+ * EXPECT_EQ(sp.nnz(), 3);  // Diagonal pattern
+ * @endcode
+ *
+ * @tparam Func Function type: (const NumericVector&) -> NumericVector
+ * @param fn Function to analyze
+ * @param n_inputs Number of scalar inputs
+ * @param n_outputs Number of scalar outputs
+ * @param opts Options (reference point, etc.)
+ * @return SparsityPattern of the Jacobian (n_outputs x n_inputs)
+ */
+template <typename Func>
+SparsityPattern nan_propagation_sparsity(Func &&fn, int n_inputs, int n_outputs,
+                                         const NaNSparsityOptions &opts = {}) {
+    // Use reference point or default to zeros
+    NumericVector x0(n_inputs);
+    if (opts.reference_point.size() == n_inputs) {
+        x0 = opts.reference_point;
+    } else {
+        x0.setZero();
+    }
+
+    // Evaluate at reference point to verify the function works
+    NumericVector y0 = fn(x0);
+    if (y0.size() != n_outputs) {
+        throw std::invalid_argument("nan_propagation_sparsity: function returned " +
+                                    std::to_string(y0.size()) + " outputs, expected " +
+                                    std::to_string(n_outputs));
+    }
+
+    // Build sparsity pattern by probing each input with NaN
+    std::vector<casadi_int> row_indices;
+    std::vector<casadi_int> col_indices;
+
+    for (int i = 0; i < n_inputs; ++i) {
+        // Create perturbed input with NaN at position i
+        NumericVector x_perturbed = x0;
+        x_perturbed(i) = std::numeric_limits<double>::quiet_NaN();
+
+        // Evaluate function
+        NumericVector y_perturbed = fn(x_perturbed);
+
+        // Check which outputs became NaN
+        for (int j = 0; j < n_outputs; ++j) {
+            if (std::isnan(y_perturbed(j))) {
+                // Output j depends on input i
+                row_indices.push_back(j);
+                col_indices.push_back(i);
+            }
+        }
+    }
+
+    // Construct CasADi sparsity from triplets
+    casadi::Sparsity sp = casadi::Sparsity::triplet(n_outputs, n_inputs, row_indices, col_indices);
+    return SparsityPattern(sp);
+}
+
+/**
+ * @brief Detect Jacobian sparsity of a janus::Function using NaN propagation
+ *
+ * Convenience overload that uses the Function's internal structure.
+ *
+ * @param fn Function to analyze (must have single vector input/output)
+ * @param opts Options for NaN propagation
+ * @return SparsityPattern of the Jacobian
+ */
+inline SparsityPattern nan_propagation_sparsity(const Function &fn,
+                                                const NaNSparsityOptions &opts = {}) {
+    // Get input/output dimensions from the function
+    auto sp_in = fn.casadi_function().sparsity_in(0);
+    auto sp_out = fn.casadi_function().sparsity_out(0);
+
+    int n_inputs = static_cast<int>(sp_in.nnz());
+    int n_outputs = static_cast<int>(sp_out.nnz());
+
+    // Create wrapper that evaluates the function with a single vector input
+    auto eval_fn = [&fn](const NumericVector &x) -> NumericVector {
+        // Pass as a single Eigen vector (not as separate scalars)
+        auto results = fn(x);
+        // Flatten results to a single vector
+        int total_size = 0;
+        for (const auto &m : results) {
+            total_size += static_cast<int>(m.size());
+        }
+        NumericVector y(total_size);
+        int offset = 0;
+        for (const auto &m : results) {
+            for (int i = 0; i < m.size(); ++i) {
+                y(offset + i) = m(i);
+            }
+            offset += static_cast<int>(m.size());
+        }
+        return y;
+    };
+
+    return nan_propagation_sparsity(eval_fn, n_inputs, n_outputs, opts);
 }
 
 } // namespace janus

@@ -6,4 +6,6 @@
 #include "core/JanusTypes.hpp"
 #include "core/Sparsity.hpp"
 #include "math/JanusMath.hpp"
+#include "optimization/Collocation.hpp"
+#include "optimization/MultiShooting.hpp"
 #include "optimization/Opti.hpp"

@@ -105,3 +105,64 @@ janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
 This structure produces a banded matrix with off-diagonal bands at distance $\pm 1$ and $\pm N$.
 
 ![2D Laplacian Sparsity Pattern](../images/laplacian_2d.png)
+
+---
+
+## NaN-Propagation Sparsity Detection
+
+Sometimes you have **black-box functions** where symbolic sparsity analysis isn't possible:
+- External library calls
+- Non-traceable operations
+- Functions with runtime branching
+
+Janus provides `nan_propagation_sparsity()` for these cases.
+
+### How It Works
+
+1. Evaluate f(x) at a reference point
+2. For each input i: set x[i] = NaN, evaluate f(x)
+3. If output[j] becomes NaN → depends on input i → Jacobian(j, i) ≠ 0
+
+### API
+
+```cpp
+// For lambda/callable functions
+auto sp = janus::nan_propagation_sparsity(
+    [](const NumericVector& x) {
+        NumericVector y(x.size());
+        for (int i = 0; i < x.size(); ++i) y(i) = x(i) * x(i);
+        return y;
+    },
+    n_inputs, n_outputs);
+
+// For janus::Function
+janus::Function fn(...);
+auto sp = janus::nan_propagation_sparsity(fn);
+
+// With custom options (reference point)
+NaNSparsityOptions opts;
+opts.reference_point = NumericVector{{1.0, 2.0, 3.0}};
+auto sp = nan_propagation_sparsity(fn, opts);
+```
+
+### Example: Verifying Symbolic Sparsity
+
+```cpp
+// Create symbolic function
+auto x = janus::sym("x", 4);
+auto f = x * x;  // Element-wise square
+
+// Symbolic sparsity
+auto sp_symbolic = janus::sparsity_of_jacobian(f, x);
+
+// NaN-propagation sparsity (black-box equivalent)
+janus::Function fn({x}, {f});
+auto sp_nan = janus::nan_propagation_sparsity(fn);
+
+// They should match!
+assert(sp_symbolic == sp_nan);
+```
+
+> [!TIP]
+> Use NaN-propagation to validate that your symbolic expressions have the expected structure, or when interfacing with external numerical code.
+

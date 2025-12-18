@@ -65,3 +65,6 @@ cmake-build-*/
 
 # Ignore 
 !docs/images/*.png
+
+# Licensed/Commercial Dependencies (use local copies only)
+reference/snopt7.7.7/

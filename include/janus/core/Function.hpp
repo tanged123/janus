@@ -7,6 +7,8 @@
 #include <vector>
 
 #include <atomic>
+#include <tuple>
+#include <utility>
 
 namespace janus {
 
@@ -173,5 +175,150 @@ class Function {
         return ret;
     }
 };
+
+// =============================================================================
+// Lambda-Style Function Construction
+// =============================================================================
+
+namespace detail {
+
+/**
+ * @brief Helper to detect if a type is a std::tuple
+ */
+template <typename T> struct is_tuple : std::false_type {};
+template <typename... Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+template <typename T> inline constexpr bool is_tuple_v = is_tuple<T>::value;
+
+/**
+ * @brief Convert a tuple of symbolic scalars to a vector of SymbolicArg
+ */
+template <typename Tuple, std::size_t... Is>
+std::vector<SymbolicArg> tuple_to_outputs_impl(const Tuple &t, std::index_sequence<Is...>) {
+    return {std::get<Is>(t)...};
+}
+
+template <typename... Ts> std::vector<SymbolicArg> tuple_to_outputs(const std::tuple<Ts...> &t) {
+    return tuple_to_outputs_impl(t, std::index_sequence_for<Ts...>{});
+}
+
+/**
+ * @brief Invoke lambda with unpacked symbolic arguments
+ */
+template <typename Func, std::size_t... Is>
+auto invoke_with_symbols_impl(Func &&fn, const std::vector<SymbolicScalar> &syms,
+                              std::index_sequence<Is...>) {
+    return fn(syms[Is]...);
+}
+
+template <int NInputs, typename Func>
+auto invoke_with_symbols(Func &&fn, const std::vector<SymbolicScalar> &syms) {
+    return invoke_with_symbols_impl(std::forward<Func>(fn), syms,
+                                    std::make_index_sequence<NInputs>{});
+}
+
+} // namespace detail
+
+/**
+ * @brief Create a Function from a lambda expression
+ *
+ * Automatically creates symbolic input variables and constructs a Function
+ * from the lambda's return value(s).
+ *
+ * @code
+ * // Single output
+ * auto f = janus::make_function<2, 1>("f", [](auto x, auto y) {
+ *     return x*x + y*y;
+ * });
+ *
+ * // Multiple outputs (return a tuple)
+ * auto g = janus::make_function<2, 2>("g", [](auto x, auto y) {
+ *     return std::make_tuple(x + y, x - y);
+ * });
+ * @endcode
+ *
+ * @tparam NInputs Number of scalar inputs
+ * @tparam NOutputs Number of scalar outputs (for validation)
+ * @tparam Func Lambda type
+ * @param name Function name
+ * @param fn Lambda taking NInputs symbolic scalars
+ * @return Function constructed from the lambda
+ */
+template <int NInputs, int NOutputs, typename Func>
+Function make_function(const std::string &name, Func &&fn) {
+    static_assert(NInputs > 0, "NInputs must be positive");
+    static_assert(NOutputs > 0, "NOutputs must be positive");
+
+    // Create symbolic inputs with auto-generated names
+    std::vector<SymbolicScalar> inputs;
+    inputs.reserve(NInputs);
+    for (int i = 0; i < NInputs; ++i) {
+        inputs.push_back(sym("_x" + std::to_string(i)));
+    }
+
+    // Invoke lambda with unpacked symbols
+    auto result = detail::invoke_with_symbols<NInputs>(std::forward<Func>(fn), inputs);
+
+    // Convert result to output vector
+    std::vector<SymbolicArg> outputs;
+    if constexpr (detail::is_tuple_v<decltype(result)>) {
+        outputs = detail::tuple_to_outputs(result);
+    } else {
+        // Single output
+        outputs = {result};
+    }
+
+    // Convert inputs to SymbolicArg vector
+    std::vector<SymbolicArg> input_args(inputs.begin(), inputs.end());
+
+    return Function(name, input_args, outputs);
+}
+
+/**
+ * @brief Create a Function from a lambda with named inputs
+ *
+ * @code
+ * auto f = janus::make_function<2>("f", {"x", "y"}, [](auto x, auto y) {
+ *     return x*x + y*y;
+ * });
+ * @endcode
+ *
+ * @tparam NInputs Number of inputs (must match input_names.size())
+ * @tparam Func Lambda type
+ * @param name Function name
+ * @param input_names Names for input variables
+ * @param fn Lambda taking NInputs symbolic scalars
+ * @return Function constructed from the lambda
+ */
+template <int NInputs, typename Func>
+Function make_function(const std::string &name, const std::vector<std::string> &input_names,
+                       Func &&fn) {
+    static_assert(NInputs > 0, "NInputs must be positive");
+    if (static_cast<int>(input_names.size()) != NInputs) {
+        throw std::invalid_argument("make_function: input_names.size() must equal NInputs");
+    }
+
+    // Create symbolic inputs with provided names
+    std::vector<SymbolicScalar> inputs;
+    inputs.reserve(NInputs);
+    for (const auto &iname : input_names) {
+        inputs.push_back(sym(iname));
+    }
+
+    // Invoke lambda with unpacked symbols
+    auto result = detail::invoke_with_symbols<NInputs>(std::forward<Func>(fn), inputs);
+
+    // Convert result to output vector
+    std::vector<SymbolicArg> outputs;
+    if constexpr (detail::is_tuple_v<decltype(result)>) {
+        outputs = detail::tuple_to_outputs(result);
+    } else {
+        outputs = {result};
+    }
+
+    // Convert inputs to SymbolicArg vector
+    std::vector<SymbolicArg> input_args(inputs.begin(), inputs.end());
+
+    return Function(name, input_args, outputs);
+}
 
 } // namespace janus

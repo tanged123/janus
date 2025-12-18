@@ -268,3 +268,130 @@ TEST(SparsityTests, FunctionJacobianSparsity) {
     EXPECT_EQ(sp.n_cols(), 3);
     EXPECT_EQ(sp.nnz(), 3); // Diagonal
 }
+
+// ============================================================================
+// NaN-Propagation Sparsity Tests
+// ============================================================================
+
+TEST(SparsityTests, NaNSparsity_Diagonal) {
+    // f[i] = x[i]^2 -> diagonal Jacobian
+    auto square_fn = [](const NumericVector &x) {
+        NumericVector y(x.size());
+        for (int i = 0; i < x.size(); ++i) {
+            y(i) = x(i) * x(i);
+        }
+        return y;
+    };
+
+    auto sp = nan_propagation_sparsity(square_fn, 3, 3);
+
+    EXPECT_EQ(sp.n_rows(), 3);
+    EXPECT_EQ(sp.n_cols(), 3);
+    EXPECT_EQ(sp.nnz(), 3); // Diagonal
+
+    // Check diagonal pattern
+    EXPECT_TRUE(sp.has_nz(0, 0));
+    EXPECT_TRUE(sp.has_nz(1, 1));
+    EXPECT_TRUE(sp.has_nz(2, 2));
+    EXPECT_FALSE(sp.has_nz(0, 1));
+    EXPECT_FALSE(sp.has_nz(1, 0));
+}
+
+TEST(SparsityTests, NaNSparsity_Dense) {
+    // f[i] = sum(x) -> each output depends on all inputs
+    auto sum_fn = [](const NumericVector &x) {
+        NumericVector y(2);
+        double s = x.sum();
+        y(0) = s;
+        y(1) = s * 2;
+        return y;
+    };
+
+    auto sp = nan_propagation_sparsity(sum_fn, 3, 2);
+
+    EXPECT_EQ(sp.n_rows(), 2);
+    EXPECT_EQ(sp.n_cols(), 3);
+    EXPECT_EQ(sp.nnz(), 6); // Dense: all outputs depend on all inputs
+
+    // All entries should be non-zero
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            EXPECT_TRUE(sp.has_nz(i, j));
+        }
+    }
+}
+
+TEST(SparsityTests, NaNSparsity_Sparse) {
+    // f[0] = x[0] * x[1]  -> depends on x[0], x[1]
+    // f[1] = x[2]         -> depends only on x[2]
+    auto sparse_fn = [](const NumericVector &x) {
+        NumericVector y(2);
+        y(0) = x(0) * x(1);
+        y(1) = x(2);
+        return y;
+    };
+
+    auto sp = nan_propagation_sparsity(sparse_fn, 3, 2);
+
+    EXPECT_EQ(sp.n_rows(), 2);
+    EXPECT_EQ(sp.n_cols(), 3);
+    EXPECT_EQ(sp.nnz(), 3);
+
+    // f[0] depends on x[0], x[1]
+    EXPECT_TRUE(sp.has_nz(0, 0));
+    EXPECT_TRUE(sp.has_nz(0, 1));
+    EXPECT_FALSE(sp.has_nz(0, 2));
+
+    // f[1] depends only on x[2]
+    EXPECT_FALSE(sp.has_nz(1, 0));
+    EXPECT_FALSE(sp.has_nz(1, 1));
+    EXPECT_TRUE(sp.has_nz(1, 2));
+}
+
+TEST(SparsityTests, NaNSparsity_MatchesSymbolic) {
+    // Create a symbolic function and compare sparsity patterns
+    auto x = sym("x", 3);
+    auto f = x * x; // Element-wise square, diagonal Jacobian
+
+    // Get symbolic sparsity
+    auto symbolic_sp = sparsity_of_jacobian(f, x);
+
+    // Create janus::Function and get NaN-propagation sparsity
+    Function fn("square", {x}, {f});
+    auto nan_sp = nan_propagation_sparsity(fn);
+
+    // They should match
+    EXPECT_EQ(symbolic_sp.n_rows(), nan_sp.n_rows());
+    EXPECT_EQ(symbolic_sp.n_cols(), nan_sp.n_cols());
+    EXPECT_EQ(symbolic_sp.nnz(), nan_sp.nnz());
+    EXPECT_EQ(symbolic_sp, nan_sp);
+}
+
+TEST(SparsityTests, NaNSparsity_WithReferencePoint) {
+    // Test with a custom reference point
+    auto fn = [](const NumericVector &x) {
+        NumericVector y(2);
+        y(0) = x(0) + x(1);
+        y(1) = x(1) + x(2);
+        return y;
+    };
+
+    NaNSparsityOptions opts;
+    opts.reference_point = NumericVector{{1.0, 2.0, 3.0}};
+
+    auto sp = nan_propagation_sparsity(fn, 3, 2, opts);
+
+    EXPECT_EQ(sp.n_rows(), 2);
+    EXPECT_EQ(sp.n_cols(), 3);
+    EXPECT_EQ(sp.nnz(), 4);
+
+    // f[0] = x[0] + x[1]
+    EXPECT_TRUE(sp.has_nz(0, 0));
+    EXPECT_TRUE(sp.has_nz(0, 1));
+    EXPECT_FALSE(sp.has_nz(0, 2));
+
+    // f[1] = x[1] + x[2]
+    EXPECT_FALSE(sp.has_nz(1, 0));
+    EXPECT_TRUE(sp.has_nz(1, 1));
+    EXPECT_TRUE(sp.has_nz(1, 2));
+}

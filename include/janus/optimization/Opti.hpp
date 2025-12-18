@@ -416,41 +416,43 @@ class Opti {
     /**
      * @brief Solve the optimization problem
      *
-     * Uses IPOPT as the underlying NLP solver.
+     * Uses the solver specified in options (default: IPOPT).
      *
-     * @param options Solver configuration (max_iter, verbose, etc.)
+     * @param options Solver configuration (solver, max_iter, verbose, etc.)
      * @return OptiSol containing optimized values
-     * @throws std::runtime_error if optimization fails to converge
+     * @throws std::runtime_error if selected solver unavailable or fails
      */
     OptiSol solve(const OptiOptions &options = {}) {
-        // Configure IPOPT options
+        // Verify solver availability
+        if (!solver_available(options.solver)) {
+            throw std::runtime_error(std::string("Solver '") + solver_name(options.solver) +
+                                     "' is not available in this CasADi build");
+        }
+
         casadi::Dict solver_opts;
-        solver_opts["ipopt.max_iter"] = options.max_iter;
-        solver_opts["ipopt.max_cpu_time"] = options.max_cpu_time;
-        solver_opts["ipopt.tol"] = options.tol;
-        solver_opts["ipopt.mu_strategy"] = options.mu_strategy;
-        solver_opts["ipopt.sb"] = "yes"; // Suppress banner
 
-        if (options.verbose) {
-            solver_opts["ipopt.print_level"] = 5;
-        } else {
-            solver_opts["print_time"] = false;
-            solver_opts["ipopt.print_level"] = 0;
+        // Configure solver-specific options
+        switch (options.solver) {
+        case Solver::SNOPT:
+            configure_snopt_opts(solver_opts, options);
+            break;
+        case Solver::QPOASES:
+            configure_qpoases_opts(solver_opts, options);
+            break;
+        case Solver::IPOPT:
+        default:
+            configure_ipopt_opts(solver_opts, options);
+            break;
         }
 
-        if (options.detect_simple_bounds) {
-            solver_opts["detect_simple_bounds"] = true;
-        }
-
+        // Common options
         if (options.jit) {
             solver_opts["jit"] = true;
             solver_opts["jit_options"] = casadi::Dict{{"flags", std::vector<std::string>{"-O3"}}};
         }
 
-        // Set solver
-        opti_.solver("ipopt", solver_opts);
-
-        // Solve and wrap result
+        // Set solver and solve
+        opti_.solver(solver_name(options.solver), solver_opts);
         return OptiSol(opti_.solve());
     }
 
@@ -479,27 +481,35 @@ class Opti {
      */
     SweepResult solve_sweep(const SymbolicScalar &param, const std::vector<double> &values,
                             const OptiOptions &options = {}) {
+        // Verify solver availability
+        if (!solver_available(options.solver)) {
+            throw std::runtime_error(std::string("Solver '") + solver_name(options.solver) +
+                                     "' is not available in this CasADi build");
+        }
+
         SweepResult result;
         result.param_values = values;
         result.all_converged = true;
 
         // Configure solver once
         casadi::Dict solver_opts;
-        solver_opts["ipopt.max_iter"] = options.max_iter;
-        solver_opts["ipopt.max_cpu_time"] = options.max_cpu_time;
-        solver_opts["ipopt.tol"] = options.tol;
-        solver_opts["ipopt.mu_strategy"] = options.mu_strategy;
-        solver_opts["ipopt.sb"] = "yes";
-        solver_opts["ipopt.warm_start_init_point"] = "yes";
 
-        if (options.verbose) {
-            solver_opts["ipopt.print_level"] = 5;
-        } else {
-            solver_opts["print_time"] = false;
-            solver_opts["ipopt.print_level"] = 0;
+        switch (options.solver) {
+        case Solver::SNOPT:
+            configure_snopt_opts(solver_opts, options);
+            break;
+        case Solver::QPOASES:
+            configure_qpoases_opts(solver_opts, options);
+            break;
+        case Solver::IPOPT:
+        default:
+            configure_ipopt_opts(solver_opts, options);
+            // Enable warm-start for parameter sweeps
+            solver_opts["ipopt.warm_start_init_point"] = "yes";
+            break;
         }
 
-        opti_.solver("ipopt", solver_opts);
+        opti_.solver(solver_name(options.solver), solver_opts);
 
         for (double val : values) {
             // Update parameter value
@@ -678,6 +688,58 @@ class Opti {
     casadi::Opti opti_;
     std::vector<std::string> categories_to_freeze_;
     std::map<std::string, std::vector<SymbolicScalar>> categories_;
+
+    // =========================================================================
+    // Solver Configuration Helpers
+    // =========================================================================
+
+    void configure_ipopt_opts(casadi::Dict &solver_opts, const OptiOptions &options) {
+        solver_opts["ipopt.max_iter"] = options.max_iter;
+        solver_opts["ipopt.max_cpu_time"] = options.max_cpu_time;
+        solver_opts["ipopt.tol"] = options.tol;
+        solver_opts["ipopt.mu_strategy"] = options.mu_strategy;
+        solver_opts["ipopt.sb"] = "yes"; // Suppress banner
+
+        if (options.verbose) {
+            solver_opts["ipopt.print_level"] = 5;
+        } else {
+            solver_opts["print_time"] = false;
+            solver_opts["ipopt.print_level"] = 0;
+        }
+
+        if (options.detect_simple_bounds) {
+            solver_opts["detect_simple_bounds"] = true;
+        }
+    }
+
+    void configure_snopt_opts(casadi::Dict &solver_opts, const OptiOptions &options) {
+        const auto &snopt = options.snopt_opts;
+
+        // SNOPT option names in CasADi use underscores
+        solver_opts["snopt.Major_iterations_limit"] = snopt.major_iterations_limit;
+        solver_opts["snopt.Minor_iterations_limit"] = snopt.minor_iterations_limit;
+        solver_opts["snopt.Major_optimality_tolerance"] = snopt.major_optimality_tolerance;
+        solver_opts["snopt.Major_feasibility_tolerance"] = snopt.major_feasibility_tolerance;
+
+        if (options.verbose) {
+            solver_opts["snopt.Major_print_level"] = 1;
+            solver_opts["snopt.Minor_print_level"] = 1;
+        } else {
+            solver_opts["print_time"] = false;
+            solver_opts["snopt.Major_print_level"] = snopt.print_level;
+            solver_opts["snopt.Minor_print_level"] = 0;
+        }
+    }
+
+    void configure_qpoases_opts(casadi::Dict &solver_opts, const OptiOptions &options) {
+        solver_opts["qpoases.nWSR"] = options.max_iter;
+        solver_opts["qpoases.CPUtime"] = options.max_cpu_time;
+
+        if (!options.verbose) {
+            solver_opts["print_time"] = false;
+            solver_opts["qpoases.printLevel"] = "none";
+        }
+    }
 };
 
 } // namespace janus
