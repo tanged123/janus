@@ -87,8 +87,9 @@ int main() {
     auto T_e = motor.electromagnetic_torque(id, iq);
     janus::export_graph_dot(T_e, "graph_em_torque", "ElectromagneticTorque");
     janus::render_graph("graph_em_torque.dot", "graph_em_torque.pdf");
+    janus::export_graph_html(T_e, "graph_em_torque", "ElectromagneticTorque");
     std::cout << "   T_e = 1.5 * p * [lambda*iq + (Ld-Lq)*id*iq]\n";
-    std::cout << "   → graph_em_torque.pdf\n\n";
+    std::cout << "   -> graph_em_torque.pdf / .html\n\n";
 
     // ============================================================
     // Graph 2: Voltage Equations (Park Transform)
@@ -100,8 +101,9 @@ int main() {
 
     janus::export_graph_dot(V_magnitude, "graph_voltage", "VoltageMagnitude");
     janus::render_graph("graph_voltage.dot", "graph_voltage.pdf");
+    janus::export_graph_html(V_magnitude, "graph_voltage", "VoltageMagnitude");
     std::cout << "   |V| = sqrt(Vd^2 + Vq^2)\n";
-    std::cout << "   → graph_voltage.pdf\n\n";
+    std::cout << "   -> graph_voltage.pdf / .html\n\n";
 
     // ============================================================
     // Graph 3: Complete Motor Dynamics (ODE RHS)
@@ -111,8 +113,9 @@ int main() {
 
     janus::export_graph_dot(domega_dt, "graph_dynamics", "MechanicalDynamics");
     janus::render_graph("graph_dynamics.dot", "graph_dynamics.pdf");
+    janus::export_graph_html(domega_dt, "graph_dynamics", "MechanicalDynamics");
     std::cout << "   d(omega)/dt = (T_e - T_load - B*omega) / J\n";
-    std::cout << "   → graph_dynamics.pdf\n\n";
+    std::cout << "   -> graph_dynamics.pdf / .html\n\n";
 
     // ============================================================
     // Graph 4: Electrical Power with Losses
@@ -122,8 +125,9 @@ int main() {
 
     janus::export_graph_dot(P_elec, "graph_power", "ElectricalPower");
     janus::render_graph("graph_power.dot", "graph_power.pdf");
+    janus::export_graph_html(P_elec, "graph_power", "ElectricalPower");
     std::cout << "   P = 1.5 * (Vd*id + Vq*iq)\n";
-    std::cout << "   → graph_power.pdf\n\n";
+    std::cout << "   -> graph_power.pdf / .html\n\n";
 
     // ============================================================
     // Create callable janus::Function for torque
@@ -135,8 +139,9 @@ int main() {
     auto dT_dq = janus::jacobian({T_e}, {id, iq});
     janus::export_graph_dot(dT_dq, "graph_jacobian", "TorqueJacobian");
     janus::render_graph("graph_jacobian.dot", "graph_jacobian.pdf");
+    janus::export_graph_html(dT_dq, "graph_jacobian", "TorqueJacobian");
     std::cout << "   dT/d[id, iq] Jacobian computed symbolically\n";
-    std::cout << "   → graph_jacobian.pdf\n\n";
+    std::cout << "   -> graph_jacobian.pdf / .html\n\n";
 
     // ============================================================
     // Evaluate numerically
@@ -154,7 +159,9 @@ int main() {
     std::cout << "   T_e(id=0, iq=10A) = " << T_numeric(0, 0) << " N*m\n";
     std::cout << "   Expected: 1.5 * 4 * 0.175 * 10 = 10.5 N*m\n\n";
 
-    std::cout << "=== Complete! View graphs with: xdg-open graph_dynamics.pdf ===\n";
+    std::cout << "=== Complete! ===\n";
+    std::cout << "View PDF graphs:  xdg-open graph_dynamics.pdf\n";
+    std::cout << "View HTML graphs: xdg-open graph_dynamics.html (interactive pan/zoom)\n";
 
     return 0;
 }

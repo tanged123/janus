@@ -262,6 +262,234 @@ class SparsityPattern {
         }
     }
 
+    /**
+     * @brief Export sparsity pattern to an interactive HTML file
+     *
+     * Creates a self-contained HTML file with an SVG spy plot.
+     * Supports pan, zoom, and hover info showing (row, col) coordinates.
+     *
+     * @param filename Output filename (without extension, .html will be added)
+     * @param name Optional title for the visualization
+     */
+    void export_spy_html(const std::string &filename, const std::string &name = "sparsity") const {
+        std::string html_filename = filename + ".html";
+        std::ofstream out(html_filename);
+        if (!out.is_open()) {
+            throw std::runtime_error("Cannot open file: " + html_filename);
+        }
+
+        int rows = n_rows();
+        int cols = n_cols();
+        int cell_size = 12; // pixels per cell
+
+        // Limit cell size for very large matrices
+        if (rows > 100 || cols > 100) {
+            cell_size = std::max(3, 1200 / std::max(rows, cols));
+        }
+
+        // Add margins for axis labels
+        int margin_left = 50;
+        int margin_top = 40;
+        int svg_width = cols * cell_size + margin_left + 20;
+        int svg_height = rows * cell_size + margin_top + 20;
+
+        // Determine tick interval based on matrix size
+        int tick_interval = 1;
+        if (rows > 50 || cols > 50)
+            tick_interval = 10;
+        else if (rows > 20 || cols > 20)
+            tick_interval = 5;
+
+        out << R"SPYHTML(<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>)SPYHTML"
+            << name << R"SPYHTML(</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; overflow: hidden; display: flex; }
+        #controls { position: fixed; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.8);
+                    padding: 12px; border-radius: 8px; }
+        #controls button { margin: 2px; padding: 8px 14px; cursor: pointer; border: none;
+                           border-radius: 4px; background: #4a4a6a; color: white; font-size: 13px; }
+        #controls button:hover { background: #6a6a8a; }
+        #container { flex: 1; cursor: grab; overflow: hidden; height: 100%; }
+        #container:active { cursor: grabbing; }
+        #sidebar { width: 280px; height: 100%; background: #16213e; padding: 16px; overflow-y: auto; 
+                   border-left: 2px solid #0f3460; }
+        #sidebar h2 { color: #e94560; margin-bottom: 12px; font-size: 16px; }
+        #sidebar .section { margin-bottom: 14px; }
+        #sidebar .label { color: #888; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+        #sidebar .value { background: #0f3460; padding: 10px; border-radius: 6px; font-family: monospace;
+                          font-size: 14px; }
+        #sidebar .stat { display: flex; justify-content: space-between; padding: 6px 0;
+                         border-bottom: 1px solid #0f3460; }
+        #sidebar .stat-value { color: #4dc3ff; font-weight: bold; }
+        #info { position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8);
+                padding: 10px; border-radius: 4px; font-size: 12px; }
+        .nz { cursor: pointer; }
+        .nz:hover { fill: #e94560 !important; }
+        .axis-label { font-family: monospace; font-size: 10px; fill: #666; }
+        .grid-line { stroke: #ddd; stroke-width: 0.5; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button onclick="zoomIn()">Zoom +</button>
+        <button onclick="zoomOut()">Zoom -</button>
+        <button onclick="resetView()">Reset</button>
+        <button onclick="fitToScreen()">Fit</button>
+    </div>
+    <div id="container">
+        <svg id="spy" width=")SPYHTML"
+            << svg_width << R"SPYHTML(" height=")SPYHTML" << svg_height
+            << R"SPYHTML(" style="background:#ffffff;">
+            <g id="matrix" transform="translate()SPYHTML"
+            << margin_left << "," << margin_top << R"SPYHTML()">
+)SPYHTML";
+
+        // Draw grid lines at tick intervals
+        for (int r = 0; r <= rows; r += tick_interval) {
+            out << "                <line class=\"grid-line\" x1=\"0\" y1=\"" << (r * cell_size)
+                << "\" x2=\"" << (cols * cell_size) << "\" y2=\"" << (r * cell_size) << "\"/>\n";
+        }
+        for (int c = 0; c <= cols; c += tick_interval) {
+            out << "                <line class=\"grid-line\" x1=\"" << (c * cell_size)
+                << "\" y1=\"0\" x2=\"" << (c * cell_size) << "\" y2=\"" << (rows * cell_size)
+                << "\"/>\n";
+        }
+
+        // Draw axis labels
+        for (int r = 0; r <= rows; r += tick_interval) {
+            out << "                <text class=\"axis-label\" x=\"-5\" y=\""
+                << (r * cell_size + cell_size / 2)
+                << "\" text-anchor=\"end\" dominant-baseline=\"middle\">" << r << "</text>\n";
+        }
+        for (int c = 0; c <= cols; c += tick_interval) {
+            out << "                <text class=\"axis-label\" x=\""
+                << (c * cell_size + cell_size / 2) << "\" y=\"-8\" text-anchor=\"middle\">" << c
+                << "</text>\n";
+        }
+
+        // Output non-zero cells as rectangles
+        auto [row_idx, col_idx] = get_triplet();
+        for (size_t i = 0; i < row_idx.size(); ++i) {
+            int r = row_idx[i];
+            int c = col_idx[i];
+            out << "                <rect class=\"nz\" x=\"" << (c * cell_size) << "\" y=\""
+                << (r * cell_size) << "\" width=\"" << cell_size << "\" height=\"" << cell_size
+                << "\" fill=\"#1e3a5f\" data-row=\"" << r << "\" data-col=\"" << c << "\"/>\n";
+        }
+
+        out << R"SPYHTML(            </g>
+        </svg>
+    </div>
+    <div id="sidebar">
+        <h2>Sparsity Info</h2>
+        <div class="section">
+            <div class="stat"><span>Matrix Size</span><span class="stat-value">)SPYHTML"
+            << rows << " x " << cols << R"SPYHTML(</span></div>
+            <div class="stat"><span>Non-zeros</span><span class="stat-value">)SPYHTML"
+            << nnz() << R"SPYHTML(</span></div>
+            <div class="stat"><span>Density</span><span class="stat-value">)SPYHTML";
+
+        // Format density nicely
+        double dens = density() * 100;
+        out << std::fixed << std::setprecision(2) << dens;
+
+        out << R"SPYHTML(%</span></div>
+        </div>
+        <div class="section">
+            <div class="label">Selected Cell</div>
+            <div class="value" id="cell-info">Click on a non-zero cell</div>
+        </div>
+        <div class="section">
+            <div class="label">Notation</div>
+            <div class="value" id="notation-info">A(row, col)</div>
+        </div>
+    </div>
+    <div id="info">Scroll to zoom - Drag to pan - Click cells for info</div>
+    <script>
+        let scale = 1, panX = 0, panY = 0, isDragging = false, startX, startY;
+        const container = document.getElementById('container');
+        const svg = document.getElementById('spy');
+        const cellInfo = document.getElementById('cell-info');
+        const notationInfo = document.getElementById('notation-info');
+        const svgWidth = )SPYHTML"
+            << svg_width << R"SPYHTML(;
+        const svgHeight = )SPYHTML"
+            << svg_height << R"SPYHTML(;
+        const matrixRows = )SPYHTML"
+            << rows << R"SPYHTML(;
+        const matrixCols = )SPYHTML"
+            << cols << R"SPYHTML(;
+
+        fitToScreen();
+
+        function updateTransform() {
+            svg.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+            svg.style.transformOrigin = '0 0';
+        }
+        function zoomIn() { scale *= 1.3; updateTransform(); }
+        function zoomOut() { scale /= 1.3; updateTransform(); }
+        function resetView() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+        function fitToScreen() {
+            const availWidth = window.innerWidth - 280;
+            const scaleX = (availWidth - 40) / svgWidth;
+            const scaleY = (window.innerHeight - 40) / svgHeight;
+            scale = Math.min(scaleX, scaleY);
+            panX = (availWidth - svgWidth * scale) / 2;
+            panY = (window.innerHeight - svgHeight * scale) / 2;
+            updateTransform();
+        }
+        container.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+            const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+            panX = mouseX - (mouseX - panX) * zoomFactor;
+            panY = mouseY - (mouseY - panY) * zoomFactor;
+            scale *= zoomFactor;
+            updateTransform();
+        });
+        container.addEventListener('mousedown', e => { 
+            if (e.target.classList.contains('nz')) return;
+            isDragging = true; startX = e.clientX - panX; startY = e.clientY - panY; 
+        });
+        container.addEventListener('mousemove', e => { if (isDragging) { panX = e.clientX - startX; panY = e.clientY - startY; updateTransform(); } });
+        container.addEventListener('mouseup', () => isDragging = false);
+        container.addEventListener('mouseleave', () => isDragging = false);
+
+        // Cell interaction
+        let selectedCell = null;
+        svg.querySelectorAll('.nz').forEach(rect => {
+            rect.addEventListener('click', e => {
+                e.stopPropagation();
+                if (selectedCell) selectedCell.style.stroke = 'none';
+                selectedCell = e.target;
+                selectedCell.style.stroke = '#e94560';
+                selectedCell.style.strokeWidth = '2';
+                
+                const r = parseInt(e.target.dataset.row);
+                const c = parseInt(e.target.dataset.col);
+                cellInfo.textContent = `Row: ${r}, Col: ${c}`;
+                notationInfo.textContent = `A(${r}, ${c}) = nonzero`;
+            });
+            rect.addEventListener('mouseenter', e => {
+                const r = e.target.dataset.row;
+                const c = e.target.dataset.col;
+                cellInfo.textContent = `Row: ${r}, Col: ${c}`;
+            });
+        });
+    </script>
+</body>
+</html>
+)SPYHTML";
+        out.close();
+    }
+
     // === Underlying Access ===
 
     /**
