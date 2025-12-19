@@ -89,6 +89,11 @@ int main() {
         } else {
             std::cout << "Failed to render PDF (Graphviz 'dot' command might be missing)\n";
         }
+
+        // Export to interactive HTML
+        std::cout << "Exporting 'block_diag.html' for interactive visualization...\n";
+        sp.export_spy_html("block_diag", "Block Diagonal System");
+        std::cout << "Open block_diag.html in a browser for pan/zoom exploration!\n";
     }
 
     // Example 4: 2D Laplacian (5-point stencil)
@@ -129,8 +134,10 @@ int main() {
         std::cout << sp.to_string() << "\n";
 
         // Visualize
-        std::cout << "Exporting 'laplacian_2d.pdf'...\n";
+        std::cout << "Exporting 'laplacian_2d.pdf' and 'laplacian_2d.html'...\n";
         sp.visualize_spy("laplacian_2d");
+        sp.export_spy_html("laplacian_2d", "2D Laplacian Sparsity");
+        std::cout << "Open laplacian_2d.html for interactive exploration!\n";
     }
 
     // Example 5: NaN-Propagation Sparsity (Black-Box Detection)

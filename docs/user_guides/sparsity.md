@@ -70,6 +70,18 @@ sp.visualize_spy("my_pattern"); // Creates my_pattern.pdf
 ```
 This renders a true "spy plot" where non-zeros are black squares.
 
+### Interactive HTML
+For exploring large matrices with pan/zoom and cell inspection:
+```cpp
+sp.export_spy_html("my_pattern", "My Jacobian"); // Creates my_pattern.html
+```
+
+The HTML output includes:
+- **Pan/zoom** with mouse scroll and drag
+- **Click cells** to see row/col in sidebar
+- **Axis labels** with automatic tick marks
+- **Stats panel** showing matrix size, nnz, density
+
 ## Example Walkthrough: `sparsity_intro.cpp`
 
 The example `examples/intro/sparsity_intro.cpp` demonstrates four common structures found in optimization.
@@ -104,7 +116,8 @@ janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
 
 This structure produces a banded matrix with off-diagonal bands at distance $\pm 1$ and $\pm N$.
 
-![2D Laplacian Sparsity Pattern](../images/laplacian_2d.png)
+> [!TIP]
+> [🔍 Explore the 2D Laplacian sparsity pattern interactively](../examples/laplacian_2d.html)
 
 ---
 

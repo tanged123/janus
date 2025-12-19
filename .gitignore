@@ -62,9 +62,11 @@ cmake-build-*/
 *.png
 *.dot
 *.json
+*.html
 
 # Ignore 
 !docs/images/*.png
+!docs/examples/*.html
 
 # Licensed/Commercial Dependencies (use local copies only)
 reference/snopt7.7.7/

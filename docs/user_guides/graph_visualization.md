@@ -47,7 +47,8 @@ Janus provides three functions for graph visualization in `<janus/core/JanusIO.h
 |----------|-------------|
 | `export_graph_dot(expr, filename)` | Export to DOT format |
 | `render_graph(dot_file, output_file)` | Render DOT to PDF/PNG/SVG |
-| `visualize_graph(expr, base)` | Convenience (export + render) |
+| `visualize_graph(expr, base)` | Convenience (export + render to PDF) |
+| `export_graph_html(expr, filename)` | **Interactive HTML** with pan/zoom and node details |
 
 ### Basic Usage
 
@@ -57,13 +58,21 @@ Janus provides three functions for graph visualization in `<janus/core/JanusIO.h
 auto x = janus::sym("x");
 auto expr = janus::sin(x) * x;
 
-// Option 1: Two-step (export then render)
+// Option 1: Two-step (export then render to PDF)
 janus::export_graph_dot(expr, "my_graph", "SinExpression");
 janus::render_graph("my_graph.dot", "my_graph.pdf");
 
-// Option 2: One-step convenience
+// Option 2: One-step convenience (PDF)
 janus::visualize_graph(expr, "my_graph");  // Creates .dot and .pdf
+
+// Option 3: Interactive HTML (recommended for exploration)
+janus::export_graph_html(expr, "my_graph", "SinExpression");  // Creates .html
 ```
+
+The **HTML output** is recommended for exploring complex graphs:
+- **Click nodes** to see the full expression in the sidebar
+- **Pan/zoom** with mouse drag and scroll
+- **Connection highlighting** when a node is selected
 
 > [!NOTE]
 > Rendering requires **Graphviz** installed. In NixOS, it's included in the dev shell.
@@ -106,14 +115,16 @@ auto Vq = motor.voltage_q(id, iq, diq_dt, omega_e);
 auto P_elec = motor.electrical_power(Vd, Vq, id, iq);
 
 // Visualize the computational graph
-janus::visualize_graph(P_elec, "graph_power");
+janus::visualize_graph(P_elec, "graph_power");      // PDF
+janus::export_graph_html(P_elec, "graph_power");   // Interactive HTML
 ```
 
 ### The Generated Graph
 
-The power expression `P = 1.5 * (Vd*id + Vq*iq)` expands to include all the intermediate terms from the voltage equations, creating a deep graph:
+The power expression `P = 1.5 * (Vd*id + Vq*iq)` expands to include all the intermediate terms from the voltage equations, creating a deep graph.
 
-![Electrical Power Computational Graph](../images/graph_power.png)
+> [!TIP]
+> [🔍 Explore the power expression graph interactively](../examples/graph_power.html) - click nodes to see full expressions!
 
 **Node colors:**
 - 🟢 **Green ellipses**: Input variables (id, iq, Rs, Ld, etc.)
@@ -181,9 +192,13 @@ cd /path/to/janus
 ./scripts/build.sh
 ./build/examples/graph_visualization
 
-# View generated graphs
+# View generated graphs (PDF requires Graphviz)
 xdg-open graph_power.pdf
 xdg-open graph_dynamics.pdf
+
+# Or open interactive HTML in browser (no dependencies)
+xdg-open graph_power.html     # Or: explorer.exe graph_power.html (WSL)
+xdg-open graph_dynamics.html
 ```
 
 ---
