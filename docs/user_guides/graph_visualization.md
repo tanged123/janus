@@ -124,7 +124,7 @@ janus::export_graph_html(P_elec, "graph_power");   // Interactive HTML
 The power expression `P = 1.5 * (Vd*id + Vq*iq)` expands to include all the intermediate terms from the voltage equations, creating a deep graph.
 
 > [!TIP]
-> [🔍 Explore the power expression graph interactively](../examples/graph_power.html) - click nodes to see full expressions!
+> [🔍 Explore the power expression graph interactively](examples/graph_power.html) - click nodes to see full expressions! (open locally or via GitHub Pages)
 
 **Node colors:**
 - 🟢 **Green ellipses**: Input variables (id, iq, Rs, Ld, etc.)
