@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 # Enter the Janus development environment
-nix develop
+if [ $# -eq 0 ]; then
+    nix develop
+else
+    nix develop --command "$@"
+fi

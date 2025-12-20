@@ -171,4 +171,94 @@ template <JanusScalar T> T atan2(const T &y, const T &x) {
     }
 }
 
+// --- Arcsinh ---
+/**
+ * @brief Computes inverse hyperbolic sine of x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return Inverse hyperbolic sine of x
+ */
+template <JanusScalar T> T asinh(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::asinh(x);
+    } else {
+        return asinh(x);
+    }
+}
+
+/**
+ * @brief Computes inverse hyperbolic sine element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of inverse hyperbolic sines
+ */
+template <typename Derived> auto asinh(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return asinh(v); });
+    } else {
+        return x.array().asinh().matrix();
+    }
+}
+
+// --- Arccosh ---
+/**
+ * @brief Computes inverse hyperbolic cosine of x
+ * @tparam T Scalar type
+ * @param x Input value (must be >= 1)
+ * @return Inverse hyperbolic cosine of x
+ */
+template <JanusScalar T> T acosh(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::acosh(x);
+    } else {
+        return acosh(x);
+    }
+}
+
+/**
+ * @brief Computes inverse hyperbolic cosine element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of inverse hyperbolic cosines
+ */
+template <typename Derived> auto acosh(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return acosh(v); });
+    } else {
+        return x.array().acosh().matrix();
+    }
+}
+
+// --- Arctanh ---
+/**
+ * @brief Computes inverse hyperbolic tangent of x
+ * @tparam T Scalar type
+ * @param x Input value (must be in (-1, 1))
+ * @return Inverse hyperbolic tangent of x
+ */
+template <JanusScalar T> T atanh(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::atanh(x);
+    } else {
+        return atanh(x);
+    }
+}
+
+/**
+ * @brief Computes inverse hyperbolic tangent element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of inverse hyperbolic tangents
+ */
+template <typename Derived> auto atanh(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return atanh(v); });
+    } else {
+        return x.array().atanh().matrix();
+    }
+}
+
 } // namespace janus

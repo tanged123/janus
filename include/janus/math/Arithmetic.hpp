@@ -374,4 +374,341 @@ auto fmod(const Eigen::MatrixBase<Derived> &x, const Scalar &y) {
     }
 }
 
+// --- Log2 ---
+/**
+ * @brief Computes base-2 logarithm of x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return Base-2 logarithm of x
+ */
+template <JanusScalar T> T log2(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::log2(x);
+    } else {
+        // CasADi: log2(x) = log(x) / log(2)
+        return log(x) / log(T(2.0));
+    }
+}
+
+/**
+ * @brief Computes base-2 logarithm element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of base-2 logarithms
+ */
+template <typename Derived> auto log2(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::log2(v); });
+    } else {
+        return (x.array().log() / std::log(2.0)).matrix();
+    }
+}
+
+// --- Exp2 ---
+/**
+ * @brief Computes 2^x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return 2 raised to the power x
+ */
+template <JanusScalar T> T exp2(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::exp2(x);
+    } else {
+        // CasADi: 2^x = exp(x * log(2))
+        return exp(x * log(T(2.0)));
+    }
+}
+
+/**
+ * @brief Computes 2^x element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of 2^x values
+ */
+template <typename Derived> auto exp2(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::exp2(v); });
+    } else {
+        return (x.array() * std::log(2.0)).exp().matrix();
+    }
+}
+
+// --- Cbrt ---
+/**
+ * @brief Computes cube root of x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return Cube root of x
+ */
+template <JanusScalar T> T cbrt(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::cbrt(x);
+    } else {
+        // CasADi: cbrt(x) = sign(x) * pow(abs(x), 1/3)
+        // This handles negative values correctly
+        return sign(x) * pow(fabs(x), T(1.0 / 3.0));
+    }
+}
+
+/**
+ * @brief Computes cube root element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of cube roots
+ */
+template <typename Derived> auto cbrt(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::cbrt(v); });
+    } else {
+        return x.unaryExpr([](double v) { return std::cbrt(v); });
+    }
+}
+
+// --- Round ---
+/**
+ * @brief Rounds x to the nearest integer
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return Nearest integer to x
+ */
+template <JanusScalar T> T round(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::round(x);
+    } else {
+        // CasADi: implement round as floor(x + 0.5) for positive,
+        // ceil(x - 0.5) for negative (round half away from zero)
+        return floor(x + T(0.5));
+    }
+}
+
+/**
+ * @brief Rounds element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of rounded values
+ */
+template <typename Derived> auto round(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::round(v); });
+    } else {
+        return x.array().round().matrix();
+    }
+}
+
+// --- Trunc ---
+/**
+ * @brief Truncates x toward zero
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return x truncated toward zero
+ */
+template <JanusScalar T> T trunc(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::trunc(x);
+    } else {
+        // CasADi: trunc(x) = sign(x) * floor(abs(x))
+        return sign(x) * floor(fabs(x));
+    }
+}
+
+/**
+ * @brief Truncates element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of truncated values
+ */
+template <typename Derived> auto trunc(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::trunc(v); });
+    } else {
+        return x.unaryExpr([](double v) { return std::trunc(v); });
+    }
+}
+
+// --- Hypot ---
+/**
+ * @brief Computes sqrt(x^2 + y^2) without undue overflow/underflow
+ * @tparam T Scalar type
+ * @param x First value
+ * @param y Second value
+ * @return Hypotenuse length
+ */
+template <JanusScalar T> T hypot(const T &x, const T &y) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::hypot(x, y);
+    } else {
+        // CasADi: use sqrt(x^2 + y^2) - CasADi handles this symbolically
+        return sqrt(x * x + y * y);
+    }
+}
+
+/**
+ * @brief Computes hypot(x, y) with mixed types
+ */
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
+T hypot(const T &x, double y) {
+    return janus::hypot(x, T(y));
+}
+
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
+T hypot(double x, const T &y) {
+    return janus::hypot(T(x), y);
+}
+
+/**
+ * @brief Computes hypot element-wise for matrices
+ * @tparam Derived Eigen matrix type
+ * @param x First matrix
+ * @param y Second matrix
+ * @return Matrix of hypotenuse values
+ */
+template <typename Derived>
+auto hypot(const Eigen::MatrixBase<Derived> &x, const Eigen::MatrixBase<Derived> &y) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return (x.array().square() + y.array().square()).sqrt().matrix();
+    } else {
+        return x.binaryExpr(y, [](double a, double b) { return std::hypot(a, b); });
+    }
+}
+
+// --- Expm1 ---
+/**
+ * @brief Computes exp(x) - 1, accurate for small x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return exp(x) - 1
+ */
+template <JanusScalar T> T expm1(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::expm1(x);
+    } else {
+        // CasADi: fall back to exp(x) - 1
+        return exp(x) - T(1.0);
+    }
+}
+
+/**
+ * @brief Computes expm1 element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of expm1 values
+ */
+template <typename Derived> auto expm1(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::expm1(v); });
+    } else {
+        return x.unaryExpr([](double v) { return std::expm1(v); });
+    }
+}
+
+// --- Log1p ---
+/**
+ * @brief Computes log(1 + x), accurate for small x
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return log(1 + x)
+ */
+template <JanusScalar T> T log1p(const T &x) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::log1p(x);
+    } else {
+        // CasADi: fall back to log(1 + x)
+        return log(T(1.0) + x);
+    }
+}
+
+/**
+ * @brief Computes log1p element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of log1p values
+ */
+template <typename Derived> auto log1p(const Eigen::MatrixBase<Derived> &x) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.unaryExpr([](const Scalar &v) { return janus::log1p(v); });
+    } else {
+        return x.unaryExpr([](double v) { return std::log1p(v); });
+    }
+}
+
+// --- Copysign ---
+/**
+ * @brief Returns magnitude of x with sign of y
+ * @tparam T Scalar type
+ * @param x Magnitude source
+ * @param y Sign source
+ * @return |x| with sign of y
+ */
+template <JanusScalar T> T copysign(const T &x, const T &y) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::copysign(x, y);
+    } else {
+        // CasADi: copysign(x, y) = sign(y) * abs(x)
+        return sign(y) * fabs(x);
+    }
+}
+
+/**
+ * @brief Copysign with mixed types
+ */
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
+T copysign(const T &x, double y) {
+    return janus::copysign(x, T(y));
+}
+
+template <JanusScalar T>
+    requires(!std::is_same_v<T, double>)
+T copysign(double x, const T &y) {
+    return janus::copysign(T(x), y);
+}
+
+/**
+ * @brief Copysign element-wise for matrices
+ * @tparam Derived Eigen matrix type
+ * @param x Magnitude matrix
+ * @param y Sign matrix
+ * @return Matrix with magnitudes from x and signs from y
+ */
+template <typename Derived>
+auto copysign(const Eigen::MatrixBase<Derived> &x, const Eigen::MatrixBase<Derived> &y) {
+    using Scalar = typename Derived::Scalar;
+    if constexpr (std::is_same_v<Scalar, casadi::MX>) {
+        return x.binaryExpr(y,
+                            [](const Scalar &a, const Scalar &b) { return janus::copysign(a, b); });
+    } else {
+        return x.binaryExpr(y, [](double a, double b) { return std::copysign(a, b); });
+    }
+}
+
+// --- Square ---
+/**
+ * @brief Computes x^2 (more efficient than pow(x, 2))
+ * @tparam T Scalar type
+ * @param x Input value
+ * @return x squared
+ */
+template <JanusScalar T> T square(const T &x) { return x * x; }
+
+/**
+ * @brief Computes square element-wise for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param x Input matrix
+ * @return Matrix of squared values
+ */
+template <typename Derived> auto square(const Eigen::MatrixBase<Derived> &x) {
+    return x.array().square().matrix();
+}
+
 } // namespace janus
