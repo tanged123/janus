@@ -1,6 +1,7 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
 #include <janus/core/JanusTypes.hpp>
+#include <janus/janus.hpp>
 #include <janus/math/Interpolate.hpp>
 
 // ============================================================================
@@ -1366,4 +1367,138 @@ TEST(InterpnTests, HermiteSymbolicNotSupported) {
     EXPECT_THROW(janus::interpn<janus::SymbolicScalar>(points, values, xi,
                                                        janus::InterpolationMethod::Hermite),
                  janus::InterpolationError);
+}
+
+// ============================================================================
+// Extrapolation Configuration Tests
+// ============================================================================
+
+TEST(ExtrapConfigTests, LinearExtrap1D_LeftSide) {
+    // Test linear extrapolation below x_min
+    // y = x^2 sampled at [0, 1, 2, 3, 4]
+    janus::NumericVector x(5), y(5);
+    x << 0, 1, 2, 3, 4;
+    y << 0, 1, 4, 9, 16;
+
+    // Left slope at x=0: (y[1] - y[0]) / (x[1] - x[0]) = 1
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::BSpline,
+                               janus::ExtrapolationConfig::linear());
+
+    // Query at x = -2: expect y[0] + slope * (x - x_min) = 0 + 1 * (-2 - 0) = -2
+    double result = interp(-2.0);
+    EXPECT_NEAR(result, -2.0, 1e-10);
+
+    // Query at x = -0.5
+    double result2 = interp(-0.5);
+    EXPECT_NEAR(result2, -0.5, 1e-10);
+}
+
+TEST(ExtrapConfigTests, LinearExtrap1D_RightSide) {
+    // Test linear extrapolation above x_max
+    // y = x^2 sampled at [0, 1, 2, 3, 4]
+    janus::NumericVector x(5), y(5);
+    x << 0, 1, 2, 3, 4;
+    y << 0, 1, 4, 9, 16;
+
+    // Right slope at x=4: (y[4] - y[3]) / (x[4] - x[3]) = (16-9)/(4-3) = 7
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear());
+
+    // Query at x = 5: expect y[4] + slope * (x - x_max) = 16 + 7 * (5 - 4) = 23
+    double result = interp(5.0);
+    EXPECT_NEAR(result, 23.0, 1e-10);
+
+    // Query at x = 6: expect 16 + 7 * 2 = 30
+    double result2 = interp(6.0);
+    EXPECT_NEAR(result2, 30.0, 1e-10);
+}
+
+TEST(ExtrapConfigTests, LinearExtrap1D_WithBounds) {
+    // Test that output bounds are applied after extrapolation
+    janus::NumericVector x(3), y(3);
+    x << 0, 1, 2;
+    y << 10, 20, 30; // slope = 10
+
+    // Linear extrapolation with bounds [0, 50]
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear(0.0, 50.0));
+
+    // Query at x = -2: expect 10 + 10*(-2-0) = -10, but clamped to 0
+    double result_left = interp(-2.0);
+    EXPECT_NEAR(result_left, 0.0, 1e-10);
+
+    // Query at x = 5: expect 30 + 10*(5-2) = 60, but clamped to 50
+    double result_right = interp(5.0);
+    EXPECT_NEAR(result_right, 50.0, 1e-10);
+
+    // In-bounds query should not be affected by bounds (20 is within [0,50])
+    double result_mid = interp(1.0);
+    EXPECT_NEAR(result_mid, 20.0, 1e-10);
+}
+
+TEST(ExtrapConfigTests, LinearExtrap1D_Symbolic) {
+    // Test symbolic linear extrapolation with automatic differentiation
+    janus::NumericVector x(4), y(4);
+    x << 0, 1, 2, 3;
+    y << 0, 2, 4, 6; // y = 2x (linear function)
+
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear());
+
+    // Symbolic query
+    auto x_sym = janus::sym("x");
+    auto y_sym = interp(x_sym);
+
+    // Compute derivative
+    auto dy_dx = janus::jacobian(y_sym, x_sym);
+
+    janus::Function f("extrap_test", {x_sym}, {y_sym, dy_dx});
+
+    // Query at x = -1 (extrapolation left)
+    // Left slope = (y[1] - y[0]) / (x[1] - x[0]) = 2
+    auto res = f(-1.0);
+    EXPECT_NEAR(res[0](0, 0), -2.0, 1e-9); // y = 0 + 2 * (-1) = -2
+    EXPECT_NEAR(res[1](0, 0), 2.0, 1e-9);  // dy/dx = slope = 2
+
+    // Query at x = 5 (extrapolation right)
+    auto res2 = f(5.0);
+    EXPECT_NEAR(res2[0](0, 0), 10.0, 1e-9); // y = 6 + 2 * (5-3) = 10
+    EXPECT_NEAR(res2[1](0, 0), 2.0, 1e-9);  // dy/dx = slope = 2
+
+    // Query in-bounds (x = 1.5)
+    auto res3 = f(1.5);
+    EXPECT_NEAR(res3[0](0, 0), 3.0, 1e-9); // y = 2 * 1.5 = 3
+}
+
+TEST(ExtrapConfigTests, BackwardsCompatibility_DefaultClamp) {
+    // Verify that default constructor still uses clamping
+    janus::NumericVector x(3), y(3);
+    x << 0, 1, 2;
+    y << 0, 10, 0;
+
+    janus::Interpolator interp(x, y); // No extrapolation config = clamp
+
+    // Query outside bounds should clamp
+    double result_left = interp(-1.0); // Should clamp to x=0, y=0
+    double result_right = interp(3.0); // Should clamp to x=2, y=0
+
+    EXPECT_NEAR(result_left, 0.0, 1e-10);
+    EXPECT_NEAR(result_right, 0.0, 1e-10);
+}
+
+TEST(ExtrapConfigTests, ExplicitClamp) {
+    // Test explicit ExtrapolationConfig::clamp()
+    janus::NumericVector x(3), y(3);
+    x << 0, 1, 2;
+    y << 5, 10, 15;
+
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::clamp());
+
+    // Query outside bounds should clamp
+    double result_left = interp(-1.0); // Clamps to x=0, y=5
+    double result_right = interp(3.0); // Clamps to x=2, y=15
+
+    EXPECT_NEAR(result_left, 5.0, 1e-10);
+    EXPECT_NEAR(result_right, 15.0, 1e-10);
 }
