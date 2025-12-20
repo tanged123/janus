@@ -34,6 +34,9 @@ target_link_libraries(nd_interpolation_demo PRIVATE janus)
 add_executable(rootfinding_demo interpolation/rootfinding_demo.cpp)
 target_link_libraries(rootfinding_demo PRIVATE janus)
 
+add_executable(table_from_file_demo interpolation/table_from_file_demo.cpp)
+target_link_libraries(table_from_file_demo PRIVATE janus)
+
 # =============================================================================
 # Simulation Examples
 # =============================================================================

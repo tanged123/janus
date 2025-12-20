@@ -165,7 +165,7 @@ values << 0,   // (0,0) = 0+0
 
 ## Boundary Handling
 
-### Extrapolation (Default)
+### Default: Clamping
 
 When `fill_value` is not provided, out-of-bounds queries are **clamped** to the grid boundary:
 
@@ -188,6 +188,85 @@ auto result = janus::interpn<double>(
     std::optional<double>(-999.0)  // Fill value
 );
 // Returns -999.0 for any query outside grid bounds
+```
+
+### Linear Extrapolation (1D Only)
+
+For optimization problems, clamping produces **zero gradients** outside bounds, which can stall solvers. The `ExtrapolationConfig` class provides linear extrapolation with optional safety bounds:
+
+```cpp
+#include <janus/math/Interpolate.hpp>
+
+janus::NumericVector x(4), y(4);
+x << 0, 1, 2, 3;
+y << 0, 10, 40, 90;  // y = 10*x^2 sampled
+
+// Linear extrapolation with output bounds [0, 200]
+janus::Interpolator interp(x, y,
+    janus::InterpolationMethod::BSpline,
+    janus::ExtrapolationConfig::linear(0.0, 200.0));
+
+// Query outside bounds
+double val = interp(4.0);  // Extrapolates linearly from boundary slope
+                            // then clamps result to [0, 200]
+```
+
+#### ExtrapolationConfig Factory Methods
+
+| Factory Method | Behavior |
+|----------------|----------|
+| `ExtrapolationConfig::clamp()` | Clamp queries to grid bounds (default, safe) |
+| `ExtrapolationConfig::linear()` | Linear extrapolation, unbounded |
+| `ExtrapolationConfig::linear(lower, upper)` | Linear extrapolation with output bounds |
+
+#### How Linear Extrapolation Works
+
+```
+                Left extrapolation          Right extrapolation
+                     │                           │
+      ╲              │              ╱            │              ╱
+       ╲             │  ●──────────●            │  ●──────────●
+        ╲            │ ╱            ╲           │ ╱            ╲
+─────────●──────────●──────────────●───────────●──────────────●─────────
+       x_min                     x_max
+         │                         │
+         └─ slope = (y[1]-y[0])    └─ slope = (y[n-1]-y[n-2])
+               ───────────             ───────────────────
+              (x[1]-x[0])              (x[n-1]-x[n-2])
+```
+
+#### Symbolic Support
+
+Linear extrapolation works in symbolic mode with full AD support:
+
+```cpp
+auto x_sym = janus::sym("x");
+auto y_sym = interp(x_sym);
+
+// Compute gradient (non-zero even outside bounds!)
+auto dy_dx = janus::jacobian(y_sym, x_sym);
+```
+
+#### N-D Extrapolation
+
+Linear extrapolation is fully supported in N dimensions. For each dimension that falls outside bounds, the extrapolation adds a correction term:
+
+```
+result = interp(clamped_query) + Σ slope_d × (query_d - boundary_d)
+```
+
+where the sum is over all out-of-bounds dimensions. The partial derivatives `∂f/∂x_d` are computed at construction time using finite differences at the grid boundaries.
+
+```cpp
+// 2D example with linear extrapolation
+janus::Interpolator interp2d(points, values,
+    janus::InterpolationMethod::Linear,
+    janus::ExtrapolationConfig::linear(-10.0, 100.0));
+
+// Query outside bounds in both dimensions
+janus::NumericVector query(2);
+query << 3.0, 3.0;  // Both x and y outside [0, 2]
+double result = interp2d(query);  // Extrapolates using both ∂f/∂x and ∂f/∂y
 ```
 
 ---
