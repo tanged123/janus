@@ -117,7 +117,7 @@ janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
 This structure produces a banded matrix with off-diagonal bands at distance $\pm 1$ and $\pm N$.
 
 > [!TIP]
-> [🔍 Explore the 2D Laplacian sparsity pattern interactively](examples/laplacian_2d.html) (open locally or via GitHub Pages)
+> [🔍 Explore the 2D Laplacian sparsity pattern interactively](../examples/laplacian_2d.html) (open locally or via GitHub Pages)
 
 ---
 
