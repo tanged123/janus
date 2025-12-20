@@ -347,9 +347,10 @@ class Interpolator {
     // Extrapolation configuration
     ExtrapolationConfig m_extrap_config;
 
-    // Precomputed boundary slopes for 1D linear extrapolation
-    double m_slope_left = 0.0;  // dy/dx at left boundary
-    double m_slope_right = 0.0; // dy/dx at right boundary
+    // Precomputed boundary partial derivatives for linear extrapolation
+    // For each dimension d: slope of f w.r.t. x_d at left/right boundary
+    std::vector<double> m_slopes_left;  // ∂f/∂x_d at x_d = x_d_min (per dimension)
+    std::vector<double> m_slopes_right; // ∂f/∂x_d at x_d = x_d_max (per dimension)
 
   public:
     /**
@@ -687,26 +688,59 @@ class Interpolator {
     }
 
     /**
-     * @brief Compute boundary slopes for 1D linear extrapolation
+     * @brief Compute boundary partial derivatives for N-D linear extrapolation
      *
-     * For 1D: computes left slope (from first two points) and right slope (from last two).
-     * For N-D: linear extrapolation is not supported, will clamp instead.
+     * For each dimension d, computes ∂f/∂x_d at the left and right boundaries
+     * using finite differences from the CasADi interpolant.
      */
     void compute_boundary_slopes() {
-        if (m_dims != 1 || m_extrap_config.mode != ExtrapolationMode::Linear) {
-            return; // Only compute for 1D with linear extrapolation
+        if (m_extrap_config.mode != ExtrapolationMode::Linear) {
+            return;
         }
 
-        const auto &x = m_grid[0];
-        const auto &y = m_values;
-        size_t n = x.size();
+        m_slopes_left.resize(m_dims, 0.0);
+        m_slopes_right.resize(m_dims, 0.0);
 
-        if (n >= 2) {
-            // Left boundary slope: (y[1] - y[0]) / (x[1] - x[0])
-            m_slope_left = (y[1] - y[0]) / (x[1] - x[0]);
+        // For each dimension, compute partial derivative at boundaries
+        for (int d = 0; d < m_dims; ++d) {
+            const auto &grid_d = m_grid[d];
+            size_t n_d = grid_d.size();
+            if (n_d < 2)
+                continue;
 
-            // Right boundary slope: (y[n-1] - y[n-2]) / (x[n-1] - x[n-2])
-            m_slope_right = (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]);
+            double x_min = grid_d.front();
+            double x_max = grid_d.back();
+            double h_left = grid_d[1] - grid_d[0];
+            double h_right = grid_d[n_d - 1] - grid_d[n_d - 2];
+
+            // Create query point at center of other dimensions
+            std::vector<double> query_base(m_dims);
+            for (int dd = 0; dd < m_dims; ++dd) {
+                // Use midpoint of grid for other dimensions
+                query_base[dd] = 0.5 * (m_grid[dd].front() + m_grid[dd].back());
+            }
+
+            // Left boundary: finite difference using first two grid points
+            query_base[d] = x_min;
+            std::vector<casadi::DM> args0 = {casadi::DM(query_base)};
+            double f0 = static_cast<double>(m_casadi_fn(args0)[0]);
+
+            query_base[d] = x_min + h_left;
+            std::vector<casadi::DM> args1 = {casadi::DM(query_base)};
+            double f1 = static_cast<double>(m_casadi_fn(args1)[0]);
+
+            m_slopes_left[d] = (f1 - f0) / h_left;
+
+            // Right boundary: finite difference using last two grid points
+            query_base[d] = x_max - h_right;
+            std::vector<casadi::DM> args2 = {casadi::DM(query_base)};
+            double f2 = static_cast<double>(m_casadi_fn(args2)[0]);
+
+            query_base[d] = x_max;
+            std::vector<casadi::DM> args3 = {casadi::DM(query_base)};
+            double f3 = static_cast<double>(m_casadi_fn(args3)[0]);
+
+            m_slopes_right[d] = (f3 - f2) / h_right;
         }
     }
 
@@ -745,15 +779,15 @@ class Interpolator {
         const double x_min = m_grid[0].front();
         const double x_max = m_grid[0].back();
 
-        // Check if we need linear extrapolation (1D only)
-        if (m_extrap_config.mode == ExtrapolationMode::Linear) {
+        // Check if we need linear extrapolation
+        if (m_extrap_config.mode == ExtrapolationMode::Linear && !m_slopes_left.empty()) {
             if (query < x_min) {
                 // Left extrapolation: y = y[0] + slope_left * (x - x_min)
-                double result = m_values.front() + m_slope_left * (query - x_min);
+                double result = m_values.front() + m_slopes_left[0] * (query - x_min);
                 return apply_output_bounds(result);
             } else if (query > x_max) {
                 // Right extrapolation: y = y[n-1] + slope_right * (x - x_max)
-                double result = m_values.back() + m_slope_right * (query - x_max);
+                double result = m_values.back() + m_slopes_right[0] * (query - x_max);
                 return apply_output_bounds(result);
             }
             // In bounds: fall through to normal interpolation
@@ -786,6 +820,28 @@ class Interpolator {
     }
 
     double eval_numeric_point(const NumericVector &query) const {
+        // Check for out-of-bounds dimensions and compute extrapolation corrections
+        double extrap_correction = 0.0;
+        bool needs_extrapolation = false;
+
+        if (m_extrap_config.mode == ExtrapolationMode::Linear && !m_slopes_left.empty()) {
+            for (int d = 0; d < m_dims; ++d) {
+                double val = query(d);
+                double x_min = m_grid[d].front();
+                double x_max = m_grid[d].back();
+
+                if (val < x_min) {
+                    // Left extrapolation for dimension d
+                    extrap_correction += m_slopes_left[d] * (val - x_min);
+                    needs_extrapolation = true;
+                } else if (val > x_max) {
+                    // Right extrapolation for dimension d
+                    extrap_correction += m_slopes_right[d] * (val - x_max);
+                    needs_extrapolation = true;
+                }
+            }
+        }
+
         // Build clamped query
         std::vector<double> clamped(m_dims);
         for (int d = 0; d < m_dims; ++d) {
@@ -795,19 +851,28 @@ class Interpolator {
             clamped[d] = val;
         }
 
+        double result;
         if (m_use_custom_hermite) {
-            return detail::hermite_interpn_numeric(m_grid, m_values, clamped);
-        }
-
-        if (m_method == InterpolationMethod::Nearest) {
+            result = detail::hermite_interpn_numeric(m_grid, m_values, clamped);
+        } else if (m_method == InterpolationMethod::Nearest) {
             // TODO: Implement N-D nearest neighbor
             // For now, fall through to linear
+            std::vector<casadi::DM> args = {casadi::DM(clamped)};
+            std::vector<casadi::DM> res = m_casadi_fn(args);
+            result = static_cast<double>(res[0]);
+        } else {
+            // Linear/BSpline: Use CasADi
+            std::vector<casadi::DM> args = {casadi::DM(clamped)};
+            std::vector<casadi::DM> res = m_casadi_fn(args);
+            result = static_cast<double>(res[0]);
         }
 
-        // Linear/BSpline: Use CasADi
-        std::vector<casadi::DM> args = {casadi::DM(clamped)};
-        std::vector<casadi::DM> res = m_casadi_fn(args);
-        return static_cast<double>(res[0]);
+        // Add extrapolation correction
+        if (needs_extrapolation) {
+            result += extrap_correction;
+        }
+
+        return apply_output_bounds(result);
     }
 
     // ========================================================================
@@ -828,17 +893,14 @@ class Interpolator {
         SymbolicScalar interp_result = res[0];
 
         // Handle extrapolation if configured
-        if (m_extrap_config.mode == ExtrapolationMode::Linear) {
+        if (m_extrap_config.mode == ExtrapolationMode::Linear && !m_slopes_left.empty()) {
             // Left extrapolation: y = y[0] + slope_left * (x - x_min)
-            SymbolicScalar left_extrap = m_values.front() + m_slope_left * (query - x_min);
+            SymbolicScalar left_extrap = m_values.front() + m_slopes_left[0] * (query - x_min);
 
             // Right extrapolation: y = y[n-1] + slope_right * (x - x_max)
-            SymbolicScalar right_extrap = m_values.back() + m_slope_right * (query - x_max);
+            SymbolicScalar right_extrap = m_values.back() + m_slopes_right[0] * (query - x_max);
 
-            // Use where() for smooth symbolic branching
-            // if (query < x_min) use left_extrap
-            // else if (query > x_max) use right_extrap
-            // else use interp_result
+            // Use if_else for smooth symbolic branching
             SymbolicScalar result = casadi::MX::if_else(
                 query < x_min, left_extrap,
                 casadi::MX::if_else(query > x_max, right_extrap, interp_result));
@@ -859,9 +921,36 @@ class Interpolator {
             clamped(d) = val;
         }
 
+        // Get interpolated result at clamped location
         std::vector<casadi::MX> args = {clamped};
         std::vector<casadi::MX> res = m_casadi_fn(args);
-        return res[0];
+        SymbolicScalar interp_result = res[0];
+
+        // Handle N-D extrapolation if configured
+        if (m_extrap_config.mode == ExtrapolationMode::Linear && !m_slopes_left.empty()) {
+            // Add extrapolation corrections for each out-of-bounds dimension
+            SymbolicScalar extrap_correction = 0.0;
+
+            for (int d = 0; d < m_dims; ++d) {
+                double x_min = m_grid[d].front();
+                double x_max = m_grid[d].back();
+                casadi::MX val = query(d);
+
+                // Left extrapolation correction: slope * (x - x_min) when x < x_min
+                SymbolicScalar left_corr = m_slopes_left[d] * (val - x_min);
+                SymbolicScalar left_contrib = casadi::MX::if_else(val < x_min, left_corr, 0.0);
+
+                // Right extrapolation correction: slope * (x - x_max) when x > x_max
+                SymbolicScalar right_corr = m_slopes_right[d] * (val - x_max);
+                SymbolicScalar right_contrib = casadi::MX::if_else(val > x_max, right_corr, 0.0);
+
+                extrap_correction = extrap_correction + left_contrib + right_contrib;
+            }
+
+            return apply_output_bounds_sym(interp_result + extrap_correction);
+        }
+
+        return apply_output_bounds_sym(interp_result);
     }
 };
 

@@ -247,8 +247,27 @@ auto y_sym = interp(x_sym);
 auto dy_dx = janus::jacobian(y_sym, x_sym);
 ```
 
-> [!IMPORTANT]
-> Linear extrapolation is currently **1D only**. For N-D interpolators, use clamping or add physical constraints to your optimization.
+#### N-D Extrapolation
+
+Linear extrapolation is fully supported in N dimensions. For each dimension that falls outside bounds, the extrapolation adds a correction term:
+
+```
+result = interp(clamped_query) + Σ slope_d × (query_d - boundary_d)
+```
+
+where the sum is over all out-of-bounds dimensions. The partial derivatives `∂f/∂x_d` are computed at construction time using finite differences at the grid boundaries.
+
+```cpp
+// 2D example with linear extrapolation
+janus::Interpolator interp2d(points, values,
+    janus::InterpolationMethod::Linear,
+    janus::ExtrapolationConfig::linear(-10.0, 100.0));
+
+// Query outside bounds in both dimensions
+janus::NumericVector query(2);
+query << 3.0, 3.0;  // Both x and y outside [0, 2]
+double result = interp2d(query);  // Extrapolates using both ∂f/∂x and ∂f/∂y
+```
 
 ---
 

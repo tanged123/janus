@@ -1502,3 +1502,107 @@ TEST(ExtrapConfigTests, ExplicitClamp) {
     EXPECT_NEAR(result_left, 5.0, 1e-10);
     EXPECT_NEAR(result_right, 15.0, 1e-10);
 }
+
+TEST(ExtrapConfigTests, LinearExtrap2D_SingleDimOutOfBounds) {
+    // Test 2D extrapolation when only one dimension is out of bounds
+    // z = x + y grid
+    janus::NumericVector x_pts(3), y_pts(3);
+    x_pts << 0, 1, 2;
+    y_pts << 0, 1, 2;
+
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    // z = x + y in Fortran order
+    janus::NumericVector values(9);
+    values << 0, 1, 2, 1, 2, 3, 2, 3, 4; // z[i,j] = x[i] + y[j]
+
+    janus::Interpolator interp(points, values, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear());
+
+    // Query with x out of bounds, y in bounds
+    janus::NumericVector query1(2);
+    query1 << 3.0, 1.0; // x=3 (out), y=1 (in)
+    double result1 = interp(query1);
+    // Clamped interp at (2, 1) = 3, plus slope_x * (3-2) = 1 * 1 = 1
+    // Expected: 3 + 1 = 4
+    EXPECT_NEAR(result1, 4.0, 0.1); // Allow some tolerance for FD slopes
+
+    // Query with x in bounds, y out of bounds
+    janus::NumericVector query2(2);
+    query2 << 1.0, 3.0; // x=1 (in), y=3 (out)
+    double result2 = interp(query2);
+    // Clamped interp at (1, 2) = 3, plus slope_y * (3-2) = 1 * 1 = 1
+    // Expected: 3 + 1 = 4
+    EXPECT_NEAR(result2, 4.0, 0.1);
+}
+
+TEST(ExtrapConfigTests, LinearExtrap2D_BothDimsOutOfBounds) {
+    // Test 2D extrapolation at a corner (both dims out of bounds)
+    janus::NumericVector x_pts(3), y_pts(3);
+    x_pts << 0, 1, 2;
+    y_pts << 0, 1, 2;
+
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    // z = x + y
+    janus::NumericVector values(9);
+    values << 0, 1, 2, 1, 2, 3, 2, 3, 4;
+
+    janus::Interpolator interp(points, values, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear());
+
+    // Query at corner: x=3, y=3 (both out)
+    janus::NumericVector query(2);
+    query << 3.0, 3.0;
+    double result = interp(query);
+    // Clamped at (2,2) = 4, plus slope_x * 1 + slope_y * 1 = 1 + 1 = 2
+    // Expected: 4 + 2 = 6
+    EXPECT_NEAR(result, 6.0, 0.2);
+}
+
+TEST(ExtrapConfigTests, LinearExtrap2D_WithBounds) {
+    // Test 2D extrapolation with output bounds
+    janus::NumericVector x_pts(3), y_pts(3);
+    x_pts << 0, 1, 2;
+    y_pts << 0, 1, 2;
+
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(9);
+    values << 0, 1, 2, 1, 2, 3, 2, 3, 4;
+
+    // Extrapolate with bounds [0, 5]
+    janus::Interpolator interp(points, values, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear(0.0, 5.0));
+
+    // Query at corner that would exceed bounds
+    janus::NumericVector query(2);
+    query << 4.0, 4.0; // Would extrapolate to ~8, but clamped to 5
+    double result = interp(query);
+    EXPECT_NEAR(result, 5.0, 0.1); // Should be clamped to upper bound
+}
+
+TEST(ExtrapConfigTests, LinearExtrap2D_Symbolic) {
+    // Test 2D symbolic extrapolation with AD
+    janus::NumericVector x_pts(3), y_pts(3);
+    x_pts << 0, 1, 2;
+    y_pts << 0, 1, 2;
+
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+    janus::NumericVector values(9);
+    values << 0, 1, 2, 1, 2, 3, 2, 3, 4; // z = x + y
+
+    janus::Interpolator interp(points, values, janus::InterpolationMethod::Linear,
+                               janus::ExtrapolationConfig::linear());
+
+    // Symbolic query
+    auto x_sym = janus::sym("x");
+    auto y_sym = janus::sym("y");
+    janus::SymbolicVector query_sym(2);
+    query_sym << x_sym, y_sym;
+
+    auto z_sym = interp(query_sym);
+
+    janus::Function f("extrap2d", {x_sym, y_sym}, {z_sym});
+
+    // Query outside bounds
+    auto res = f(3.0, 3.0);
+    EXPECT_NEAR(res[0](0, 0), 6.0, 0.2); // Same as numeric test
+}
