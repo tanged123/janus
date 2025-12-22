@@ -9,139 +9,25 @@ if [ -z "$IN_NIX_SHELL" ]; then
     exit $?
 fi
 
-# Ensure we have a build
-if [ ! -d "build" ]; then
-    echo "Build directory not found. Building..."
-    ./scripts/build.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "Running examples..."
+
+# Find and run all examples in the build directory
+EXAMPLES_DIR="$PROJECT_ROOT/build/examples"
+
+if [ -d "$EXAMPLES_DIR" ]; then
+    # Find all executable files in the examples directory
+    # Sort them to ensure deterministic run order
+    for exe in $(find "$EXAMPLES_DIR" -maxdepth 1 -type f -executable | sort); do
+        echo ""
+        echo "=== Running $(basename "$exe") ==="
+        "$exe"
+    done
+else
+    echo "Examples directory not found at $EXAMPLES_DIR. Did you build the project?"
 fi
 
-# Rebuild to ensure latest changes
-ninja -C build
-
-echo "========================================"
-echo "Running Janus Examples"
-echo "========================================"
-
-# =============================================================================
-# Intro Examples
-# =============================================================================
 echo ""
-echo "=== INTRO EXAMPLES ==="
-echo ""
-
-echo "[intro/1] Energy Intro"
-./build/examples/energy_intro
-echo ""
-
-echo "[intro/2] Numeric Intro"
-./build/examples/numeric_intro
-echo ""
-
-echo "[intro/3] Print Intro"
-./build/examples/print_example
-echo ""
-
-echo "[intro/4] Sparsity Intro"
-./build/examples/sparsity_intro
-echo ""
-
-# =============================================================================
-# Math Examples
-# =============================================================================
-echo ""
-echo "=== MATH EXAMPLES ==="
-echo ""
-
-echo "[math/1] Branching Logic"
-./build/examples/branching_logic
-echo ""
-
-echo "[math/2] Loop Patterns"
-./build/examples/loop_patterns
-echo ""
-
-echo "[math/3] Graph Visualization"
-./build/examples/graph_visualization
-echo ""
-
-# =============================================================================
-# Interpolation Examples
-# =============================================================================
-echo ""
-echo "=== INTERPOLATION EXAMPLES ==="
-echo ""
-
-echo "[interp/1] N-Dimensional Interpolation"
-./build/examples/nd_interpolation_demo
-echo ""
-
-echo "[interp/2] Root Finding"
-./build/examples/rootfinding_demo
-echo ""
-
-# =============================================================================
-# Simulation Examples
-# =============================================================================
-echo ""
-echo "=== SIMULATION EXAMPLES ==="
-echo ""
-
-echo "[sim/1] Drag Coefficient"
-./build/examples/drag_coefficient
-echo ""
-
-echo "[sim/2] Hybrid Simulation"
-./build/examples/hybrid_sim
-echo ""
-
-echo "[sim/3] Smooth Trajectory"
-./build/examples/smooth_trajectory
-echo ""
-
-echo "[sim/4] Aircraft Attitudes"
-./build/examples/aircraft_attitudes
-echo ""
-
-echo "[sim/5] Brachistochrone ODE"
-./build/examples/brachistochrone
-echo ""
-
-# =============================================================================
-# Optimization Examples
-# =============================================================================
-echo ""
-echo "=== OPTIMIZATION EXAMPLES ==="
-echo ""
-
-echo "[opt/1] Rosenbrock Benchmark"
-./build/examples/rosenbrock
-echo ""
-
-echo "[opt/2] Brachistochrone Trajectory Optimization"
-./build/examples/brachistochrone_opti
-echo ""
-
-echo "[opt/3] Beam Deflection (Structural)"
-./build/examples/beam_deflection
-echo ""
-
-echo "[opt/4] Drag Optimization (Aerodynamics)"
-./build/examples/drag_optimization
-echo ""
-
-echo "[opt/5] Parametric Sweep"
-./build/examples/parametric_sweep
-echo ""
-
-echo "[opt/6] Collocation Demo"
-./build/examples/collocation_demo
-echo ""
-
-echo "[opt/7] Direct Collocation vs Multiple Shooting"
-./build/examples/multishoot_comparison
-echo ""
-
-echo "========================================"
-echo "All examples ran successfully!"
-echo "========================================"
-
+echo "All examples completed."

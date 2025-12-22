@@ -13,6 +13,7 @@
 #include "janus/math/FiniteDifference.hpp"
 #include "janus/math/Integrate.hpp"
 #include "janus/math/IntegrateDiscrete.hpp"
+#include "janus/math/IntegratorStep.hpp"
 #include "janus/math/Interpolate.hpp"
 #include "janus/math/Linalg.hpp"
 #include "janus/math/Logic.hpp"

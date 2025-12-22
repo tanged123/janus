@@ -5,12 +5,15 @@
  *
  * Provides `quad` (definite integration) and `solve_ivp` (initial value problem)
  * with dual-backend support: numeric fallback and CasADi CVODES for symbolic graphs.
+ *
+ * See also IntegratorStep.hpp for single-step integrators (euler_step, rk4_step, etc.)
  */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
+#include "janus/math/IntegratorStep.hpp"
 #include "janus/math/Spacing.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
@@ -274,13 +277,8 @@ OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span, const 
         double dt = dt_base / substeps;
 
         for (int s = 0; s < substeps; ++s) {
-            // RK4 step
-            NumericVector k1 = fun(t, y);
-            NumericVector k2 = fun(t + dt / 2, y + dt / 2 * k1);
-            NumericVector k3 = fun(t + dt / 2, y + dt / 2 * k2);
-            NumericVector k4 = fun(t + dt, y + dt * k3);
-
-            y = y + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4);
+            // Use shared step implementation
+            y = rk4_step(fun, y, t, dt);
             t += dt;
         }
 
