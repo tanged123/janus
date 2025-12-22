@@ -55,6 +55,9 @@ target_link_libraries(aircraft_attitudes PRIVATE janus)
 add_executable(brachistochrone simulation/brachistochrone.cpp)
 target_link_libraries(brachistochrone PRIVATE janus)
 
+add_executable(integration_demo integration_demo.cpp)
+target_link_libraries(integration_demo PRIVATE janus)
+
 # =============================================================================
 # Optimization Examples (Phase 6)
 # =============================================================================

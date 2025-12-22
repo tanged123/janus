@@ -29,6 +29,7 @@ add_executable(test_math
     math/test_finite_diff.cpp
     math/test_integrate_discrete.cpp
     math/test_integrate.cpp
+    math/test_integrator_step.cpp
     math/test_spacing.cpp
     math/test_quaternion.cpp
     math/test_coverage_gaps.cpp
