@@ -271,6 +271,99 @@ double result = interp2d(query);  // Extrapolates using both ∂f/∂x and ∂f/
 
 ---
 
+## Scattered Data Interpolation
+
+For unstructured point cloud data (non-gridded), use `ScatteredInterpolator`. It fits Radial Basis Functions (RBF) to scattered points, then resamples onto a grid for fast symbolic-compatible queries.
+
+### Quick Start
+
+```cpp
+#include <janus/math/ScatteredInterpolator.hpp>
+
+// 2D scattered data (e.g., wind tunnel test points)
+janus::NumericMatrix points(20, 2);  // 20 test points, 2D input
+janus::NumericVector values(20);      // Measured values
+// ... fill in data ...
+
+janus::ScatteredInterpolator interp(points, values);
+
+// Query at arbitrary point
+janus::NumericVector query(2);
+query << 0.6, 5.0;
+double result = interp(query);
+```
+
+### Gridded vs Scattered Comparison
+
+| Feature | Gridded (`Interpolator`) | Scattered (`ScatteredInterpolator`) |
+|---------|--------------------------|-------------------------------------|
+| Data Structure | Regular axis-aligned grid | Arbitrary point cloud |
+| Performance | Very fast (tensorially separable) | Slower (RBF solve at construction) |
+| Use Case | Uniformly sampled data | Wind tunnel points, CFD meshes |
+| Symbolic Mode | ✅ Native | ✅ Via gridded resampling |
+
+### RBF Kernels
+
+| Kernel | Enum Value | Description |
+|--------|------------|-------------|
+| **Thin Plate Spline** | `RBFKernel::ThinPlateSpline` | r² log(r) - smooth, good default |
+| **Multiquadric** | `RBFKernel::Multiquadric` | sqrt(1 + (εr)²) - adjustable shape |
+| **Gaussian** | `RBFKernel::Gaussian` | exp(-(εr)²) - localized influence |
+| **Linear** | `RBFKernel::Linear` | r - simple, stable for few points |
+| **Cubic** | `RBFKernel::Cubic` | r³ - smooth |
+
+### API Reference
+
+```cpp
+// N-D scattered data
+ScatteredInterpolator(
+    const NumericMatrix& points,     // Shape (n_points, n_dims)
+    const NumericVector& values,     // Length n_points
+    int grid_resolution = 20,        // Points per dimension for resampling
+    RBFKernel kernel = RBFKernel::ThinPlateSpline,
+    double epsilon = 1.0,            // Shape parameter for MQ/Gaussian
+    InterpolationMethod method = InterpolationMethod::Linear
+);
+
+// 1D convenience
+ScatteredInterpolator(
+    const NumericVector& x,
+    const NumericVector& y,
+    int grid_resolution = 50,
+    RBFKernel kernel = RBFKernel::ThinPlateSpline
+);
+```
+
+### Reconstruction Error
+
+Check fit quality with `reconstruction_error()`:
+
+```cpp
+janus::ScatteredInterpolator interp(points, values);
+std::cout << "RMS error: " << interp.reconstruction_error() << "\n";
+```
+
+### Symbolic Mode
+
+Scattered interpolation works in symbolic mode (via the underlying gridded interpolant):
+
+```cpp
+auto sym_x = janus::sym("x");
+auto result = interp(sym_x);  // SymbolicScalar
+
+// Compute gradient
+auto grad = janus::jacobian(result, sym_x);
+```
+
+### Best Practices
+
+1. **Grid Resolution**: Higher resolution → better accuracy, more memory. Start with 20-30.
+2. **Kernel Choice**: ThinPlateSpline is a good default. Use Linear for very few points.
+3. **Check Error**: Always check `reconstruction_error()` to validate fit quality.
+4. **Extrapolation**: Queries outside convex hull are clamped to boundary.
+
+---
+
 ## Implementation Details
 
 ### CasADi Backend

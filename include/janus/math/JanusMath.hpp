@@ -20,6 +20,7 @@
 #include "janus/math/Quaternion.hpp"
 #include "janus/math/RootFinding.hpp"
 #include "janus/math/Rotations.hpp"
+#include "janus/math/ScatteredInterpolator.hpp"
 #include "janus/math/Spacing.hpp"
 #include "janus/math/SurrogateModel.hpp"
 #include "janus/math/Trig.hpp"

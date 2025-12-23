@@ -37,6 +37,9 @@ target_link_libraries(rootfinding_demo PRIVATE janus)
 add_executable(table_from_file_demo interpolation/table_from_file_demo.cpp)
 target_link_libraries(table_from_file_demo PRIVATE janus)
 
+add_executable(scattered_interpolation_demo interpolation/scattered_interpolation_demo.cpp)
+target_link_libraries(scattered_interpolation_demo PRIVATE janus)
+
 # =============================================================================
 # Simulation Examples
 # =============================================================================

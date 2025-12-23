@@ -24,6 +24,7 @@ add_executable(test_math
     math/test_autodiff.cpp
     math/test_linalg.cpp
     math/test_interpolate.cpp
+    math/test_scattered_interpolator.cpp
     math/test_rotations.cpp
     math/test_surrogate.cpp
     math/test_finite_diff.cpp
