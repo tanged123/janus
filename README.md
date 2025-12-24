@@ -11,11 +11,25 @@ Built on C++20, Eigen, and CasADi, Janus implements the Code Transformations par
 
 > For a deep dive into the architecture, see [Design Overview](docs/design_overview.md).
 
+## Features
+
+- 🎭 **Dual-Mode Physics**: Write once, run as Numeric (Fast C++) or Symbolic (CasADi Graph).
+- 🔢 **Unified Math**: Std/CasADi agnostic math functions (`janus::sin`, `janus::pow`, `janus::where`).
+- ⚡ **Linear Algebra**: Eigen-based matrix operations compatible with symbolic types.
+- 📉 **Optimization**: High-level `Opti` interface for NLP (Nonlinear Programming) solvers like IPOPT, shooting and collocation methods.
+- 🔁 **Differentiation**: Automatic differentiation (Forward/Reverse) via CasADi.
+- ⏱️ **Integration**: ODE solvers (`solve_ivp`), Runge-Kutta methods, discrete integration.
+- 📈 **Interpolation**: 1D, 2D, Sparse, and N-D table lookups with B-spline support.
+- 📐 **Geometry**: Quaternions, Rotation Matrices, Euler Angles.
+- 🔍 **Root Finding**: Newton-Raphson and bracketing solvers.
+- 🧠 **Surrogates**: Differentiable approximations (sigmoid, softmax) for discontinuous functions.
+- 💾 **IO**: Graph visualization and serialization.
+
 ## Quick Start
 
 ### Prerequisites
 
-* **Nix**: This project uses Nix Flakes to provide a reproducible development environment.
+- **Nix**: This project uses Nix Flakes to provide a reproducible development environment.
 
 ### Dev Shell
 
@@ -52,7 +66,7 @@ We provide shorthand scripts to streamline the workflow:
     ```bash
     ./scripts/ci.sh
     ```
-    
+
 5. **Examples**: Runs all example simulations.
 
     ```bash
@@ -64,18 +78,21 @@ We provide shorthand scripts to streamline the workflow:
     ```bash
     ./scripts/verify.sh
     ```
-    
+
     Logs are saved to `logs/ci.log`, `logs/tests.log`, `logs/examples.log`, and `logs/verify.log`.
+
 ### Formatting
 
 We use **treefmt** (via `nix fmt`) to enforce code style for C++, CMake, and Nix files.
 
 **Manual formatting:**
+
 ```bash
 nix fmt
 ```
 
 **Auto-format on commit (recommended):**
+
 ```bash
 ./scripts/install-hooks.sh
 ```
@@ -120,9 +137,10 @@ int main() {
 ```
 
 For more details:
-*   **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
-*   **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/drag_coefficient.cpp`.
-*   **Optimization**: [Optimization Guide](docs/user_guides/optimization.md) and `examples/optimization/drag_optimization.cpp`.
+
+- **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
+- **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/drag_coefficient.cpp`.
+- **Optimization**: [Optimization Guide](docs/user_guides/optimization.md) and `examples/optimization/drag_optimization.cpp`.
 
 ## Project Structure
 
@@ -170,10 +188,10 @@ janus/
 
 Janus is heavily inspired by **AeroSandbox**, Peter Sharpe's Python-based design optimization framework. Janus serves as a C++ implementation and extension of the "Code Transformations" paradigm pioneered by Sharpe.
 
-*   **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
-*   **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
+- **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
+- **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
 
 Janus is built upon the shoulders of giants:
-*   **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
-*   **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
 
+- **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
+- **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
