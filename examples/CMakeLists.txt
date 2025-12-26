@@ -25,6 +25,9 @@ target_link_libraries(loop_patterns PRIVATE janus)
 add_executable(graph_visualization math/graph_visualization.cpp)
 target_link_libraries(graph_visualization PRIVATE janus)
 
+add_executable(deep_graph_demo math/deep_graph_demo.cpp)
+target_link_libraries(deep_graph_demo PRIVATE janus)
+
 # =============================================================================
 # Interpolation Examples
 # =============================================================================
