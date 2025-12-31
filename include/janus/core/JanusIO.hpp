@@ -213,7 +213,7 @@ inline void export_graph_dot(const SymbolicScalar &expr, const std::string &file
         throw RuntimeError("Failed to open file for writing: " + dot_filename);
     }
 
-    out << "digraph " << name << " {\n";
+    out << "digraph \"" << name << "\" {\n";
     out << "  rankdir=BT;\n"; // Bottom to top (inputs at bottom)
     out << "  splines=ortho;\n";
     out << "  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];\n";
@@ -381,7 +381,7 @@ inline void export_graph_html(const SymbolicScalar &expr, const std::string &fil
     // Get all free variables
     std::vector<SymbolicScalar> free_vars = SymbolicScalar::symvar(expr);
 
-    dot_stream << "digraph " << name << " {\n";
+    dot_stream << "digraph \"" << name << "\" {\n";
     dot_stream << "  rankdir=BT;\n";
     dot_stream << "  splines=ortho;\n";
     dot_stream << "  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];\n";
@@ -949,7 +949,7 @@ inline void export_sx_graph_dot(const casadi::SX &expr, const std::string &filen
         throw RuntimeError("Failed to open file for writing: " + dot_filename);
     }
 
-    out << "digraph " << name << " {\n";
+    out << "digraph \"" << name << "\" {\n";
     out << "  rankdir=BT;\n";
     out << "  splines=ortho;\n";
     out << "  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];\n";
@@ -1058,7 +1058,7 @@ inline void export_sx_graph_html(const casadi::SX &expr, const std::string &file
     std::ostringstream node_data_stream;
     std::ostringstream edges_stream;
 
-    dot_stream << "digraph " << name << " {\n";
+    dot_stream << "digraph \"" << name << "\" {\n";
     dot_stream << "  rankdir=BT;\n";
     dot_stream << "  splines=ortho;\n";
     dot_stream << "  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];\n";
