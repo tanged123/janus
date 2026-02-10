@@ -213,4 +213,4 @@ transcription.set_final_state(xf);
 - [Direct Collocation Guide](collocation.md)
 - [Multiple Shooting Guide](multiple_shooting.md)
 - [Pseudospectral Guide](pseudospectral.md)
-- [Example: Brachistochrone Comparison](file:///home/tanged/sources/janus/examples/optimization/multishoot_comparison.cpp)
+- [Example: Brachistochrone Comparison](file:///home/tanged/sources/janus/examples/optimization/transcription_comparison_demo.cpp)

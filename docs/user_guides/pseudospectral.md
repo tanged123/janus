@@ -85,6 +85,11 @@ const auto &w = ps.quadrature_weights();
 - Internally, nodes and `D` are built on `[-1, 1]` and scaled correctly in constraints/objectives.
 - Pseudospectral methods are strongest for smooth trajectories; sharp bang-bang controls can need mesh refinement or alternative transcription.
 
-## Example
+## Unified Comparison Example
 
-See `examples/optimization/pseudospectral_demo.cpp` for a full brachistochrone setup with free final time.
+The optimization demos are unified in:
+
+- `examples/optimization/transcription_comparison_demo.cpp`
+
+This runs Direct Collocation, Multiple Shooting, and Pseudospectral on the same brachistochrone problem and prints a side-by-side comparison.
+The output includes both performance metrics and a convergence study.

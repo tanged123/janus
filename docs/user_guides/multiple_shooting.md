@@ -60,3 +60,17 @@ ms.set_final_state(xf);
 opti.minimize(T);
 auto sol = opti.solve();
 ```
+
+## Unified Comparison Example
+
+The optimization demos are unified in:
+
+- `examples/optimization/transcription_comparison_demo.cpp`
+
+This single file runs and compares:
+- Direct Collocation
+- Multiple Shooting
+- Pseudospectral
+
+on the same brachistochrone problem so you can compare solver behavior and NLP structure directly.
+It also includes solve-time performance statistics and a convergence sweep across grid sizes.
