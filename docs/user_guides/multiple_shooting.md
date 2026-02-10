@@ -71,6 +71,7 @@ This single file runs and compares:
 - Direct Collocation
 - Multiple Shooting
 - Pseudospectral
+- Birkhoff Pseudospectral
 
 on the same brachistochrone problem so you can compare solver behavior and NLP structure directly.
 It also includes solve-time performance statistics and a convergence sweep across grid sizes.

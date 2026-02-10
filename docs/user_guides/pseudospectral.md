@@ -91,5 +91,5 @@ The optimization demos are unified in:
 
 - `examples/optimization/transcription_comparison_demo.cpp`
 
-This runs Direct Collocation, Multiple Shooting, and Pseudospectral on the same brachistochrone problem and prints a side-by-side comparison.
+This runs Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral on the same brachistochrone problem and prints a side-by-side comparison.
 The output includes both performance metrics and a convergence study.

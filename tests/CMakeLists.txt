@@ -47,6 +47,7 @@ add_executable(test_opti
     optimization/test_collocation.cpp
     optimization/test_multishoot.cpp
     optimization/test_pseudospectral.cpp
+    optimization/test_birkhoff_pseudospectral.cpp
 )
 target_link_libraries(test_opti PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_opti)

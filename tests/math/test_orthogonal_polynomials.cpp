@@ -7,6 +7,7 @@
 #include <janus/janus.hpp>
 
 #include <cmath>
+#include <vector>
 
 using namespace janus;
 
@@ -133,4 +134,49 @@ TEST(OrthogonalPolynomialsTests, SpectralDiffMatrixDifferentiatesAsExpected) {
         NumericVector df_approx = D * f;
         EXPECT_LT((df_approx - df_exact).cwiseAbs().maxCoeff(), 1e-8);
     }
+}
+
+TEST(OrthogonalPolynomialsTests, BirkhoffIntegrationMatrixBasicProperties) {
+    const int N = 15;
+    const auto lgl = lgl_nodes(N);
+    const auto cgl = cgl_nodes(N);
+    for (const auto &entry : std::vector<std::pair<NumericVector, NumericVector>>{
+             {lgl, lgl_weights(N, lgl)}, {cgl, cgl_weights(N, cgl)}}) {
+        const auto &nodes = entry.first;
+        const auto &w_expected = entry.second;
+        const auto B = birkhoff_integration_matrix(nodes);
+
+        EXPECT_LT(B.row(0).cwiseAbs().maxCoeff(), 1e-13);
+
+        NumericVector ones = NumericVector::Ones(N);
+        NumericVector integral_of_one = B * ones;
+        NumericVector expected = nodes.array() - nodes(0);
+        EXPECT_LT((integral_of_one - expected).cwiseAbs().maxCoeff(), 1e-11);
+
+        NumericVector w_birkhoff = B.row(N - 1).transpose();
+        EXPECT_LT((w_birkhoff - w_expected).cwiseAbs().maxCoeff(), 5e-11);
+    }
+}
+
+TEST(OrthogonalPolynomialsTests, BirkhoffIntegrationReproducesPolynomialAntiderivative) {
+    const int N = 21;
+    const auto nodes = lgl_nodes(N);
+    const auto B = birkhoff_integration_matrix(nodes);
+
+    // p(t) = t^4 - 0.5 t^3 + 2 t^2 + 0.1 t - 1
+    // p'(t) = 4 t^3 - 1.5 t^2 + 4 t + 0.1  (degree 3)
+    NumericVector v(N);
+    NumericVector expected(N);
+    const double a = nodes(0);
+    const double p_a = std::pow(a, 4) - 0.5 * std::pow(a, 3) + 2.0 * a * a + 0.1 * a - 1.0;
+
+    for (int i = 0; i < N; ++i) {
+        const double t = nodes(i);
+        v(i) = 4.0 * std::pow(t, 3) - 1.5 * t * t + 4.0 * t + 0.1;
+        const double p_t = std::pow(t, 4) - 0.5 * std::pow(t, 3) + 2.0 * t * t + 0.1 * t - 1.0;
+        expected(i) = p_t - p_a;
+    }
+
+    NumericVector recovered = B * v;
+    EXPECT_LT((recovered - expected).cwiseAbs().maxCoeff(), 5e-11);
 }

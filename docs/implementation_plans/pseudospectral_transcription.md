@@ -540,11 +540,350 @@ The demo mirrors `collocation_demo.cpp` (brachistochrone) so users can directly 
 
 ---
 
-## Part 5: Future Extensions (Not in This PR)
+## Part 5: Stretch Goal -- Birkhoff Pseudospectral Transcription
+
+The current `Pseudospectral` class uses the classical Lagrange approach: **state values** at nodes are the decision variables, and dynamics are enforced via the differentiation matrix `D * X = (dt/2) * F`. The **Birkhoff pseudospectral method** (Ross et al., 2023-2025) inverts this paradigm: **state derivatives** at nodes become the primary decision variables, and states are recovered via an **integration matrix** `B`. This yields dramatically better conditioning (O(1) vs O(N^2)) and a cleaner separation of the convex and nonconvex parts of the NLP.
+
+### 5.1 The Core Idea: Integration Instead of Differentiation
+
+In classical (Lagrange) pseudospectral methods:
+- **Decision variables**: state values `X` at nodes
+- **Dynamics constraint**: `D * X = (dt/2) * f(X, U, t)` (differentiation)
+- **Problem**: the differentiation matrix `D` has condition number O(N^2), degrading NLP conditioning as N grows
+
+In the Birkhoff pseudospectral method:
+- **Decision variables**: state derivatives `V` (called "virtual variables") at nodes, plus boundary values
+- **State recovery**: `X = x_a * 1 + B * V` (integration -- a linear/convex constraint)
+- **Dynamics constraint**: `V = f(X, U, t)` (direct collocation of the derivative)
+- **Advantage**: the integration matrix `B` has condition number O(1), independent of N
+
+The key insight is that Birkhoff interpolation uses **derivative values at interior nodes** and **function values at boundary nodes** as its interpolation data, rather than function values everywhere. Since the ODE `dx/dt = f(x,u,t)` directly gives us derivative values, this is a natural fit.
+
+### 5.2 Mathematical Foundation
+
+**Reference**: [A Universal Birkhoff Theory for Fast Trajectory Optimization](https://arxiv.org/abs/2308.01400) (Ross, Proulx, Karpenko, 2024)
+
+Given a grid `pi^N = {tau_0, tau_1, ..., tau_N}` on `[-1, 1]` with `tau_0 = -1` (left boundary `a`) and `tau_N = +1` (right boundary `b`):
+
+**Lagrange basis antiderivatives.** Let `ell_j(tau)` be the standard Lagrange basis polynomial for node `j`. Define its antiderivative anchored at the left boundary:
+
+```
+L_j(tau) = integral_{tau_a}^{tau} ell_j(s) ds
+```
+
+**Birkhoff basis functions (a-form).** The Birkhoff basis is:
+
+```
+B_0^0(tau) = 1                                    (constant, for boundary value x_a)
+B_j^a(tau) = L_j(tau) - L_j(tau_a),   j = 0..N   (for derivative data v_j)
+```
+
+Note `L_j(tau_a) = 0` by construction (the integral from `tau_a` to `tau_a` is zero), so `B_j^a(tau) = L_j(tau)`. The Birkhoff basis functions are simply the antiderivatives of the Lagrange basis polynomials.
+
+**The Birkhoff integration matrix.** Evaluate the basis at grid points:
+
+```
+B^a_{ij} = B_j^a(tau_i) = integral_{tau_0}^{tau_i} ell_j(s) ds
+```
+
+This is an `(N+1) x (N+1)` matrix. Its entries are the integrals of each Lagrange basis polynomial from the left boundary to each grid point.
+
+**State recovery.** Given boundary value `x_a` and derivative values `V = [v_0, ..., v_N]^T`:
+
+```
+X = x_a * 1 + B^a * V
+```
+
+where `X` is the vector of state values at all grid points. This is a **linear** equation in the decision variables.
+
+**Birkhoff quadrature weights.** The last row of `B^a` gives the quadrature weights:
+
+```
+w_j^B = B^a_{N,j} = integral_{tau_0}^{tau_N} ell_j(s) ds = integral_{-1}^{1} ell_j(s) ds
+```
+
+These are the standard Gauss-type quadrature weights for the chosen node set.
+
+**Grid equivalency (boundary consistency).** The right-boundary state must satisfy:
+
+```
+x_b = x_a + sum_j  w_j^B * v_j
+```
+
+This is the discrete version of `x(tf) = x(t0) + integral f dt`.
+
+### 5.3 Why This Is Better: Condition Number
+
+The classical approach requires IPOPT to work with the matrix `D`, whose condition number grows as O(N^2). For N=50, `kappa(D) ~ 2500`. This means:
+- The NLP Jacobian is poorly conditioned
+- IPOPT needs more iterations
+- Numerical accuracy is limited by `sqrt(kappa) * eps_machine`
+
+The Birkhoff integration matrix `B` has condition number O(1) -- essentially independent of N. This means:
+- The convex subproblem (state recovery) is perfectly conditioned
+- The only ill-conditioning comes from the nonlinear dynamics themselves
+- Higher N does **not** degrade numerical performance
+
+### 5.4 NLP Formulation
+
+For a trajectory with `n_x` states, `n_u` controls, and `N+1` grid points:
+
+**Decision variables:**
+
+| Variable | Size | Description |
+|----------|------|-------------|
+| `V` | `(N+1) * n_x` | State derivatives at all nodes (the "virtual variables") |
+| `X` | `(N+1) * n_x` | State values at all nodes (could be eliminated, but kept for solver warmstarting) |
+| `U` | `(N+1) * n_u` | Control values at all nodes |
+| `x_a` | `n_x` | Initial boundary state |
+| `x_b` | `n_x` | Final boundary state |
+
+**Constraints:**
+
+| Constraint | Count | Type | Description |
+|------------|-------|------|-------------|
+| State recovery | `(N+1) * n_x` | Linear equality | `X = x_a * 1 + B * V` |
+| Dynamics | `(N+1) * n_x` | Nonlinear equality | `V = (dt/2) * f(X, U, t)` |
+| Grid equivalency | `n_x` | Linear equality | `x_b = x_a + w^T * V` |
+| Boundary conditions | user-defined | Nonlinear equality | `psi(x_a, x_b) = 0` |
+| Path constraints | user-defined | Nonlinear inequality | `g(X_k, U_k) <= 0` |
+
+**Critical structural insight** (Ross, Remark 4.13): The first three constraint groups form a **problem-invariant convex subsystem**. Only the dynamics constraint `V = f(X, U, t)` is problem-dependent and nonconvex. The NLP solver can exploit this structure.
+
+**Comparison with classical PS:**
+
+| | Classical (Lagrange) | Birkhoff |
+|--|---------------------|----------|
+| Decision variables | `X`, `U` | `V`, `X`, `U`, `x_a`, `x_b` |
+| Dynamics constraint | `D * X = (dt/2) * f` (coupled) | `V = (dt/2) * f` (pointwise) |
+| State recovery | implicit in `D*X` | explicit: `X = x_a + B * V` |
+| Conditioning | O(N^2) | O(1) |
+| Dynamics Jacobian sparsity | Dense (D couples all nodes) | **Diagonal** (each `v_i = f(x_i, u_i)` is local) |
+
+The dynamics constraint `V_i = f(X_i, U_i, t_i)` is **pointwise** -- node `i` only depends on `(X_i, U_i)`, not on all other nodes. The all-to-all coupling moves to the state-recovery constraint `X = x_a + B*V`, which is **linear** and handled trivially by the solver. This is a major structural improvement.
+
+### 5.5 Computing the Integration Matrix B
+
+The matrix `B^a_{ij} = integral_{tau_0}^{tau_i} ell_j(s) ds` can be computed from the existing differentiation matrix infrastructure:
+
+**Method 1: Direct quadrature of Lagrange basis polynomials.**
+
+For each basis function `ell_j(s)`, compute its integral from `tau_0` to each `tau_i`. Since `ell_j` is a degree-(N) polynomial, its antiderivative is degree-(N+1), which can be evaluated exactly. Using our existing barycentric weights, evaluate `ell_j` at a fine quadrature grid and integrate.
+
+**Method 2: Pseudoinverse of D (conceptual, not recommended numerically).**
+
+In principle, `B ≈ D^{-1}` with appropriate boundary anchoring. But `D` is singular (rank N for N+1 nodes, since constants are in the null space), so this requires careful pseudoinversion. Not recommended due to the very conditioning issues we're trying to avoid.
+
+**Method 3: Antiderivative via Legendre expansion (recommended for implementation).**
+
+Express each `ell_j(tau)` in the Legendre basis, integrate term-by-term (Legendre antiderivatives have closed-form expressions), and evaluate at each `tau_i`. This is exact and stable.
+
+```cpp
+/// Compute the Birkhoff integration matrix B^a on the given nodes.
+///
+/// B^a_{ij} = integral_{tau_0}^{tau_i} ell_j(s) ds
+///
+/// where ell_j is the j-th Lagrange basis polynomial on the nodes.
+///
+/// @param nodes  Collocation nodes (LGL or CGL), length N+1, including endpoints
+/// @return (N+1) x (N+1) integration matrix
+inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
+    const int N = static_cast<int>(nodes.size());
+    // Use high-order Gauss quadrature on each sub-interval [tau_0, tau_i]
+    // to integrate each Lagrange basis polynomial exactly.
+    //
+    // Since ell_j is degree N-1, its integral is degree N, so we need
+    // N/2 + 1 Gauss points per sub-interval for exact integration.
+    // Alternatively, use the cumulative sum approach:
+    //
+    //   B^a = cumulative_integral(D^{-1})
+    //
+    // But the cleanest approach uses the fact that:
+    //   B^a_{ij} = sum_{k} w_k^{[0,i]} * ell_j(s_k)
+    // where w_k^{[0,i]} are quadrature weights on [tau_0, tau_i].
+
+    // Implementation: Use the relationship B = W * L where W encodes
+    // cumulative quadrature and L encodes Lagrange basis evaluation.
+    // For LGL/CGL nodes of moderate size (N < 100), direct construction
+    // via nested quadrature is tractable and exact.
+
+    NumericMatrix B = NumericMatrix::Zero(N, N);
+
+    // Precompute barycentric weights for Lagrange basis evaluation
+    NumericVector bary_w = barycentric_weights(nodes);
+
+    // For each target node tau_i, integrate each basis function from tau_0 to tau_i
+    // using Gauss-Legendre quadrature on [tau_0, tau_i] with enough points for exactness
+    const int n_quad = (N + 2) / 2 + 1;  // Enough for exact integration of degree N-1 poly
+    NumericVector gl_nodes = lgl_nodes(n_quad);  // Could use pure Gauss points too
+    NumericVector gl_weights = lgl_weights(n_quad, gl_nodes);
+
+    for (int i = 0; i < N; ++i) {
+        const double a = nodes(0);
+        const double b_pt = nodes(i);
+        const double half_len = (b_pt - a) / 2.0;
+        const double mid = (b_pt + a) / 2.0;
+
+        if (std::abs(half_len) < 1e-15) continue;  // B[0][j] = 0
+
+        for (int j = 0; j < N; ++j) {
+            double integral = 0.0;
+            for (int q = 0; q < n_quad; ++q) {
+                // Map Gauss point from [-1,1] to [a, b_pt]
+                double s = mid + half_len * gl_nodes(q);
+                // Evaluate ell_j(s) via barycentric interpolation
+                // ell_j(s) = [w_j / (s - tau_j)] / [sum_k w_k / (s - tau_k)]
+                double ell_j = barycentric_basis_eval(nodes, bary_w, j, s);
+                integral += gl_weights(q) * ell_j;
+            }
+            B(i, j) = half_len * integral;
+        }
+    }
+
+    return B;
+}
+```
+
+### 5.6 Birkhoff Pseudospectral Class
+
+```cpp
+enum class BirkhoffScheme {
+    LGL,  ///< Legendre-Gauss-Lobatto nodes
+    CGL   ///< Chebyshev-Gauss-Lobatto nodes
+};
+
+struct BirkhoffOptions {
+    BirkhoffScheme scheme = BirkhoffScheme::LGL;
+    int n_nodes = 21;
+};
+
+class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> {
+    friend class TranscriptionBase<BirkhoffPseudospectral>;
+
+public:
+    explicit BirkhoffPseudospectral(Opti &opti)
+        : TranscriptionBase<BirkhoffPseudospectral>(opti) {}
+
+    std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
+    setup(int n_states, int n_controls, double t0, double tf,
+          const BirkhoffOptions &opts = {});
+
+    /// Access the integration matrix (dual of diff_matrix())
+    const NumericMatrix &integration_matrix() const { return B_; }
+
+    /// Access the Birkhoff quadrature weights (last row of B)
+    const NumericVector &quadrature_weights() const { return bk_weights_; }
+
+    /// Gauss quadrature of an integrand via Birkhoff weights
+    SymbolicScalar quadrature(const SymbolicVector &integrand) const;
+
+    /// Access the virtual variables (state derivatives at nodes)
+    const SymbolicMatrix &virtual_vars() const { return V_; }
+
+private:
+    NumericMatrix B_;            ///< (N+1) x (N+1) Birkhoff integration matrix
+    NumericVector bk_weights_;   ///< Birkhoff quadrature weights (last row of B)
+    SymbolicMatrix V_;           ///< Virtual variables (derivatives), [n_nodes x n_states]
+
+    void add_dynamics_constraints_impl();
+};
+```
+
+**Setup** creates three sets of decision variables: `states_` (X), `V_` (derivatives), and `controls_` (U). The boundary values `x_a`, `x_b` are simply `states_(0, :)` and `states_(N-1, :)`.
+
+**Dynamics constraint implementation:**
+
+```cpp
+void BirkhoffPseudospectral::add_dynamics_constraints_impl() {
+    const SymbolicScalar half_dt = get_duration() / 2.0;
+
+    // 1. Evaluate dynamics at every node
+    std::vector<SymbolicVector> f(n_nodes_);
+    for (int k = 0; k < n_nodes_; ++k) {
+        f[k] = dynamics_(get_state_at_node(k), get_control_at_node(k),
+                         get_time_at_node(k));
+    }
+
+    for (int s = 0; s < n_states_; ++s) {
+        // 2. Dynamics collocation: V_i = (dt/2) * f_i  (POINTWISE -- diagonal Jacobian!)
+        for (int i = 0; i < n_nodes_; ++i) {
+            opti_.subject_to(V_(i, s) == half_dt * f[i](s));
+        }
+
+        // 3. State recovery: X = x_a * 1 + B * V  (LINEAR)
+        for (int i = 0; i < n_nodes_; ++i) {
+            SymbolicScalar Bv_i = SymbolicScalar(0.0);
+            for (int j = 0; j < n_nodes_; ++j) {
+                Bv_i = Bv_i + B_(i, j) * V_(j, s);
+            }
+            opti_.subject_to(states_(i, s) == states_(0, s) + Bv_i);
+        }
+
+        // 4. Grid equivalency: x_b = x_a + w^T * V
+        SymbolicScalar wv = SymbolicScalar(0.0);
+        for (int j = 0; j < n_nodes_; ++j) {
+            wv = wv + bk_weights_(j) * V_(j, s);
+        }
+        opti_.subject_to(states_(n_nodes_ - 1, s) == states_(0, s) + wv);
+    }
+}
+```
+
+Note: constraints (3) and (4) are **purely linear** in the decision variables. The NLP solver handles these almost for free -- the nonlinear work is entirely in constraint (2), which has a **diagonal Jacobian** (each row depends only on `X_i, U_i` at that node). This is the structural win.
+
+### 5.7 Expected Benefits
+
+Based on the convergence results from the existing implementation:
+
+```
+[Pseudospectral (LGL)]   -- Classical (current)
+N=7     1.80153     |err|=1.012e-05     solve=10.20ms
+
+[BirkhoffPS (LGL)]       -- Expected improvement
+N=7     ~1.80154    |err|~1e-05         solve < 10ms, fewer IPOPT iters
+N=50    <accurate>  <accurate>          solve ~ same (no conditioning blowup)
+```
+
+The real advantage shows at **higher N**: the classical method's solve time and iteration count grow with N due to worsening conditioning, while Birkhoff stays flat. This matters for problems requiring high accuracy or many state dimensions.
+
+### 5.8 Testing Strategy
+
+| Test | Description |
+|------|-------------|
+| Integration matrix properties | `B * [1,1,...,1]^T` = expected (integral of partition of unity). Last row = quadrature weights. |
+| Round-trip consistency | `D * (x_a + B * V) ≈ V` for random V (integration then differentiation recovers derivatives) |
+| Double integrator (Birkhoff) | Same problem as classical PS test, verify same optimal cost |
+| Brachistochrone (Birkhoff) | Compare T* with classical PS and direct collocation |
+| Condition number study | Compute `cond(B)` for N = 5..100, verify O(1) growth. Compute `cond(D)` for comparison, verify O(N^2). |
+| High-N stability | Solve at N=51, N=81 -- Birkhoff should converge where classical PS struggles |
+| IPOPT iteration comparison | Same problem, same N, compare iteration counts between classical PS and Birkhoff |
+
+### 5.9 Implementation Scope
+
+| Component | Estimated lines | File |
+|-----------|----------------|------|
+| `birkhoff_integration_matrix()` | ~60 | `OrthogonalPolynomials.hpp` |
+| `BirkhoffPseudospectral` class | ~120 | `BirkhoffPseudospectral.hpp` (new) |
+| Tests | ~200 | `test_birkhoff_pseudospectral.cpp` (new) |
+| Integration matrix unit tests | ~80 | `test_orthogonal_polynomials.cpp` |
+
+**Dependencies**: Requires the existing `Pseudospectral` infrastructure (nodes, weights, barycentric weights) and `TranscriptionBase`. The `B` matrix computation reuses `barycentric_weights()` and Lagrange basis evaluation.
+
+### 5.10 References
+
+- [Universal Birkhoff Theory for Fast Trajectory Optimization](https://arxiv.org/abs/2308.01400) -- Ross, Proulx, Karpenko (2024, J. Guidance Control Dynamics)
+- [Implementations of the Universal Birkhoff Theory](https://arc.aiaa.org/doi/10.2514/1.G007738) -- Companion paper with benchmarks
+- [Ascent Trajectory Optimization Using Second-Order Birkhoff Pseudospectral Methods](https://www.mdpi.com/2226-4310/12/2/141) -- 2nd-order extension for mechanical systems
+- [A Well-Conditioned Collocation Method Using Pseudospectral Integration Matrix](https://arxiv.org/abs/1305.2041) -- Wang & Huybrechs (2014), foundational integration matrix theory
+- [Hessians in Birkhoff-Theoretic Trajectory Optimization](https://arc.aiaa.org/doi/10.2514/1.G008778) -- Second-order NLP exploitation
+
+---
+
+## Part 6: Future Extensions (Not in This PR)
 
 These are natural follow-ons that inform the current design but are **not** part of this implementation:
 
-### 5.1 Legendre-Gauss-Radau (LGR) Scheme
+### 6.1 Legendre-Gauss-Radau (LGR) Scheme (p-method upgrade)
 
 LGR nodes include only the initial endpoint (tau = -1). The differentiation matrix is **(N) x (N+1) rectangular** (N collocation nodes, N+1 state nodes including the non-collocated terminal point). This is what GPOPS-II uses and provides:
 - Full-rank differentiation matrix (no singularity issues)
@@ -553,17 +892,17 @@ LGR nodes include only the initial endpoint (tau = -1). The differentiation matr
 
 **Design note:** The current `TranscriptionBase` assumes `states_` is `[n_nodes x n_states]` where nodes and state evaluation points coincide. LGR breaks this assumption because the terminal state is an extra decision variable beyond the collocation nodes. The base class should be designed to not preclude this (store `n_collocation_nodes` and `n_state_nodes` separately, or handle it in the derived class). For this first implementation we document this consideration but don't over-engineer for it.
 
-### 5.2 hp-Adaptive Mesh Refinement
+### 6.2 hp-Adaptive Mesh Refinement
 
 Divide the trajectory into multiple intervals, each with its own set of pseudospectral nodes. Adapt both the number of intervals (h-refinement) and polynomial degree per interval (p-refinement). This recovers sparsity (block-diagonal Jacobian) and handles non-smooth solutions.
 
-### 5.3 Costate Estimation
+### 6.3 Costate Estimation
 
 The KKT multipliers of the pseudospectral NLP approximate the continuous-time costates (Pontryagin's minimum principle). Extracting and returning these is valuable for verification and guidance law design.
 
 ---
 
-## Part 6: File Summary
+## Part 7: File Summary
 
 ### New Files
 | File | Contents |

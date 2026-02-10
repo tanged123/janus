@@ -1,8 +1,8 @@
 /**
  * @file transcription_comparison_demo.cpp
- * @brief Unified comparison of Direct Collocation, Multiple Shooting, and Pseudospectral
+ * @brief Unified comparison of trajectory transcription methods
  *
- * Solves the same brachistochrone problem with all three transcriptions and
+ * Solves the same brachistochrone problem with all transcriptions and
  * prints a side-by-side comparison.
  */
 
@@ -194,6 +194,45 @@ RunResult solve_pseudospectral(int n_nodes, double ref_time) {
     return out;
 }
 
+RunResult solve_birkhoff(int n_nodes, double ref_time) {
+    RunResult out;
+    out.method = "BirkhoffPS(LGL)";
+    out.grid_label = "N=" + std::to_string(n_nodes);
+
+    Opti opti;
+    BirkhoffPseudospectral bk(opti);
+    auto T = opti.variable(2.0, std::nullopt, 0.1, 10.0);
+
+    BirkhoffOptions opts;
+    opts.scheme = BirkhoffScheme::LGL;
+    opts.n_nodes = n_nodes;
+
+    auto [x, u, tau] = bk.setup(3, 1, 0.0, T, opts);
+    apply_brachistochrone_initial_guess(opti, x, u, tau);
+    bk.set_dynamics(brachistochrone_ode);
+    bk.add_dynamics_constraints();
+    apply_brachistochrone_constraints(opti, x, u, bk);
+    opti.minimize(T);
+
+    try {
+        const auto t0 = std::chrono::steady_clock::now();
+        auto sol = opti.solve({.max_iter = 500, .verbose = false});
+        const auto t1 = std::chrono::steady_clock::now();
+
+        out.success = true;
+        out.t_opt = sol.value(T);
+        out.abs_error = std::abs(out.t_opt - ref_time);
+        out.n_vars = static_cast<int>(opti.casadi_opti().x().numel());
+        out.n_constraints = static_cast<int>(opti.casadi_opti().g().numel());
+        out.n_iters = static_cast<int>(sol.stats().at("iter_count"));
+        out.solve_ms =
+            std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(t1 - t0).count();
+    } catch (const std::exception &e) {
+        out.failure_reason = e.what();
+    }
+    return out;
+}
+
 void print_summary(const std::vector<RunResult> &results) {
     std::cout << std::left << std::setw(24) << "Method" << std::setw(8) << "Grid" << std::setw(12)
               << "T*[s]" << std::setw(14) << "|T*-Ref|[s]" << std::setw(8) << "Iters"
@@ -256,7 +295,7 @@ int main() {
 
     std::cout << "===============================================================\n";
     std::cout << "  Brachistochrone Transcription Comparison\n";
-    std::cout << "  Methods: Direct Collocation, Multiple Shooting, Pseudospectral\n";
+    std::cout << "  Methods: Direct Collocation, Multiple Shooting, Pseudospectral, BirkhoffPS\n";
     std::cout << "  External Reference: T* = " << external_ref << " s\n";
     std::cout << "===============================================================\n\n";
 
@@ -264,6 +303,7 @@ int main() {
     const RunResult ref_dc = solve_collocation(61, external_ref);
     const RunResult ref_ms = solve_multishoot(40, external_ref);
     const RunResult ref_ps = solve_pseudospectral(61, external_ref);
+    const RunResult ref_bk = solve_birkhoff(61, external_ref);
 
     if (ref_dc.success)
         ref_samples.push_back(ref_dc.t_opt);
@@ -271,6 +311,8 @@ int main() {
         ref_samples.push_back(ref_ms.t_opt);
     if (ref_ps.success)
         ref_samples.push_back(ref_ps.t_opt);
+    if (ref_bk.success)
+        ref_samples.push_back(ref_bk.t_opt);
 
     double internal_ref = external_ref;
     if (!ref_samples.empty()) {
@@ -287,6 +329,7 @@ int main() {
     results.push_back(solve_collocation(31, internal_ref));
     results.push_back(solve_multishoot(20, internal_ref));
     results.push_back(solve_pseudospectral(31, internal_ref));
+    results.push_back(solve_birkhoff(31, internal_ref));
 
     std::cout << "[Single-Grid Performance Snapshot]\n";
     print_summary(results);
@@ -298,15 +341,18 @@ int main() {
     }
 
     std::cout << "\n[Convergence Study]\n";
-    std::cout << "Collocation and Pseudospectral use nodes; MultipleShooting uses intervals.\n";
+    std::cout
+        << "Collocation/Pseudospectral/Birkhoff use nodes; MultipleShooting uses intervals.\n";
 
     const std::vector<int> collocation_nodes = {5, 7, 9, 11, 15};
     const std::vector<int> multishoot_intervals = {4, 6, 8, 12, 16};
     const std::vector<int> pseudospectral_nodes = {5, 7, 9, 11, 15};
+    const std::vector<int> birkhoff_nodes = {5, 7, 9, 11, 15};
 
     std::vector<RunResult> collocation_sweep;
     std::vector<RunResult> multishoot_sweep;
     std::vector<RunResult> pseudospectral_sweep;
+    std::vector<RunResult> birkhoff_sweep;
 
     for (int n : collocation_nodes) {
         collocation_sweep.push_back(solve_collocation(n, internal_ref));
@@ -317,10 +363,14 @@ int main() {
     for (int n : pseudospectral_nodes) {
         pseudospectral_sweep.push_back(solve_pseudospectral(n, internal_ref));
     }
+    for (int n : birkhoff_nodes) {
+        birkhoff_sweep.push_back(solve_birkhoff(n, internal_ref));
+    }
 
     print_convergence_table("DirectCollocation (Hermite-Simpson)", collocation_sweep);
     print_convergence_table("MultipleShooting (CVODES)", multishoot_sweep);
     print_convergence_table("Pseudospectral (LGL)", pseudospectral_sweep);
+    print_convergence_table("BirkhoffPseudospectral (LGL)", birkhoff_sweep);
 
     return 0;
 }

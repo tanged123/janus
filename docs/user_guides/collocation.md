@@ -129,6 +129,7 @@ It solves the same brachistochrone setup with:
 - Direct Collocation
 - Multiple Shooting
 - Pseudospectral
+- Birkhoff Pseudospectral
 
 and prints:
 - Single-grid performance stats (solve time, iterations, NLP size, error)

@@ -1,18 +1,18 @@
-# Transcription Methods: Collocation vs Multiple Shooting vs Pseudospectral
+# Transcription Methods: Collocation vs Shooting vs Pseudospectral vs Birkhoff
 
-This guide compares **Direct Collocation**, **Multiple Shooting**, and **Pseudospectral** and provides guidance on when to use each.
+This guide compares **Direct Collocation**, **Multiple Shooting**, **Pseudospectral**, and **Birkhoff Pseudospectral** and provides guidance on when to use each.
 
 ## Overview
 
-Both methods transcribe continuous-time optimal control problems into discrete NLPs, but they differ fundamentally in how they enforce dynamics:
+All methods transcribe continuous-time optimal control problems into discrete NLPs, but they differ in how dynamics and trajectory coupling are enforced:
 
-| Aspect | Direct Collocation | Multiple Shooting | Pseudospectral |
-|--------|-------------------|-------------------|----------------|
-| **Dynamics Enforcement** | Local defect constraints | Numerical integration | Global differentiation matrix |
-| **Accuracy Source** | Fixed-order scheme (2nd or 4th) | Adaptive-step integrator | Spectral convergence (smooth problems) |
-| **Control Representation** | Values at each node | Piecewise constant per interval | Values at each node |
-| **Computational Cost** | Lower per iteration | Higher (integrator calls) | Moderate, dense Jacobian blocks |
-| **Sparsity** | Block-banded Jacobian | Block-sparse Jacobian | Dense coupling across nodes |
+| Aspect | Direct Collocation | Multiple Shooting | Pseudospectral | Birkhoff Pseudospectral |
+|--------|-------------------|-------------------|----------------|-------------------------|
+| **Dynamics Enforcement** | Local defect constraints | Numerical integration | Global differentiation matrix | Pointwise derivative collocation |
+| **State Coupling** | Local between neighbors | Local across intervals | Dense nonlinear coupling via `D*X` | Linear coupling via integration matrix `B` |
+| **Accuracy Source** | Fixed-order scheme (2nd/4th) | Adaptive-step integrator | Spectral convergence (smooth) | Spectral-like with better conditioning |
+| **Control Representation** | Values at each node | Piecewise constant per interval | Values at each node | Values at each node |
+| **Computational Cost** | Lower per iteration | Higher (integrator calls) | Moderate-high | Moderate |
 
 ---
 
@@ -121,6 +121,38 @@ D * X = (dt / 2) * F(X, U, t)
 
 ---
 
+## Birkhoff Pseudospectral
+
+Uses an integration matrix formulation:
+
+```
+X = x_a * 1 + B * V
+V = (dt / 2) * F(X, U, t)
+```
+
+This keeps dense coupling mostly in linear constraints while dynamics are pointwise.
+
+### Strengths
+
+- **Improved numerical conditioning** versus classical `D*X` form at higher node counts
+- **Pointwise nonlinear dynamics constraints** (`V_i` depends on node `i` only)
+- **Natural quadrature from Birkhoff weights**
+
+### Weaknesses
+
+- More decision variables (`X` and `V` both present)
+- Still sensitive on highly non-smooth controls
+
+### Best For
+
+| Use Case | Why |
+|----------|-----|
+| Smooth OCPs with larger node counts | Better conditioning behavior |
+| Problems where classical PS becomes iteration-heavy | Pointwise nonlinear structure |
+| Experiments with high-order pseudospectral formulations | Flexible integration form |
+
+---
+
 ## Side-by-Side Comparison
 
 ### Performance on Brachistochrone
@@ -206,6 +238,11 @@ transcription.set_final_state(xf);
 - You need high accuracy with relatively few nodes
 - Running-cost integration accuracy is important
 
+**Choose Birkhoff Pseudospectral when:**
+- You want pseudospectral accuracy but better conditioning behavior
+- Node counts are moderate-to-high
+- You want pointwise nonlinear dynamics with linear global recovery
+
 ---
 
 ## See Also
@@ -213,4 +250,5 @@ transcription.set_final_state(xf);
 - [Direct Collocation Guide](collocation.md)
 - [Multiple Shooting Guide](multiple_shooting.md)
 - [Pseudospectral Guide](pseudospectral.md)
+- [Birkhoff Pseudospectral Guide](birkhoff_pseudospectral.md)
 - [Example: Brachistochrone Comparison](file:///home/tanged/sources/janus/examples/optimization/transcription_comparison_demo.cpp)
