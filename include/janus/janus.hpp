@@ -9,3 +9,5 @@
 #include "optimization/Collocation.hpp"
 #include "optimization/MultiShooting.hpp"
 #include "optimization/Opti.hpp"
+#include "optimization/Pseudospectral.hpp"
+#include "optimization/TranscriptionBase.hpp"

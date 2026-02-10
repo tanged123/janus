@@ -87,3 +87,6 @@ target_link_libraries(collocation_demo PRIVATE janus)
 
 add_executable(multishoot_comparison optimization/multishoot_comparison.cpp)
 target_link_libraries(multishoot_comparison PRIVATE janus)
+
+add_executable(pseudospectral_demo optimization/pseudospectral_demo.cpp)
+target_link_libraries(pseudospectral_demo PRIVATE janus)

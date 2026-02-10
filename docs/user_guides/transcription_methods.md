@@ -1,18 +1,18 @@
-# Transcription Methods: Collocation vs Multiple Shooting
+# Transcription Methods: Collocation vs Multiple Shooting vs Pseudospectral
 
-This guide compares **Direct Collocation** and **Multiple Shooting**—the two trajectory optimization methods available in Janus—and provides guidance on when to use each.
+This guide compares **Direct Collocation**, **Multiple Shooting**, and **Pseudospectral** and provides guidance on when to use each.
 
 ## Overview
 
 Both methods transcribe continuous-time optimal control problems into discrete NLPs, but they differ fundamentally in how they enforce dynamics:
 
-| Aspect | Direct Collocation | Multiple Shooting |
-|--------|-------------------|-------------------|
-| **Dynamics Enforcement** | Polynomial defect constraints | Numerical integration |
-| **Accuracy Source** | Fixed-order scheme (2nd or 4th) | Adaptive-step integrator |
-| **Control Representation** | Values at each node | Piecewise constant per interval |
-| **Computational Cost** | Lower per iteration | Higher (integrator calls) |
-| **Sparsity** | Block-banded Jacobian | Block-sparse Jacobian |
+| Aspect | Direct Collocation | Multiple Shooting | Pseudospectral |
+|--------|-------------------|-------------------|----------------|
+| **Dynamics Enforcement** | Local defect constraints | Numerical integration | Global differentiation matrix |
+| **Accuracy Source** | Fixed-order scheme (2nd or 4th) | Adaptive-step integrator | Spectral convergence (smooth problems) |
+| **Control Representation** | Values at each node | Piecewise constant per interval | Values at each node |
+| **Computational Cost** | Lower per iteration | Higher (integrator calls) | Moderate, dense Jacobian blocks |
+| **Sparsity** | Block-banded Jacobian | Block-sparse Jacobian | Dense coupling across nodes |
 
 ---
 
@@ -89,6 +89,35 @@ ms.add_dynamics_constraints();  // Creates integrator-based constraints
 | Stiff ODEs | Adaptive implicit methods |
 | Matching simulation results | Same integration scheme |
 | Fewer decision variables | Accuracy without more nodes |
+
+---
+
+## Pseudospectral
+
+Uses global polynomial interpolation with Lobatto nodes and a spectral differentiation matrix:
+
+```
+D * X = (dt / 2) * F(X, U, t)
+```
+
+### Strengths
+
+- **High accuracy per node** for smooth dynamics
+- **Built-in high-order quadrature** for running costs
+- **Good low-node performance** for minimum-time/fuel style problems
+
+### Weaknesses
+
+- **Dense coupling across nodes** can increase linear-solve cost
+- **Less robust for discontinuous/bang-bang controls** without refinement
+
+### Best For
+
+| Use Case | Why |
+|----------|-----|
+| Smooth OCPs with tight accuracy targets | Spectral convergence |
+| Low node budgets | More accuracy per node |
+| Accurate running-cost integration | Native quadrature weights |
 
 ---
 
@@ -172,10 +201,16 @@ transcription.set_final_state(xf);
 - You're matching high-fidelity simulation
 - Fewer decision variables are preferred
 
+**Choose Pseudospectral when:**
+- Dynamics and controls are smooth
+- You need high accuracy with relatively few nodes
+- Running-cost integration accuracy is important
+
 ---
 
 ## See Also
 
 - [Direct Collocation Guide](collocation.md)
 - [Multiple Shooting Guide](multiple_shooting.md)
+- [Pseudospectral Guide](pseudospectral.md)
 - [Example: Brachistochrone Comparison](file:///home/tanged/sources/janus/examples/optimization/multishoot_comparison.cpp)
