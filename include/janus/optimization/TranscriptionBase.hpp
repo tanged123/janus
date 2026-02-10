@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Opti.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include <functional>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -19,10 +19,10 @@ template <typename Derived> class TranscriptionBase {
 
     void set_initial_state(const NumericVector &x0) {
         if (!setup_complete_) {
-            throw std::runtime_error("TranscriptionBase: call setup() before set_initial_state()");
+            throw RuntimeError("TranscriptionBase: call setup() before set_initial_state()");
         }
         if (x0.size() != n_states_) {
-            throw std::invalid_argument("TranscriptionBase: x0 size mismatch");
+            throw InvalidArgument("TranscriptionBase: x0 size mismatch");
         }
         for (int i = 0; i < n_states_; ++i) {
             opti_.subject_to(states_(0, i) == x0(i));
@@ -31,20 +31,20 @@ template <typename Derived> class TranscriptionBase {
 
     void set_initial_state(int idx, double value) {
         if (!setup_complete_) {
-            throw std::runtime_error("TranscriptionBase: call setup() before set_initial_state()");
+            throw RuntimeError("TranscriptionBase: call setup() before set_initial_state()");
         }
         if (idx < 0 || idx >= n_states_) {
-            throw std::out_of_range("TranscriptionBase: initial state index out of range");
+            throw InvalidArgument("TranscriptionBase: initial state index out of range");
         }
         opti_.subject_to(states_(0, idx) == value);
     }
 
     void set_final_state(const NumericVector &xf) {
         if (!setup_complete_) {
-            throw std::runtime_error("TranscriptionBase: call setup() before set_final_state()");
+            throw RuntimeError("TranscriptionBase: call setup() before set_final_state()");
         }
         if (xf.size() != n_states_) {
-            throw std::invalid_argument("TranscriptionBase: xf size mismatch");
+            throw InvalidArgument("TranscriptionBase: xf size mismatch");
         }
         for (int i = 0; i < n_states_; ++i) {
             opti_.subject_to(states_(n_nodes_ - 1, i) == xf(i));
@@ -53,17 +53,17 @@ template <typename Derived> class TranscriptionBase {
 
     void set_final_state(int idx, double value) {
         if (!setup_complete_) {
-            throw std::runtime_error("TranscriptionBase: call setup() before set_final_state()");
+            throw RuntimeError("TranscriptionBase: call setup() before set_final_state()");
         }
         if (idx < 0 || idx >= n_states_) {
-            throw std::out_of_range("TranscriptionBase: final state index out of range");
+            throw InvalidArgument("TranscriptionBase: final state index out of range");
         }
         opti_.subject_to(states_(n_nodes_ - 1, idx) == value);
     }
 
     template <typename Func> void set_dynamics(Func &&dynamics) {
         if (!setup_complete_) {
-            throw std::runtime_error("TranscriptionBase: call setup() before set_dynamics()");
+            throw RuntimeError("TranscriptionBase: call setup() before set_dynamics()");
         }
 
         dynamics_ = [fn = std::forward<Func>(dynamics)](
@@ -81,8 +81,7 @@ template <typename Derived> class TranscriptionBase {
 
     void add_dynamics_constraints() {
         if (!setup_complete_) {
-            throw std::runtime_error(
-                "TranscriptionBase: call setup() before add_dynamics_constraints()");
+            throw RuntimeError("TranscriptionBase: call setup() before add_dynamics_constraints()");
         }
         static_cast<Derived *>(this)->add_dynamics_constraints_impl();
     }
@@ -121,14 +120,14 @@ template <typename Derived> class TranscriptionBase {
 
     SymbolicScalar get_time_at_node(int k) const {
         if (k < 0 || k >= tau_.size()) {
-            throw std::out_of_range("TranscriptionBase: node index out of range");
+            throw InvalidArgument("TranscriptionBase: node index out of range");
         }
         return t0_ + tau_(k) * get_duration();
     }
 
     SymbolicVector get_state_at_node(int k) const {
         if (k < 0 || k >= states_.rows()) {
-            throw std::out_of_range("TranscriptionBase: state node index out of range");
+            throw InvalidArgument("TranscriptionBase: state node index out of range");
         }
         SymbolicVector x(n_states_);
         for (int i = 0; i < n_states_; ++i) {
@@ -139,7 +138,7 @@ template <typename Derived> class TranscriptionBase {
 
     SymbolicVector get_control_at_node(int k) const {
         if (k < 0 || k >= controls_.rows()) {
-            throw std::out_of_range("TranscriptionBase: control node index out of range");
+            throw InvalidArgument("TranscriptionBase: control node index out of range");
         }
         SymbolicVector u(n_controls_);
         for (int i = 0; i < n_controls_; ++i) {

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include <cmath>
 #include <limits>
-#include <stdexcept>
 #include <utility>
 
 namespace janus {
@@ -14,7 +14,7 @@ namespace detail {
 
 inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
     if (n < 1) {
-        throw std::invalid_argument("gauss_legendre_rule: n must be >= 1");
+        throw InvalidArgument("gauss_legendre_rule: n must be >= 1");
     }
 
     NumericVector nodes(n);
@@ -56,7 +56,7 @@ inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
  */
 inline std::pair<double, double> legendre_poly(int n, double x) {
     if (n < 0) {
-        throw std::invalid_argument("legendre_poly: n must be >= 0");
+        throw InvalidArgument("legendre_poly: n must be >= 0");
     }
 
     if (n == 0) {
@@ -112,7 +112,7 @@ inline NumericVector legendre_poly_vec(int n, const NumericVector &x) {
  */
 inline NumericVector lgl_nodes(int N) {
     if (N < 2) {
-        throw std::invalid_argument("lgl_nodes: N must be >= 2");
+        throw InvalidArgument("lgl_nodes: N must be >= 2");
     }
 
     NumericVector nodes(N);
@@ -153,7 +153,7 @@ inline NumericVector lgl_nodes(int N) {
  */
 inline NumericVector cgl_nodes(int N) {
     if (N < 2) {
-        throw std::invalid_argument("cgl_nodes: N must be >= 2");
+        throw InvalidArgument("cgl_nodes: N must be >= 2");
     }
 
     NumericVector nodes(N);
@@ -169,10 +169,10 @@ inline NumericVector cgl_nodes(int N) {
  */
 inline NumericVector lgl_weights(int N, const NumericVector &nodes) {
     if (N < 2) {
-        throw std::invalid_argument("lgl_weights: N must be >= 2");
+        throw InvalidArgument("lgl_weights: N must be >= 2");
     }
     if (nodes.size() != N) {
-        throw std::invalid_argument("lgl_weights: nodes size mismatch");
+        throw InvalidArgument("lgl_weights: nodes size mismatch");
     }
 
     NumericVector w(N);
@@ -190,10 +190,10 @@ inline NumericVector lgl_weights(int N, const NumericVector &nodes) {
  */
 inline NumericVector cgl_weights(int N, const NumericVector &nodes) {
     if (N < 2) {
-        throw std::invalid_argument("cgl_weights: N must be >= 2");
+        throw InvalidArgument("cgl_weights: N must be >= 2");
     }
     if (nodes.size() != N) {
-        throw std::invalid_argument("cgl_weights: nodes size mismatch");
+        throw InvalidArgument("cgl_weights: nodes size mismatch");
     }
 
     if (N == 2) {
@@ -255,7 +255,7 @@ inline NumericVector cgl_weights(int N, const NumericVector &nodes) {
 inline NumericVector barycentric_weights(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());
     if (N < 2) {
-        throw std::invalid_argument("barycentric_weights: need at least 2 nodes");
+        throw InvalidArgument("barycentric_weights: need at least 2 nodes");
     }
 
     NumericVector lambda(N);
@@ -279,13 +279,13 @@ inline double barycentric_basis_eval(const NumericVector &nodes, const NumericVe
                                      double s) {
     const int N = static_cast<int>(nodes.size());
     if (N < 2) {
-        throw std::invalid_argument("barycentric_basis_eval: need at least 2 nodes");
+        throw InvalidArgument("barycentric_basis_eval: need at least 2 nodes");
     }
     if (bary_w.size() != N) {
-        throw std::invalid_argument("barycentric_basis_eval: barycentric weight size mismatch");
+        throw InvalidArgument("barycentric_basis_eval: barycentric weight size mismatch");
     }
     if (j < 0 || j >= N) {
-        throw std::out_of_range("barycentric_basis_eval: basis index out of range");
+        throw InvalidArgument("barycentric_basis_eval: basis index out of range");
     }
 
     const double tol = 128.0 * std::numeric_limits<double>::epsilon() * (1.0 + std::abs(s));
@@ -311,7 +311,7 @@ inline double barycentric_basis_eval(const NumericVector &nodes, const NumericVe
 inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());
     if (N < 2) {
-        throw std::invalid_argument("birkhoff_integration_matrix: need at least 2 nodes");
+        throw InvalidArgument("birkhoff_integration_matrix: need at least 2 nodes");
     }
 
     const NumericVector bary_w = barycentric_weights(nodes);
@@ -367,7 +367,7 @@ inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
 inline NumericMatrix spectral_diff_matrix(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());
     if (N < 2) {
-        throw std::invalid_argument("spectral_diff_matrix: need at least 2 nodes");
+        throw InvalidArgument("spectral_diff_matrix: need at least 2 nodes");
     }
 
     const NumericVector lambda = barycentric_weights(nodes);

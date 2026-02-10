@@ -6,8 +6,8 @@
 #pragma once
 
 #include "TranscriptionBase.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/OrthogonalPolynomials.hpp"
-#include <stdexcept>
 #include <tuple>
 #include <vector>
 
@@ -33,7 +33,7 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
     setup(int n_states, int n_controls, double t0, double tf,
           const PseudospectralOptions &opts = {}) {
         if (opts.n_nodes < 2) {
-            throw std::invalid_argument("Pseudospectral: n_nodes must be >= 2");
+            throw InvalidArgument("Pseudospectral: n_nodes must be >= 2");
         }
 
         n_states_ = n_states;
@@ -92,10 +92,10 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
 
     SymbolicScalar quadrature(const SymbolicVector &integrand) const {
         if (!setup_complete_) {
-            throw std::runtime_error("Pseudospectral: call setup() before quadrature()");
+            throw RuntimeError("Pseudospectral: call setup() before quadrature()");
         }
         if (integrand.size() != n_nodes_) {
-            throw std::invalid_argument("Pseudospectral: integrand size mismatch");
+            throw InvalidArgument("Pseudospectral: integrand size mismatch");
         }
 
         SymbolicScalar weighted_sum = SymbolicScalar(0.0);
@@ -112,7 +112,7 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
 
     void add_dynamics_constraints_impl() {
         if (!dynamics_set_) {
-            throw std::runtime_error(
+            throw RuntimeError(
                 "Pseudospectral: call set_dynamics() before add_dynamics_constraints()");
         }
 

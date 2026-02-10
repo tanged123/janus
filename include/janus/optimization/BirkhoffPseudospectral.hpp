@@ -6,8 +6,8 @@
 #pragma once
 
 #include "TranscriptionBase.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/math/OrthogonalPolynomials.hpp"
-#include <stdexcept>
 #include <tuple>
 #include <vector>
 
@@ -32,7 +32,7 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, double tf, const BirkhoffOptions &opts = {}) {
         if (opts.n_nodes < 2) {
-            throw std::invalid_argument("BirkhoffPseudospectral: n_nodes must be >= 2");
+            throw InvalidArgument("BirkhoffPseudospectral: n_nodes must be >= 2");
         }
 
         n_states_ = n_states;
@@ -98,10 +98,10 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
 
     SymbolicScalar quadrature(const SymbolicVector &integrand) const {
         if (!setup_complete_) {
-            throw std::runtime_error("BirkhoffPseudospectral: call setup() before quadrature()");
+            throw RuntimeError("BirkhoffPseudospectral: call setup() before quadrature()");
         }
         if (integrand.size() != n_nodes_) {
-            throw std::invalid_argument("BirkhoffPseudospectral: integrand size mismatch");
+            throw InvalidArgument("BirkhoffPseudospectral: integrand size mismatch");
         }
 
         SymbolicScalar weighted_sum = SymbolicScalar(0.0);
@@ -119,7 +119,7 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
 
     void add_dynamics_constraints_impl() {
         if (!dynamics_set_) {
-            throw std::runtime_error(
+            throw RuntimeError(
                 "BirkhoffPseudospectral: call set_dynamics() before add_dynamics_constraints()");
         }
 
