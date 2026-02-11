@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <janus/janus.hpp>
+#include <string>
 
 using namespace janus;
 
@@ -195,4 +196,25 @@ TEST(CollocationTests, HarmonicOscillatorEnergy) {
     // After one period, should return to (1, 0)
     EXPECT_NEAR(x_sol(dc.n_nodes() - 1, 0), 1.0, 0.1);
     EXPECT_NEAR(x_sol(dc.n_nodes() - 1, 1), 0.0, 0.1);
+}
+
+TEST(CollocationTests, SetDynamicsTwiceThrows) {
+    Opti opti;
+    DirectCollocation dc(opti);
+
+    CollocationOptions opts;
+    opts.scheme = CollocationScheme::Trapezoidal;
+    opts.n_nodes = 5;
+
+    dc.setup(2, 1, 0.0, 1.0, opts);
+    dc.set_dynamics(double_integrator_ode);
+
+    try {
+        dc.set_dynamics(double_integrator_ode);
+        FAIL() << "Expected set_dynamics() to throw when called twice";
+    } catch (const janus::RuntimeError &e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("set_dynamics"), std::string::npos);
+        EXPECT_NE(msg.find("add_dynamics_constraints"), std::string::npos);
+    }
 }

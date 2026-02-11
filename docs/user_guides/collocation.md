@@ -119,7 +119,21 @@ auto sol = opti.solve();
 
 **Result**: T* = 1.8016s (matches Dymos reference: 1.8019s, error < 0.02%)
 
-See [collocation_demo.cpp](file:///home/tanged/sources/janus/examples/optimization/collocation_demo.cpp) for the full example.
+## Unified Comparison Example
+
+The optimization demos are now unified into one comparison file:
+
+- `examples/optimization/transcription_comparison_demo.cpp`
+
+It solves the same brachistochrone setup with:
+- Direct Collocation
+- Multiple Shooting
+- Pseudospectral
+- Birkhoff Pseudospectral
+
+and prints:
+- Single-grid performance stats (solve time, iterations, NLP size, error)
+- A multi-grid convergence table for each transcription type
 
 ---
 

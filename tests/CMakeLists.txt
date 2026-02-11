@@ -35,6 +35,7 @@ add_executable(test_math
     math/test_quaternion.cpp
     math/test_coverage_gaps.cpp
     math/test_rootfinding.cpp
+    math/test_orthogonal_polynomials.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)
@@ -45,7 +46,8 @@ add_executable(test_opti
     optimization/test_opti_solvers.cpp
     optimization/test_collocation.cpp
     optimization/test_multishoot.cpp
+    optimization/test_pseudospectral.cpp
+    optimization/test_birkhoff_pseudospectral.cpp
 )
 target_link_libraries(test_opti PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_opti)
-

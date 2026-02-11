@@ -82,8 +82,5 @@ target_link_libraries(drag_optimization PRIVATE janus)
 add_executable(parametric_sweep optimization/parametric_sweep.cpp)
 target_link_libraries(parametric_sweep PRIVATE janus)
 
-add_executable(collocation_demo optimization/collocation_demo.cpp)
-target_link_libraries(collocation_demo PRIVATE janus)
-
-add_executable(multishoot_comparison optimization/multishoot_comparison.cpp)
-target_link_libraries(multishoot_comparison PRIVATE janus)
+add_executable(transcription_comparison_demo optimization/transcription_comparison_demo.cpp)
+target_link_libraries(transcription_comparison_demo PRIVATE janus)

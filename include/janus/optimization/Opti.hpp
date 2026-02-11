@@ -4,6 +4,7 @@
 #include "OptiOptions.hpp"
 #include "OptiSol.hpp"
 #include "OptiSweep.hpp"
+#include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Calculus.hpp"
 #include "janus/math/FiniteDifference.hpp"
@@ -420,13 +421,13 @@ class Opti {
      *
      * @param options Solver configuration (solver, max_iter, verbose, etc.)
      * @return OptiSol containing optimized values
-     * @throws std::runtime_error if selected solver unavailable or fails
+     * @throws RuntimeError if selected solver unavailable or fails
      */
     OptiSol solve(const OptiOptions &options = {}) {
         // Verify solver availability
         if (!solver_available(options.solver)) {
-            throw std::runtime_error(std::string("Solver '") + solver_name(options.solver) +
-                                     "' is not available in this CasADi build");
+            throw RuntimeError(std::string("Solver '") + solver_name(options.solver) +
+                               "' is not available in this CasADi build");
         }
 
         casadi::Dict solver_opts;
@@ -483,8 +484,8 @@ class Opti {
                             const OptiOptions &options = {}) {
         // Verify solver availability
         if (!solver_available(options.solver)) {
-            throw std::runtime_error(std::string("Solver '") + solver_name(options.solver) +
-                                     "' is not available in this CasADi build");
+            throw RuntimeError(std::string("Solver '") + solver_name(options.solver) +
+                               "' is not available in this CasADi build");
         }
 
         SweepResult result;
@@ -561,7 +562,7 @@ class Opti {
                                  const std::string &method = "trapezoidal") {
         int n = static_cast<int>(var.size());
         if (n != static_cast<int>(with_respect_to.size())) {
-            throw std::invalid_argument(
+            throw InvalidArgument(
                 "derivative_of: variable and with_respect_to must have same size");
         }
 

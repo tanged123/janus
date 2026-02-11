@@ -620,7 +620,7 @@ TEST(OptiTest, DerivativeOf_SizeMismatch) {
     janus::NumericVector t = janus::linspace(0.0, 1.0, 10);
     auto x = opti.variable(5, 0.0); // Size 5, but t is size 10
 
-    EXPECT_THROW(opti.derivative_of(x, t, 0.0), std::invalid_argument);
+    EXPECT_THROW(opti.derivative_of(x, t, 0.0), janus::InvalidArgument);
 }
 
 TEST(OptiTest, VectorBounds_Combined) {
