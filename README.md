@@ -16,7 +16,7 @@ Built on C++20, Eigen, and CasADi, Janus implements the Code Transformations par
 - 🎭 **Dual-Mode Physics**: Write once, run as Numeric (Fast C++) or Symbolic (CasADi Graph).
 - 🔢 **Unified Math**: Std/CasADi agnostic math functions (`janus::sin`, `janus::pow`, `janus::where`).
 - ⚡ **Linear Algebra**: Eigen-based matrix operations compatible with symbolic types.
-- 📉 **Optimization**: High-level `Opti` interface for NLP (Nonlinear Programming) solvers like IPOPT, shooting and collocation methods.
+- 📉 **Optimization**: High-level `Opti` interface for NLP solvers (IPOPT/SNOPT/QPOASES) with Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral transcriptions.
 - 🔁 **Differentiation**: Automatic differentiation (Forward/Reverse) via CasADi.
 - ⏱️ **Integration**: ODE solvers (`solve_ivp`), Runge-Kutta methods, discrete integration.
 - 📈 **Interpolation**: 1D, 2D, Sparse, and N-D table lookups with B-spline support.
@@ -138,50 +138,33 @@ int main() {
 
 For more details:
 
-- **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/numeric_intro.cpp`.
-- **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/drag_coefficient.cpp`.
+- **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/intro/numeric_intro.cpp`.
+- **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/simulation/drag_coefficient.cpp`.
 - **Optimization**: [Optimization Guide](docs/user_guides/optimization.md) and `examples/optimization/drag_optimization.cpp`.
 
 ## Project Structure
 
 ```plaintext
 janus/
-├── docs/               # Documentation
-├── examples/           # Example Implementations (numeric & symbolic)
+├── docs/                    # Documentation
+├── examples/                # Example implementations
+│   ├── intro/               # Basic Janus usage examples
+│   ├── interpolation/       # Interpolation and table lookup demos
+│   ├── math/                # Math/symbolic graph demos
+│   ├── optimization/        # Optimization/transcription demos
+│   └── simulation/          # ODE and physics simulation demos
 ├── include/
 │   └── janus/
-│       ├── core/           # Concepts, Types & Function Wrapper
-│       │   ├── Function.hpp      # CasADi Function wrapper
-│       │   ├── JanusConcepts.hpp # Type concepts & constraints
-│       │   ├── JanusError.hpp    # Exception handling types
-│       │   ├── JanusIO.hpp       # Graph visualization & IO
-│       │   └── JanusTypes.hpp    # Matrix/Vector types
-│       ├── janus.hpp           # Main entry point
-│       └── math/           # Math & Numerics Layer
-│           ├── Arithmetic.hpp       # Core arithmetic
-│           ├── AutoDiff.hpp         # Automatic differentiation
-│           ├── Calculus.hpp         # Numerical calculus (gradient, trapz)
-│           ├── DiffOps.hpp          # Differential operators
-│           ├── FiniteDifference.hpp # Finite difference coefficients
-│           ├── Integrate.hpp        # ODE integration (quad, solve_ivp)
-│           ├── IntegrateDiscrete.hpp # Discrete integration schemes
-│           ├── Interpolate.hpp      # Interpolation utilities
-│           ├── JanusMath.hpp        # Math aggregation header
-│           ├── Linalg.hpp           # Linear algebra extensions
-│           ├── Logic.hpp            # Logical ops & branching (where)
-│           ├── Quaternion.hpp       # Quaternion algebra
-│           ├── RootFinding.hpp      # Root finding algorithms
-│           ├── Rotations.hpp        # 2D/3D rotations
-│           ├── Spacing.hpp          # Grid generation
-│           ├── SurrogateModel.hpp   # Smooth surrogates (sigmoid, etc)
-│           ├── Trig.hpp             # Trigonometry
-│       ├── optimization/       # Optimization Layer (Phase 6)
-│       │   ├── Opti.hpp             # Main solver interface
-│       │   ├── OptiOptions.hpp      # Solver configuration
-│       │   └── OptiSol.hpp          # Solution wrappers
-├── scripts/            # Build, Test & Verify Scripts
-├── tests/              # GoogleTest Suite
-└── flake.nix           # Nix Environment Definition
+│       ├── core/                # Core symbolic/numeric interfaces and IO
+│       ├── math/                # Math, interpolation, integration, autodiff helpers
+│       ├── optimization/        # Opti + transcription methods
+│       ├── utils/               # Utility helpers (e.g., JSON)
+│       ├── janus.hpp            # Main umbrella include
+│       └── using.hpp            # Convenience aliases/imports
+├── scripts/                 # Build, test, CI, and verification scripts
+├── tests/                   # GoogleTest suites (core/math/optimization)
+├── CMakeLists.txt
+└── flake.nix                # Nix environment definition
 ```
 
 ## Inspiration & Credits
