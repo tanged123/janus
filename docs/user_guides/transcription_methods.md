@@ -60,6 +60,7 @@ Divides time into intervals and integrates dynamics numerically. Continuity cons
 ### How It Works
 
 For each interval $[t_k, t_{k+1}]$:
+
 1. Integrate the ODE from state $x_k$ using control $u_k$
 2. Constrain: $x_{k+1} = \text{Integrate}(x_k, u_k, \Delta t)$
 
@@ -159,10 +160,12 @@ This keeps dense coupling mostly in linear constraints while dynamics are pointw
 
 | Method | Nodes/Intervals | Optimal Time | Error vs Reference |
 |--------|-----------------|--------------|-------------------|
-| Collocation (Hermite-Simpson) | 31 | 1.8016 s | 0.02% |
-| Multiple Shooting (CVODES) | 20 | 1.8019 s | < 0.01% |
+| Collocation (Hermite-Simpson) | 31 nodes | 1.8019 s | < 0.01% |
+| Multiple Shooting (CVODES) | 20 intervals | 1.8019 s | < 0.01% |
+| Pseudospectral (LGL) | 31 nodes | 1.8019 s | < 0.01% |
+| Birkhoff Pseudospectral (LGL) | 31 nodes | 1.8019 s | < 0.01% |
 
-Multiple shooting achieved better accuracy with fewer decision variables.
+All four methods recover essentially the same optimal time on this smooth benchmark.
 
 ### Problem Structure
 
@@ -174,6 +177,14 @@ Collocation (31 nodes, 3 states, 1 control):
 Multiple Shooting (20 intervals, 3 states, 1 control):
   Decision variables: 21×3 + 20×1 = 83
   Constraints: 20×3 (continuity) + BCs
+
+Pseudospectral (31 nodes, 3 states, 1 control):
+  Decision variables: 31×3 + 31×1 = 124
+  Constraints: 31×3 (global dynamics) + BCs
+
+Birkhoff Pseudospectral (31 nodes, 3 states, 1 control):
+  Decision variables: 31×3 + 31×3 + 31×1 = 217
+  Constraints: 31×3 (pointwise dynamics) + 31×3 (linear recovery) + BCs
 ```
 
 ---
@@ -181,64 +192,72 @@ Multiple Shooting (20 intervals, 3 states, 1 control):
 ## Decision Flowchart
 
 ```
-┌─────────────────────────────────────┐
-│ Is the system stiff or very         │
-│ sensitive to integration accuracy?  │
-├──────────────┬──────────────────────┤
-│      YES     │         NO           │
-│      ↓       │         ↓            │
-│  Multiple    │   Is fast iteration  │
-│  Shooting    │   time critical?     │
-│              ├──────────┬───────────┤
-│              │   YES    │    NO     │
-│              │    ↓     │     ↓     │
-│              │ Colloc.  │  Either   │
-│              │          │  works    │
-└──────────────┴──────────┴───────────┘
+┌──────────────────────────────────────────────┐
+│ Is the system stiff or integration-sensitive?│
+├──────────────┬───────────────────────────────┤
+│      YES     │              NO               │
+│      ↓       │              ↓                │
+│ Multiple     │ Are dynamics/controls smooth  │
+│ Shooting     │ enough for global polynomials?│
+│              ├──────────────┬────────────────┤
+│              │      YES     │       NO       │
+│              │      ↓       │       ↓        │
+│              │ Need better  │ Direct         │
+│              │ conditioning │ Collocation    │
+│              ├───────┬──────┤                │
+│              │  YES  │  NO  │                │
+│              │   ↓   │   ↓  │                │
+│              │Birkhoff│Pseudo│               │
+└──────────────┴───────┴──────┴────────────────┘
 ```
 
 ---
 
 ## Unified API
 
-Both classes now share a unified API for interchangeability:
+All transcription classes now share a unified API for interchangeability:
 
 ```cpp
-// Works with EITHER DirectCollocation OR MultipleShooting
+// Works with DirectCollocation, MultipleShooting,
+// Pseudospectral, or BirkhoffPseudospectral
 transcription.set_dynamics(my_ode);
 transcription.add_dynamics_constraints();  // Unified method
 transcription.set_initial_state(x0);
 transcription.set_final_state(xf);
 ```
 
-| Unified Method | DirectCollocation Alias | MultipleShooting Alias |
-|----------------|------------------------|------------------------|
-| `add_dynamics_constraints()` | `add_defect_constraints()` | `add_continuity_constraints()` |
-| `n_nodes()` | — | — |
-| `n_intervals()` | — | — |
+| Unified Method | DirectCollocation Alias | MultipleShooting Alias | Pseudospectral Alias | Birkhoff Pseudospectral Alias |
+|----------------|-------------------------|------------------------|----------------------|-------------------------------|
+| `add_dynamics_constraints()` | `add_defect_constraints()` | `add_continuity_constraints()` | `add_defect_constraints()` | `add_defect_constraints()` |
+| `n_nodes()` | `n_nodes()` | — | `n_nodes()` | `n_nodes()` |
+| `n_intervals()` | — | `n_intervals()` | — | — |
 
 ---
 
 ## Quick Reference
 
 **Choose Direct Collocation when:**
+
 - You need fast solver iterations (MPC, real-time)
 - Initial guess is poor or unknown
 - Problem is smooth and non-stiff
 - You want dense trajectory output
 
 **Choose Multiple Shooting when:**
+
 - High integration accuracy is required
 - System is stiff (chemical kinetics, some robotics)
 - You're matching high-fidelity simulation
 - Fewer decision variables are preferred
 
 **Choose Pseudospectral when:**
+
 - Dynamics and controls are smooth
 - You need high accuracy with relatively few nodes
 - Running-cost integration accuracy is important
 
 **Choose Birkhoff Pseudospectral when:**
+
 - You want pseudospectral accuracy but better conditioning behavior
 - Node counts are moderate-to-high
 - You want pointwise nonlinear dynamics with linear global recovery
@@ -251,4 +270,4 @@ transcription.set_final_state(xf);
 - [Multiple Shooting Guide](multiple_shooting.md)
 - [Pseudospectral Guide](pseudospectral.md)
 - [Birkhoff Pseudospectral Guide](birkhoff_pseudospectral.md)
-- [Example: Brachistochrone Comparison](file:///home/tanged/sources/janus/examples/optimization/transcription_comparison_demo.cpp)
+- [Example: Brachistochrone Comparison](../../examples/optimization/transcription_comparison_demo.cpp)

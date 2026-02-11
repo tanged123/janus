@@ -7,7 +7,6 @@
 
 #include "TranscriptionBase.hpp"
 #include "janus/math/Spacing.hpp"
-#include <stdexcept>
 #include <string>
 #include <tuple>
 
@@ -126,7 +125,7 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
 
     void add_dynamics_constraints_impl() {
         if (!dynamics_set_) {
-            throw std::runtime_error(
+            throw RuntimeError(
                 "MultipleShooting: call set_dynamics() before add_dynamics_constraints()");
         }
         ensure_integrator();

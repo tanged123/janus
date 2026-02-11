@@ -22,7 +22,7 @@ SymbolicVector double_integrator_ode(const SymbolicVector &x, const SymbolicVect
 
 SymbolicVector brachistochrone_ode(const SymbolicVector &state, const SymbolicVector &control,
                                    const SymbolicScalar & /*t*/) {
-    constexpr double g = 9.80665;
+    constexpr double g = 9.81;
     SymbolicScalar v = state(2);
     SymbolicScalar theta = control(0);
 

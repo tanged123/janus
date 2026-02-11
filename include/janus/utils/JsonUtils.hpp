@@ -1,12 +1,12 @@
 #pragma once
 
+#include "janus/core/JanusError.hpp"
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -25,7 +25,7 @@ inline void write_json(const std::string &filename,
                        const std::map<std::string, std::vector<double>> &data) {
     std::ofstream file(filename);
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open file for writing: " + filename);
+        throw janus::RuntimeError("Could not open file for writing: " + filename);
     }
 
     file << "{\n";
@@ -61,7 +61,7 @@ inline void write_json(const std::string &filename,
 inline std::map<std::string, std::vector<double>> read_json(const std::string &filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open file for reading: " + filename);
+        throw janus::RuntimeError("Could not open file for reading: " + filename);
     }
 
     std::stringstream buffer;
@@ -80,7 +80,7 @@ inline std::map<std::string, std::vector<double>> read_json(const std::string &f
 
         size_t quote_end = content.find('"', quote_start + 1);
         if (quote_end == std::string::npos)
-            throw std::runtime_error("Malformed JSON: Unclosed string");
+            throw janus::RuntimeError("Malformed JSON: Unclosed string");
 
         std::string key = content.substr(quote_start + 1, quote_end - quote_start - 1);
         pos = quote_end + 1;
@@ -88,18 +88,18 @@ inline std::map<std::string, std::vector<double>> read_json(const std::string &f
         // Find colon
         size_t colon = content.find(':', pos);
         if (colon == std::string::npos)
-            throw std::runtime_error("Malformed JSON: Missing colon");
+            throw janus::RuntimeError("Malformed JSON: Missing colon");
         pos = colon + 1;
 
         // Find value (array)
         size_t bracket_start = content.find('[', pos);
         if (bracket_start == std::string::npos)
-            throw std::runtime_error("Malformed JSON: Missing array start [");
+            throw janus::RuntimeError("Malformed JSON: Missing array start [");
         pos = bracket_start + 1;
 
         size_t bracket_end = content.find(']', pos);
         if (bracket_end == std::string::npos)
-            throw std::runtime_error("Malformed JSON: Missing array end ]");
+            throw janus::RuntimeError("Malformed JSON: Missing array end ]");
 
         // Parse array content
         std::string array_content = content.substr(pos, bracket_end - pos);

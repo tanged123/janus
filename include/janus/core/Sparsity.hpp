@@ -1,5 +1,6 @@
 #pragma once
 
+#include "JanusError.hpp"
 #include "JanusIO.hpp"
 #include "JanusTypes.hpp"
 #include <casadi/casadi.hpp>
@@ -210,7 +211,7 @@ class SparsityPattern {
     void export_spy_dot(const std::string &filename, const std::string &name = "sparsity") const {
         std::ofstream file(filename + ".dot");
         if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filename + ".dot");
+            throw RuntimeError("Cannot open file: " + filename + ".dot");
         }
 
         file << "digraph " << name << " {\n";
@@ -275,7 +276,7 @@ class SparsityPattern {
         std::string html_filename = filename + ".html";
         std::ofstream out(html_filename);
         if (!out.is_open()) {
-            throw std::runtime_error("Cannot open file: " + html_filename);
+            throw RuntimeError("Cannot open file: " + html_filename);
         }
 
         int rows = n_rows();
@@ -632,9 +633,9 @@ SparsityPattern nan_propagation_sparsity(Func &&fn, int n_inputs, int n_outputs,
     // Evaluate at reference point to verify the function works
     NumericVector y0 = fn(x0);
     if (y0.size() != n_outputs) {
-        throw std::invalid_argument("nan_propagation_sparsity: function returned " +
-                                    std::to_string(y0.size()) + " outputs, expected " +
-                                    std::to_string(n_outputs));
+        throw InvalidArgument("nan_propagation_sparsity: function returned " +
+                              std::to_string(y0.size()) + " outputs, expected " +
+                              std::to_string(n_outputs));
     }
 
     // Build sparsity pattern by probing each input with NaN

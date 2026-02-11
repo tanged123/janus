@@ -65,6 +65,12 @@ template <typename Derived> class TranscriptionBase {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_dynamics()");
         }
+        if (dynamics_set_) {
+            throw RuntimeError(
+                "TranscriptionBase: set_dynamics() cannot be called twice after "
+                "add_dynamics_constraints(); remove and re-add constraints before changing "
+                "dynamics");
+        }
 
         dynamics_ = [fn = std::forward<Func>(dynamics)](
                         const SymbolicVector &x, const SymbolicVector &u,

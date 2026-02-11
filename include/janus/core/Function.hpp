@@ -1,5 +1,6 @@
 #pragma once
 
+#include "JanusError.hpp"
 #include "JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
@@ -294,7 +295,7 @@ Function make_function(const std::string &name, const std::vector<std::string> &
                        Func &&fn) {
     static_assert(NInputs > 0, "NInputs must be positive");
     if (static_cast<int>(input_names.size()) != NInputs) {
-        throw std::invalid_argument("make_function: input_names.size() must equal NInputs");
+        throw InvalidArgument("make_function: input_names.size() must equal NInputs");
     }
 
     // Create symbolic inputs with provided names

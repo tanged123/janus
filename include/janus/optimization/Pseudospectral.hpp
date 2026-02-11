@@ -54,6 +54,8 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
             nodes = cgl_nodes(n_nodes_);
             weights_ = cgl_weights(n_nodes_, nodes);
             break;
+        default:
+            throw RuntimeError("Pseudospectral: unsupported PseudospectralScheme value");
         }
 
         tau_ = (nodes.array() + 1.0) * 0.5;

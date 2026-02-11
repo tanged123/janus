@@ -810,8 +810,9 @@ void BirkhoffPseudospectral::add_dynamics_constraints_impl() {
             opti_.subject_to(V_(i, s) == half_dt * f[i](s));
         }
 
-        // 3. State recovery: X = x_a * 1 + B * V  (LINEAR)
-        for (int i = 0; i < n_nodes_; ++i) {
+        // 3. State recovery: X = x_a * 1 + B * V  (LINEAR, interior nodes only)
+        // i=0 is trivial (B(0,j)=0), and i=n_nodes_-1 is enforced by step 4.
+        for (int i = 1; i < n_nodes_ - 1; ++i) {
             SymbolicScalar Bv_i = SymbolicScalar(0.0);
             for (int j = 0; j < n_nodes_; ++j) {
                 Bv_i = Bv_i + B_(i, j) * V_(j, s);
@@ -819,7 +820,7 @@ void BirkhoffPseudospectral::add_dynamics_constraints_impl() {
             opti_.subject_to(states_(i, s) == states_(0, s) + Bv_i);
         }
 
-        // 4. Grid equivalency: x_b = x_a + w^T * V
+        // 4. Grid equivalency (right boundary): x_b = x_a + w^T * V
         SymbolicScalar wv = SymbolicScalar(0.0);
         for (int j = 0; j < n_nodes_; ++j) {
             wv = wv + bk_weights_(j) * V_(j, s);
@@ -829,7 +830,7 @@ void BirkhoffPseudospectral::add_dynamics_constraints_impl() {
 }
 ```
 
-Note: constraints (3) and (4) are **purely linear** in the decision variables. The NLP solver handles these almost for free -- the nonlinear work is entirely in constraint (2), which has a **diagonal Jacobian** (each row depends only on `X_i, U_i` at that node). This is the structural win.
+Note: constraints (3) and (4) are **purely linear** in the decision variables and are intentionally non-overlapping (interior recovery + terminal closure). The NLP solver handles these almost for free -- the nonlinear work is entirely in constraint (2), which has a **diagonal Jacobian** (each row depends only on `X_i, U_i` at that node). This is the structural win.
 
 ### 5.7 Expected Benefits
 
@@ -961,11 +962,13 @@ w_i = 2 / (N * (N-1) * [P_{N-1}(tau_i)]^2)
 Computed via the DCT-based algorithm or the explicit formula:
 
 ```
-w_0 = w_{N-1} = 1 / (N*(N-2))    [endpoint weights, N odd]
+For N+1 nodes indexed k = 0, ..., N (endpoints at k=0 and k=N):
+  w_0 = w_N = 1 / N^2        if N is odd
+  w_0 = w_N = 1 / (N^2 - 1)  if N is even
 
 For interior nodes, computed from:
-  w_j = (2/N) * (1 - sum_{k=1}^{floor((N-1)/2)} b_k * cos(2*k*j*pi/(N-1)))
-  where b_k = 2/(4k^2 - 1), with b_{(N-1)/2} halved if N is odd
+  w_j = (2/N) * (1 - sum_{k=1}^{floor(N/2)} b_k * cos(2*k*j*pi/N))
+  where b_k = 2/(4k^2 - 1), with b_{N/2} halved when N is even
 ```
 
 ### A.4 NLP Size Comparison (N nodes, n_x states, n_u controls)

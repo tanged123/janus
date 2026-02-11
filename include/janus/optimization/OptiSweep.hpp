@@ -1,6 +1,7 @@
 #pragma once
 
 #include "OptiSol.hpp"
+#include "janus/core/JanusError.hpp"
 #include <vector>
 
 namespace janus {
@@ -38,7 +39,7 @@ struct SweepResult {
     /// Get objective value at sweep index
     double objective(size_t i) const {
         if (i >= solutions.size()) {
-            throw std::out_of_range("SweepResult::objective: index out of range");
+            throw InvalidArgument("SweepResult::objective: index out of range");
         }
         // Return the objective from solver stats
         auto stats = solutions[i].stats();

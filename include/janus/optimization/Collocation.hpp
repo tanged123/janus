@@ -7,7 +7,6 @@
 
 #include "TranscriptionBase.hpp"
 #include "janus/math/Spacing.hpp"
-#include <stdexcept>
 #include <tuple>
 
 namespace janus {
@@ -86,13 +85,13 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
      */
     SymbolicScalar quadrature(const SymbolicVector &integrand) const {
         if (!setup_complete_) {
-            throw std::runtime_error("DirectCollocation: call setup() before quadrature()");
+            throw RuntimeError("DirectCollocation: call setup() before quadrature()");
         }
         if (integrand.size() != n_nodes_) {
-            throw std::invalid_argument("DirectCollocation: integrand size mismatch");
+            throw InvalidArgument("DirectCollocation: integrand size mismatch");
         }
         if (n_nodes_ < 2) {
-            throw std::runtime_error("DirectCollocation: need at least 2 nodes for quadrature");
+            throw RuntimeError("DirectCollocation: need at least 2 nodes for quadrature");
         }
 
         const SymbolicScalar h = get_duration() / static_cast<double>(n_nodes_ - 1);
@@ -120,7 +119,7 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
 
     void add_dynamics_constraints_impl() {
         if (!dynamics_set_) {
-            throw std::runtime_error(
+            throw RuntimeError(
                 "DirectCollocation: call set_dynamics() before add_dynamics_constraints()");
         }
 
@@ -145,6 +144,8 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
             case CollocationScheme::HermiteSimpson:
                 add_hermite_simpson_constraints(x_k, x_kp1, u_k, u_kp1, f_k, f_kp1, t_k, t_kp1, dt);
                 break;
+            default:
+                throw RuntimeError("DirectCollocation: unsupported CollocationScheme value");
             }
         }
     }

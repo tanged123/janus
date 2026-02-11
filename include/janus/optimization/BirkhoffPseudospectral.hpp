@@ -51,6 +51,8 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
         case BirkhoffScheme::CGL:
             nodes = cgl_nodes(n_nodes_);
             break;
+        default:
+            throw RuntimeError("BirkhoffPseudospectral: unsupported BirkhoffScheme value");
         }
 
         tau_ = (nodes.array() + 1.0) * 0.5;
