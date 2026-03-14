@@ -485,8 +485,20 @@ template <typename Derived> auto eig_symmetric(const Eigen::MatrixBase<Derived> 
 
 // --- Explicit 3x3 Symmetric Inverse (AeroSandbox Helper) ---
 /**
- * @brief Explicit inverse of symmetric 3x3 matrix.
- * Returns tuple of elements: a11, a22, a33, a12, a23, a13
+ * @brief Explicit inverse of a symmetric 3x3 matrix.
+ *
+ * Input matrix:
+ * [m11, m12, m13]
+ * [m12, m22, m23]
+ * [m13, m23, m33]
+ *
+ * Returns the six unique inverse coefficients in Eigen-compatible packed column-major order for
+ * the lower triangle: `(0,0), (1,0), (2,0), (1,1), (2,1), (2,2)`, i.e.
+ * `{a11, a12, a13, a22, a23, a33}` for
+ *
+ * [a11, a12, a13]
+ * [a12, a22, a23]
+ * [a13, a23, a33]
  */
 template <typename T>
 std::tuple<T, T, T, T, T, T> inv_symmetric_3x3_explicit(const T &m11, const T &m22, const T &m33,
@@ -504,7 +516,7 @@ std::tuple<T, T, T, T, T, T> inv_symmetric_3x3_explicit(const T &m11, const T &m
     T a23 = (m12 * m13 - m11 * m23) * inv_det;
     T a33 = (m11 * m22 - m12 * m12) * inv_det;
 
-    return {a11, a22, a33, a12, a23, a13};
+    return {a11, a12, a13, a22, a23, a33};
 }
 
 // --- Sparse Matrix Utilities ---

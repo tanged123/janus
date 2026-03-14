@@ -1,4 +1,5 @@
 #include "../utils/TestUtils.hpp"
+#include <array>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <janus/core/Function.hpp>
@@ -166,6 +167,17 @@ void expect_eigen_residual(const janus::NumericMatrix &A, const janus::NumericVe
     EXPECT_TRUE((A * eigenvectors).isApprox(eigenvectors * eigenvalues.asDiagonal(), tol));
 }
 
+std::array<double, 6> pack_symmetric_lower_column_major(const janus::NumericMatrix &A) {
+    return {A(0, 0), A(1, 0), A(2, 0), A(1, 1), A(2, 1), A(2, 2)};
+}
+
+janus::NumericMatrix unpack_symmetric_lower_column_major(const std::array<double, 6> &packed) {
+    janus::NumericMatrix A(3, 3);
+    A << packed[0], packed[1], packed[2], packed[1], packed[3], packed[4], packed[2], packed[4],
+        packed[5];
+    return A;
+}
+
 } // namespace
 
 TEST(LinalgTests, EigSymmetricNumeric) {
@@ -239,6 +251,44 @@ TEST(LinalgTests, EigSymbolicRejectsGeneralMatrices) {
     auto A = janus::to_eigen(A_mx);
 
     EXPECT_THROW(janus::eig(A), janus::InvalidArgument);
+}
+
+TEST(LinalgTests, InvSymmetric3x3ExplicitPackedOrderMatchesInv) {
+    const std::array<janus::NumericMatrix, 4> cases = [] {
+        std::array<janus::NumericMatrix, 4> mats;
+
+        mats[0].resize(3, 3);
+        mats[0] << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0;
+
+        mats[1].resize(3, 3);
+        mats[1] << 4.0, 1.0, 1.5, 1.0, 5.0, 2.0, 1.5, 2.0, 6.0;
+
+        mats[2].resize(3, 3);
+        mats[2] << 7.0, -2.5, 3.0, -2.5, 8.0, 1.5, 3.0, 1.5, 9.0;
+
+        mats[3].resize(3, 3);
+        mats[3] << 3.5, -0.4, 0.8, -0.4, 2.2, -0.6, 0.8, -0.6, 4.1;
+
+        return mats;
+    }();
+
+    for (const auto &A : cases) {
+        const auto A_inv = janus::inv(A);
+        const auto packed_expected = pack_symmetric_lower_column_major(A_inv);
+
+        const auto packed_actual_tuple =
+            janus::inv_symmetric_3x3_explicit(A(0, 0), A(1, 1), A(2, 2), A(0, 1), A(1, 2), A(0, 2));
+        const std::array<double, 6> packed_actual = {
+            std::get<0>(packed_actual_tuple), std::get<1>(packed_actual_tuple),
+            std::get<2>(packed_actual_tuple), std::get<3>(packed_actual_tuple),
+            std::get<4>(packed_actual_tuple), std::get<5>(packed_actual_tuple)};
+
+        for (std::size_t i = 0; i < packed_actual.size(); ++i) {
+            EXPECT_NEAR(packed_actual[i], packed_expected[i], 1e-12);
+        }
+
+        EXPECT_TRUE(unpack_symmetric_lower_column_major(packed_actual).isApprox(A_inv, 1e-12));
+    }
 }
 
 // =============================================================================

@@ -14,6 +14,29 @@
 namespace janus {
 
 /**
+ * @brief Batch mapping backend for janus::Function::map().
+ */
+enum class MapParallelization {
+    Parallel, ///< CasADi OpenMP map backend (falls back to serial if unavailable)
+    Serial,   ///< CasADi serial map backend
+    Unroll    ///< CasADi unrolled map backend
+};
+
+namespace detail {
+inline std::string to_casadi_parallelization(MapParallelization parallelization) {
+    switch (parallelization) {
+    case MapParallelization::Parallel:
+        return "openmp";
+    case MapParallelization::Serial:
+        return "serial";
+    case MapParallelization::Unroll:
+        return "unroll";
+    }
+    throw InvalidArgument("Function::map: unsupported map parallelization mode");
+}
+} // namespace detail
+
+/**
  * @brief Wrapper around casadi::Function to provide Janus-native types (Eigen)
  */
 class Function {
@@ -150,7 +173,72 @@ class Function {
      */
     const casadi::Function &casadi_function() const { return fn_; }
 
+    /**
+     * @brief Create a batched version of this function using CasADi's map primitive.
+     *
+     * For a function `f(a, b) -> (y)`, `map(n)` returns `F(A, B) -> (Y)` where each
+     * input/output is the horizontal concatenation of `n` samples:
+     * `A = horzcat([a0, a1, ..., a_(n-1)])`, `Y = horzcat([y0, y1, ..., y_(n-1)])`.
+     *
+     * The default backend is `MapParallelization::Parallel`, which requests CasADi's
+     * OpenMP mapper for parallel batch evaluation. CasADi falls back to serial if it
+     * was built without OpenMP support.
+     *
+     * Use this for batch evaluation over multiple independent samples while preserving
+     * CasADi's derivative propagation through the mapped graph.
+     *
+     * @param n Number of batch samples
+     * @param parallelization Mapping backend selection
+     * @return Function Batched Janus function wrapper
+     */
+    Function map(int n, MapParallelization parallelization = MapParallelization::Parallel) const {
+        return map(n, detail::to_casadi_parallelization(parallelization));
+    }
+
+    /**
+     * @brief Create a batched version of this function using a direct CasADi backend name.
+     *
+     * Advanced escape hatch for backend strings understood by CasADi, typically
+     * `openmp`, `serial`, or `unroll`.
+     */
+    Function map(int n, const std::string &parallelization) const {
+        if (n <= 0) {
+            throw InvalidArgument("Function::map: batch size n must be positive");
+        }
+        return Function(fn_.map(n, parallelization));
+    }
+
+    /**
+     * @brief Create a batched version of this function with an explicit thread cap.
+     *
+     * @param n Number of batch samples
+     * @param parallelization Mapping backend selection
+     * @param max_num_threads Maximum number of worker threads for supported backends
+     * @return Function Batched Janus function wrapper
+     */
+    Function map(int n, MapParallelization parallelization, int max_num_threads) const {
+        return map(n, detail::to_casadi_parallelization(parallelization), max_num_threads);
+    }
+
+    /**
+     * @brief Create a batched version of this function with an explicit CasADi backend name.
+     *
+     * Advanced escape hatch for backend strings understood by CasADi, typically
+     * `openmp`, `serial`, or `unroll`.
+     */
+    Function map(int n, const std::string &parallelization, int max_num_threads) const {
+        if (n <= 0) {
+            throw InvalidArgument("Function::map: batch size n must be positive");
+        }
+        if (max_num_threads <= 0) {
+            throw InvalidArgument("Function::map: max_num_threads must be positive");
+        }
+        return Function(fn_.map(n, parallelization, max_num_threads));
+    }
+
   private:
+    explicit Function(casadi::Function fn) : fn_(std::move(fn)) {}
+
     casadi::Function fn_;
 
     template <typename Scalar, typename CasadiType>
