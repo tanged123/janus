@@ -69,6 +69,40 @@ auto select(const Cond &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
     return res;
 }
 
+inline bool is_symbolic_predicate(const SymbolicScalar &expr) {
+    if (expr.n_dep() == 0) {
+        return false;
+    }
+
+    switch (expr.op()) {
+    case casadi::OP_LT:
+    case casadi::OP_LE:
+    case casadi::OP_EQ:
+    case casadi::OP_NE:
+    case casadi::OP_AND:
+    case casadi::OP_OR:
+    case casadi::OP_NOT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline SymbolicScalar as_symbolic_predicate(const SymbolicScalar &expr) {
+    return is_symbolic_predicate(expr) ? expr : expr != 0;
+}
+
+template <typename Derived>
+SymbolicScalar count_symbolic_truthy(const Eigen::MatrixBase<Derived> &a) {
+    SymbolicScalar result = 0.0;
+    for (Eigen::Index i = 0; i < a.rows(); ++i) {
+        for (Eigen::Index j = 0; j < a.cols(); ++j) {
+            result = result + as_symbolic_predicate(a(i, j));
+        }
+    }
+    return result;
+}
+
 } // namespace logic_detail
 
 // --- where (Vector/Matrix) ---
@@ -447,8 +481,7 @@ template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a
 template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        // all is true if norm_inf(1 - a) == 0 (all a are 1)
-        return SymbolicScalar::norm_inf(1.0 - to_mx(a)) == 0;
+        return logic_detail::count_symbolic_truthy(a) == static_cast<double>(a.size());
     } else {
         return (a.array() != 0).all();
     }
@@ -463,8 +496,7 @@ template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
 template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        // any is true if norm_inf(a) > 0 (at least one non-zero)
-        return SymbolicScalar::norm_inf(to_mx(a)) != 0;
+        return logic_detail::count_symbolic_truthy(a) >= 1.0;
     } else {
         return (a.array() != 0).any();
     }

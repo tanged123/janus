@@ -113,6 +113,26 @@ TEST(OptiTest, MultipleConstraints) {
     EXPECT_NEAR(sol.value(x) + sol.value(y), 1.0, 1e-6);
 }
 
+TEST(OptiTest, AllConstraintConjunction) {
+    janus::Opti opti;
+
+    auto x = opti.variable(2, -0.5);
+    janus::SymbolicVector cond(2);
+    cond(0) = x(0) >= 0.0;
+    cond(1) = x(1) >= 0.0;
+
+    opti.subject_to(janus::all(cond));
+
+    auto objective = (x(0) - 1.0) * (x(0) - 1.0) + (x(1) - 2.0) * (x(1) - 2.0);
+    opti.minimize(objective);
+
+    auto sol = opti.solve({.verbose = false});
+    janus::NumericVector x_opt = sol.value(x);
+
+    EXPECT_NEAR(x_opt(0), 1.0, 1e-6);
+    EXPECT_NEAR(x_opt(1), 2.0, 1e-6);
+}
+
 TEST(OptiTest, VariableBounds) {
     janus::Opti opti;
 
