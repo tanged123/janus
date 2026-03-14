@@ -4,6 +4,8 @@
 #include "janus/math/Arithmetic.hpp"
 #include <Eigen/Dense>
 #include <optional>
+#include <type_traits>
+#include <utility>
 
 namespace janus {
 
@@ -39,6 +41,78 @@ auto trapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<Derived
 
     // Sum of element-wise product
     return (mean_y.array() * dx.array()).sum();
+}
+
+// --- cumtrapz(y, x) ---
+/**
+ * @brief Computes the cumulative trapezoidal integral.
+ *
+ * Returns a running integral with the same length as the inputs:
+ * out(0) = 0 and out(i) = integral from x(0) to x(i) using trapezoids.
+ *
+ * @tparam DerivedY Eigen vector type for Y
+ * @tparam DerivedX Eigen vector type for X
+ * @param y Values of function at x points
+ * @param x Grid points
+ * @return Vector of cumulative trapezoidal integrals
+ */
+template <typename DerivedY, typename DerivedX>
+auto cumtrapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<DerivedX> &x) {
+    using Scalar = std::decay_t<decltype(0.5 *
+                                         (std::declval<typename DerivedY::Scalar>() +
+                                          std::declval<typename DerivedY::Scalar>()) *
+                                         (std::declval<typename DerivedX::Scalar>() -
+                                          std::declval<typename DerivedX::Scalar>()))>;
+    JanusVector<Scalar> result(y.size());
+
+    if (y.size() != x.size()) {
+        throw InvalidArgument("cumtrapz: y and x must have the same size");
+    }
+
+    if (y.size() == 0) {
+        return result;
+    }
+
+    result(0) = Scalar(0.0);
+    for (Eigen::Index i = 1; i < y.size(); ++i) {
+        const auto interval = 0.5 * (y(i - 1) + y(i)) * (x(i) - x(i - 1));
+        result(i) = result(i - 1) + interval;
+    }
+
+    return result;
+}
+
+/**
+ * @brief Computes the cumulative trapezoidal integral with uniform spacing.
+ *
+ * Returns a running integral with the same length as the input:
+ * out(0) = 0 and out(i) = integral over the first i intervals.
+ *
+ * @tparam DerivedY Eigen vector type for Y
+ * @tparam Spacing Scalar spacing type
+ * @param y Values of function samples
+ * @param dx Uniform spacing between samples
+ * @return Vector of cumulative trapezoidal integrals
+ */
+template <typename DerivedY, JanusScalar Spacing = double>
+auto cumtrapz(const Eigen::MatrixBase<DerivedY> &y, const Spacing &dx = 1.0) {
+    using Scalar = std::decay_t<decltype(0.5 *
+                                         (std::declval<typename DerivedY::Scalar>() +
+                                          std::declval<typename DerivedY::Scalar>()) *
+                                         std::declval<Spacing>())>;
+    JanusVector<Scalar> result(y.size());
+
+    if (y.size() == 0) {
+        return result;
+    }
+
+    result(0) = Scalar(0.0);
+    for (Eigen::Index i = 1; i < y.size(); ++i) {
+        const auto interval = 0.5 * (y(i - 1) + y(i)) * dx;
+        result(i) = result(i - 1) + interval;
+    }
+
+    return result;
 }
 
 // --- gradient_1d(y, x) ---

@@ -178,6 +178,125 @@ TEST(SurrogateTests, SoftplusSymbolicDerivativesRemainSmoothAcrossLegacyThreshol
 }
 
 // ======================================================================
+// Smooth Approximation Suite Tests
+// ======================================================================
+
+TEST(SurrogateTests, SmoothAbsNumericConvergesToAbsoluteValue) {
+    constexpr double hardness = 80.0;
+
+    EXPECT_NEAR(smooth_abs(-2.0, hardness), 2.0, 1e-6);
+    EXPECT_NEAR(smooth_abs(-0.5, hardness), 0.5, 1e-6);
+    EXPECT_NEAR(smooth_abs(1.25, hardness), 1.25, 1e-6);
+    EXPECT_NEAR(smooth_abs(0.0, hardness), std::log(2.0) / hardness, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothAbsSymbolicDerivativesExistAtOrigin) {
+    constexpr double hardness = 20.0;
+
+    auto x = janus::sym("x");
+    auto expr = smooth_abs(x, hardness);
+    auto first = janus::jacobian(expr, x);
+    auto second = janus::hessian(expr, x);
+
+    janus::Function f({x}, {expr});
+    janus::Function first_fn({x}, {first});
+    janus::Function second_fn({x}, {second});
+
+    EXPECT_NEAR(f.eval(0.0)(0, 0), std::log(2.0) / hardness, 1e-10);
+    EXPECT_NEAR(first_fn.eval(0.0)(0, 0), 0.0, 1e-10);
+    EXPECT_NEAR(second_fn.eval(0.0)(0, 0), hardness, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothMaxMinNumericConvergeToHardOperators) {
+    constexpr double hardness = 100.0;
+
+    EXPECT_NEAR(smooth_max(1.0, 3.0, hardness), 3.0, 1e-10);
+    EXPECT_NEAR(smooth_min(1.0, 3.0, hardness), 1.0, 1e-10);
+    EXPECT_NEAR(smooth_max(-2.0, -5.0, hardness), -2.0, 1e-10);
+    EXPECT_NEAR(smooth_min(-2.0, -5.0, hardness), -5.0, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothMaxMinSymbolicGradientsExistAtTie) {
+    constexpr double hardness = 15.0;
+
+    auto a = janus::sym("a");
+    auto b = janus::sym("b");
+
+    auto smax = smooth_max(a, b, hardness);
+    auto smin = smooth_min(a, b, hardness);
+
+    auto grad_max = janus::jacobian(smax, a, b);
+    auto grad_min = janus::jacobian(smin, a, b);
+
+    janus::Function grad_max_fn({a, b}, {grad_max});
+    janus::Function grad_min_fn({a, b}, {grad_min});
+
+    auto max_grad = grad_max_fn.eval(0.0, 0.0);
+    auto min_grad = grad_min_fn.eval(0.0, 0.0);
+
+    EXPECT_NEAR(max_grad(0, 0), 0.5, 1e-10);
+    EXPECT_NEAR(max_grad(0, 1), 0.5, 1e-10);
+    EXPECT_NEAR(min_grad(0, 0), 0.5, 1e-10);
+    EXPECT_NEAR(min_grad(0, 1), 0.5, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothClampNumericConvergesToClamp) {
+    constexpr double hardness = 100.0;
+
+    EXPECT_NEAR(smooth_clamp(-2.0, 0.0, 1.0, hardness), 0.0, 1e-10);
+    EXPECT_NEAR(smooth_clamp(0.4, 0.0, 1.0, hardness), 0.4, 1e-10);
+    EXPECT_NEAR(smooth_clamp(2.0, 0.0, 1.0, hardness), 1.0, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothClampSymbolicGradientExistsAtBounds) {
+    constexpr double hardness = 25.0;
+
+    auto x = janus::sym("x");
+    auto expr = smooth_clamp(x, 0.0, 1.0, hardness);
+    auto grad = janus::jacobian(expr, x);
+
+    janus::Function grad_fn({x}, {grad});
+
+    const double grad_at_low = grad_fn.eval(0.0)(0, 0);
+    const double grad_at_high = grad_fn.eval(1.0)(0, 0);
+
+    EXPECT_GT(grad_at_low, 0.0);
+    EXPECT_LT(grad_at_low, 1.0);
+    EXPECT_GT(grad_at_high, 0.0);
+    EXPECT_LT(grad_at_high, 1.0);
+}
+
+TEST(SurrogateTests, KsMaxNumericConvergesToMaximum) {
+    constexpr double rho = 120.0;
+    const std::vector<double> values = {1.0, 2.0, 3.0};
+
+    EXPECT_NEAR(ks_max(values, rho), 3.0, 1e-10);
+
+    janus::NumericVector eigen_values(3);
+    eigen_values << 1.0, 2.0, 3.0;
+    EXPECT_NEAR(ks_max(eigen_values, rho), 3.0, 1e-10);
+}
+
+TEST(SurrogateTests, KsMaxSymbolicGradientExistsAndFormsConvexWeights) {
+    constexpr double rho = 9.0;
+
+    auto x = janus::sym("x");
+    auto y = janus::sym("y");
+    auto z = janus::sym("z");
+
+    auto expr = ks_max(std::vector<janus::SymbolicScalar>{x, y, z}, rho);
+    auto grad = janus::jacobian(expr, x, y, z);
+
+    janus::Function grad_fn({x, y, z}, {grad});
+    auto grad_val = grad_fn.eval(0.0, 0.0, 0.0);
+
+    EXPECT_NEAR(grad_val(0, 0), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val(0, 1), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val(0, 2), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val.row(0).sum(), 1.0, 1e-10);
+}
+
+// ======================================================================
 // Sigmoid Tests
 // ======================================================================
 
@@ -257,6 +376,13 @@ TEST(SurrogateTests, CoverageErrors) {
     std::vector<double> valid = {1.0, 2.0};
     EXPECT_THROW(janus::softmax(valid, -1.0), janus::InvalidArgument); // Invalid softness
     EXPECT_THROW(janus::softmax(valid, 0.0), janus::InvalidArgument);  // Invalid softness
+
+    EXPECT_THROW(janus::smooth_abs(0.0, 0.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_max(0.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_min(0.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_clamp(0.0, -1.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::ks_max(std::vector<double>{}, 1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::ks_max(std::vector<double>{1.0, 2.0}, 0.0), janus::InvalidArgument);
 }
 
 } // namespace test
