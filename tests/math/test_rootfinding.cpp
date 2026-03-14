@@ -108,31 +108,82 @@ TEST(RootFindingTest, ImplicitFunctionDerivative) {
 
     auto implicit_fn = create_implicit_function(g, x_guess);
 
-    // Compute Jacobian of implicit_fn w.r.t p
-    // implicit_fn takes p, returns x.
-
-    // We can use janus::jacobian? No, use CasADi jacobian on underlying
-    auto fn_casadi = implicit_fn.casadi_function();
-    auto J = fn_casadi.jacobian(); // Returns function computing jacobian
-
-    // Eval J at p=4
-    std::vector<double> args = {4.0};
-    auto j_res = J(std::vector<casadi::DM>{casadi::DM(args), casadi::DM(2.0)});
-    // Jacobian outputs are usually [J, x] or just J?
-    // Function::jacobian returns function with inputs [in..., out...] and output [jac]
-
-    // Easier way: Construct symbolic expression and diff
     auto p_sym = sym("p_sym");
-    auto x_sym = implicit_fn(p_sym)[0]; // Symbolic output
+    auto x_sym = implicit_fn(p_sym)[0];
 
-    // Jacobian of x_sym w.r.t p_sym
     auto jac = casadi::MX::jacobian(janus::to_mx(x_sym), p_sym);
 
-    // Eval jac at p=4
     casadi::Function j_fn("j_fn", {p_sym}, {jac});
     auto j_val = j_fn(std::vector<casadi::DM>{casadi::DM(4.0)});
 
     EXPECT_NEAR(double(j_val[0]), 0.25, 1e-6);
+}
+
+TEST(RootFindingTest, ImplicitFunctionMultiParameterDerivative) {
+    // G(x, a, b) = x^2 + a*x - b = 0
+    // At (a, b) = (3, 4), the positive root is x = 1,
+    // dx/da = -x / (2x + a) = -0.2 and dx/db = 1 / (2x + a) = 0.2.
+    auto x = sym("x");
+    auto a = sym("a");
+    auto b = sym("b");
+    auto residual = x * x + a * x - b;
+    Function g("g_parametric", {x, a, b}, {residual});
+
+    Eigen::VectorXd x_guess(1);
+    x_guess << 1.0;
+
+    auto implicit_fn = create_implicit_function(g, x_guess);
+
+    auto res = implicit_fn.eval(3.0, 4.0);
+    EXPECT_NEAR(res(0), 1.0, 1e-6);
+
+    auto a_sym = sym("a_sym");
+    auto b_sym = sym("b_sym");
+    auto x_sym = implicit_fn(a_sym, b_sym)[0];
+    auto ab_sym = casadi::MX::vertcat({a_sym, b_sym});
+    auto jac = casadi::MX::jacobian(janus::to_mx(x_sym), ab_sym);
+    casadi::Function j_fn("j_fn_multi", {a_sym, b_sym}, {jac});
+    auto j_val = j_fn(std::vector<casadi::DM>{casadi::DM(3.0), casadi::DM(4.0)});
+    std::vector<double> jac_vals = std::vector<double>(j_val[0]);
+
+    ASSERT_EQ(jac_vals.size(), 2u);
+    EXPECT_NEAR(jac_vals[0], -0.2, 1e-6);
+    EXPECT_NEAR(jac_vals[1], 0.2, 1e-6);
+}
+
+TEST(RootFindingTest, ImplicitFunctionCustomSlots) {
+    // Same implicit equation as above, but the unknown lives in input slot 1
+    // and the residual lives in output slot 1.
+    auto a = sym("a");
+    auto x = sym("x");
+    auto b = sym("b");
+    auto aux = a - b;
+    auto residual = x * x + a * x - b;
+    Function g("g_custom_slots", {a, x, b}, {aux, residual});
+
+    Eigen::VectorXd x_guess(1);
+    x_guess << 1.0;
+
+    ImplicitFunctionOptions implicit_opts;
+    implicit_opts.implicit_input_index = 1;
+    implicit_opts.implicit_output_index = 1;
+    auto implicit_fn = create_implicit_function(g, x_guess, {}, implicit_opts);
+
+    auto res = implicit_fn.eval(3.0, 4.0);
+    EXPECT_NEAR(res(0), 1.0, 1e-6);
+
+    auto a_sym = sym("a_sym_custom");
+    auto b_sym = sym("b_sym_custom");
+    auto x_sym = implicit_fn(a_sym, b_sym)[0];
+    auto ab_sym = casadi::MX::vertcat({a_sym, b_sym});
+    auto jac = casadi::MX::jacobian(janus::to_mx(x_sym), ab_sym);
+    casadi::Function j_fn("j_fn_custom", {a_sym, b_sym}, {jac});
+    auto j_val = j_fn(std::vector<casadi::DM>{casadi::DM(3.0), casadi::DM(4.0)});
+    std::vector<double> jac_vals = std::vector<double>(j_val[0]);
+
+    ASSERT_EQ(jac_vals.size(), 2u);
+    EXPECT_NEAR(jac_vals[0], -0.2, 1e-6);
+    EXPECT_NEAR(jac_vals[1], 0.2, 1e-6);
 }
 
 TEST(RootFindingTest, NewtonSolverClass) {

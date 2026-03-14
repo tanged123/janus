@@ -108,6 +108,27 @@ interpn(const std::vector<Eigen::VectorXd>& points,
 
 `Eigen::Matrix<Scalar, Dynamic, 1>` - Vector of interpolated values at each query point.
 
+### Symbolic Table Values
+
+`interpn()` also accepts a `janus::SymbolicVector` of table values. This keeps
+the lookup table coefficients inside the symbolic graph so they can be optimized
+directly:
+
+```cpp
+auto [table_values, table_values_mx] = janus::sym_vec_pair("table", 4);
+
+janus::NumericMatrix xi(1, 2);
+xi << 0.25, 0.75;
+
+auto result = janus::interpn(points, table_values, xi,
+                             janus::InterpolationMethod::Linear);
+```
+
+This parameterized-table path currently supports `Linear` and `BSpline`.
+`Hermite` and `Nearest` remain numeric-only for table values. The cached
+`janus::Interpolator` class still stores numeric tables; use the free
+`interpn()` overloads when the table itself must stay symbolic.
+
 #### Type Aliases (Recommended)
 
 Use Janus types for better readability:

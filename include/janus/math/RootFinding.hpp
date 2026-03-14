@@ -11,11 +11,21 @@ namespace janus {
  * @brief Options for root finding algorithms
  */
 struct RootFinderOptions {
-    double abstol = 1e-10;     // Absolute tolerance on residual
-    double abstolStep = 1e-10; // Tolerance on step size
-    int max_iter = 50;         // Maximum Newton iterations
-    bool line_search = true;   // Use line search for globalization
-    bool verbose = false;      // Print solver progress
+    double abstol = 1e-10;              // Absolute tolerance on residual
+    double abstolStep = 1e-10;          // Tolerance on step size
+    int max_iter = 50;                  // Maximum Newton iterations
+    bool line_search = true;            // Use line search for globalization
+    bool verbose = false;               // Print solver progress
+    std::string linear_solver = "qr";   // Linear solver used by CasADi rootfinder
+    casadi::Dict linear_solver_options; // Options forwarded to the linear solver
+};
+
+/**
+ * @brief Options for building differentiable implicit solve wrappers
+ */
+struct ImplicitFunctionOptions {
+    int implicit_input_index = 0;  // Input slot containing the unknown state
+    int implicit_output_index = 0; // Output slot containing the residual equation
 };
 
 /**
@@ -34,7 +44,12 @@ namespace detail {
 inline casadi::Dict opts_to_dict(const RootFinderOptions &opts) {
     casadi::Dict d;
     d["abstol"] = opts.abstol;
+    d["abstolStep"] = opts.abstolStep;
     d["max_iter"] = opts.max_iter;
+    d["linear_solver"] = opts.linear_solver;
+    if (!opts.linear_solver_options.empty()) {
+        d["linear_solver_options"] = opts.linear_solver_options;
+    }
     // CasADi rootfinder specific options mapping
     // "newton" plugin options:
     // "linear_solver": Linear solver to use
@@ -51,6 +66,61 @@ inline casadi::Dict opts_to_dict(const RootFinderOptions &opts) {
         d["print_out"] = true;
     }
     return d;
+}
+
+inline casadi::DM vector_to_dm(const Eigen::VectorXd &x) {
+    casadi::DM out(x.size(), 1);
+    for (Eigen::Index i = 0; i < x.size(); ++i) {
+        out(static_cast<int>(i), 0) = x(i);
+    }
+    return out;
+}
+
+inline std::string implicit_function_name(const casadi::Function &g_casadi) {
+    return g_casadi.name() + "_implicit";
+}
+
+inline void validate_implicit_problem(const casadi::Function &g_casadi,
+                                      const Eigen::VectorXd &x_guess,
+                                      const ImplicitFunctionOptions &implicit_opts) {
+    if (g_casadi.n_in() == 0 || g_casadi.n_out() == 0) {
+        throw InvalidArgument(
+            "create_implicit_function: G must have at least one input and one output");
+    }
+
+    if (implicit_opts.implicit_input_index < 0 ||
+        implicit_opts.implicit_input_index >= g_casadi.n_in()) {
+        throw InvalidArgument("create_implicit_function: implicit_input_index out of range");
+    }
+    if (implicit_opts.implicit_output_index < 0 ||
+        implicit_opts.implicit_output_index >= g_casadi.n_out()) {
+        throw InvalidArgument("create_implicit_function: implicit_output_index out of range");
+    }
+
+    const auto unknown_sparsity = g_casadi.sparsity_in(implicit_opts.implicit_input_index);
+    if (!unknown_sparsity.is_dense() || !unknown_sparsity.is_column()) {
+        throw InvalidArgument(
+            "create_implicit_function: implicit input must be a dense column vector");
+    }
+
+    const auto residual_sparsity = g_casadi.sparsity_out(implicit_opts.implicit_output_index);
+    if (!residual_sparsity.is_dense() || !residual_sparsity.is_column()) {
+        throw InvalidArgument(
+            "create_implicit_function: implicit output must be a dense column vector residual");
+    }
+
+    const auto n_unknown =
+        static_cast<Eigen::Index>(g_casadi.nnz_in(implicit_opts.implicit_input_index));
+    const auto n_residual =
+        static_cast<Eigen::Index>(g_casadi.nnz_out(implicit_opts.implicit_output_index));
+    if (n_unknown != n_residual) {
+        throw InvalidArgument(
+            "create_implicit_function: implicit input and output dimensions must match");
+    }
+    if (x_guess.size() != n_unknown) {
+        throw InvalidArgument("create_implicit_function: x_guess size must match the implicit "
+                              "input dimension");
+    }
 }
 
 } // namespace detail
@@ -160,45 +230,56 @@ RootResult<Scalar> rootfinder(const janus::Function &F,
 }
 
 /**
- * @brief Create a function solving implicit equation G(x, p) = 0 for x
+ * @brief Create a differentiable implicit solve wrapper for G(...) = 0
  *
- * Returns a function that takes parameters p and returns solution x.
+ * All non-implicit inputs of @p G become inputs of the returned function, in
+ * their original order and original shapes. CasADi's rootfinder provides the
+ * implicit sensitivities, so the returned function remains differentiable with
+ * respect to every remaining input.
  *
- * @param G Implicit function G(x, p) -> residual
- * @param x_guess Initial guess for x (defines dimension)
+ * @param G Implicit function containing the unknown input and residual output
+ * @param x_guess Fixed initial guess for the implicit solve
  * @param opts Solver options
- * @return janus::Function mapping p -> x(p)
+ * @param implicit_opts Selects which input/output pair defines the rootfinding problem
+ * @return janus::Function mapping the remaining inputs to x(...)
  */
 inline janus::Function create_implicit_function(const janus::Function &G,
                                                 const Eigen::VectorXd &x_guess,
-                                                const RootFinderOptions &opts = {}) {
+                                                const RootFinderOptions &opts = {},
+                                                const ImplicitFunctionOptions &implicit_opts = {}) {
     casadi::Function g_casadi = G.casadi_function();
+    detail::validate_implicit_problem(g_casadi, x_guess, implicit_opts);
 
-    // Create solver
-    // "implicit_solver": [x0, p] -> [x]
-    casadi::Function solver =
-        casadi::rootfinder("implicit_solver", "newton", g_casadi, detail::opts_to_dict(opts));
+    casadi::Dict solver_opts = detail::opts_to_dict(opts);
+    solver_opts["implicit_input"] = implicit_opts.implicit_input_index;
+    solver_opts["implicit_output"] = implicit_opts.implicit_output_index;
 
-    // We want to return a function [p] -> [x]
-    // The solver natively takes [x0, p]. We need to fix x0 to x_guess?
-    // Usually for implicit layers, x0 might depend on p or be fixed.
-    // If we want a clean p -> x interface, we can wrap it.
+    casadi::Function solver = casadi::rootfinder(detail::implicit_function_name(g_casadi), "newton",
+                                                 g_casadi, solver_opts);
 
-    // Define wrapper using MX
-    int n_p = g_casadi.n_in() > 1 ? g_casadi.size2_in(1) : 0; // Assuming 2nd input is p
-    int n_x = x_guess.size();
+    std::vector<SymbolicArg> wrapper_inputs;
+    wrapper_inputs.reserve(static_cast<std::size_t>(g_casadi.n_in() - 1));
 
-    SymbolicScalar p = SymbolicScalar::sym("p", n_p);
-    casadi::MX x0 =
-        casadi::DM(std::vector<double>(x_guess.data(), x_guess.data() + x_guess.size()));
+    std::vector<casadi::MX> solver_args;
+    solver_args.reserve(static_cast<std::size_t>(g_casadi.n_in()));
 
-    // Call solver
-    // Inputs: x0, p
-    SymbolicScalar x_sol = solver(std::vector<SymbolicScalar>{x0, p})[0];
+    const casadi::DM x0 = detail::vector_to_dm(x_guess);
+    for (int i = 0; i < g_casadi.n_in(); ++i) {
+        if (i == implicit_opts.implicit_input_index) {
+            solver_args.push_back(casadi::MX(x0));
+            continue;
+        }
 
-    // Create janus::Function
-    // Input: p, Output: x_sol
-    return janus::Function("implicit_fn", std::vector<SymbolicArg>{SymbolicArg(p)},
+        casadi::MX arg =
+            janus::sym(g_casadi.name_in(i), g_casadi.size1_in(i), g_casadi.size2_in(i));
+        wrapper_inputs.push_back(SymbolicArg(arg));
+        solver_args.push_back(arg);
+    }
+
+    const auto solver_outputs = solver(solver_args);
+    const casadi::MX x_sol = solver_outputs.at(implicit_opts.implicit_output_index);
+
+    return janus::Function(detail::implicit_function_name(g_casadi), wrapper_inputs,
                            std::vector<SymbolicArg>{SymbolicArg(x_sol)});
 }
 

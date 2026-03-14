@@ -14,6 +14,12 @@ void expect_hermite_symbolic_error(const janus::InterpolationError &err) {
     EXPECT_NE(message.find("BSpline"), std::string::npos);
 }
 
+void expect_symbolic_table_values_error(const janus::InterpolationError &err) {
+    const std::string message = err.what();
+    EXPECT_NE(message.find("symbolic table values"), std::string::npos);
+    EXPECT_NE(message.find("BSpline"), std::string::npos);
+}
+
 } // namespace
 
 // ============================================================================
@@ -380,6 +386,107 @@ TEST(InterpnTests, Symbolic2DLinear) {
 
     // Evaluate the symbolic result (no variables, just constants)
     EXPECT_NEAR(eval_scalar(result(0)), 1.0, 1e-9);
+}
+
+TEST(InterpnTests, SymbolicValues2DLinearWeights) {
+    janus::NumericVector x_pts(2);
+    x_pts << 0.0, 1.0;
+    janus::NumericVector y_pts(2);
+    y_pts << 0.0, 1.0;
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+
+    auto [values_vec, values_mx] = janus::sym_vec_pair("table_values", 4);
+    janus::SymbolicScalar qx = janus::sym("qx");
+    janus::SymbolicScalar qy = janus::sym("qy");
+    janus::SymbolicMatrix xi(1, 2);
+    xi(0, 0) = qx;
+    xi(0, 1) = qy;
+
+    auto result = janus::interpn(points, values_vec, xi, janus::InterpolationMethod::Linear);
+    auto jac = casadi::MX::jacobian(janus::to_mx(result), values_mx);
+    casadi::Function eval_fn("eval_parametric_linear", {qx, qy, values_mx},
+                             {janus::to_mx(result), jac});
+
+    auto outputs = eval_fn(std::vector<casadi::DM>{
+        casadi::DM(0.25), casadi::DM(0.75), casadi::DM(std::vector<double>{0.0, 1.0, 2.0, 3.0})});
+    std::vector<double> jacobian_values = std::vector<double>(outputs[1]);
+
+    EXPECT_NEAR(double(outputs[0]), 1.75, 1e-9);
+    ASSERT_EQ(jacobian_values.size(), 4u);
+    EXPECT_NEAR(jacobian_values[0], 0.1875, 1e-9);
+    EXPECT_NEAR(jacobian_values[1], 0.0625, 1e-9);
+    EXPECT_NEAR(jacobian_values[2], 0.5625, 1e-9);
+    EXPECT_NEAR(jacobian_values[3], 0.1875, 1e-9);
+}
+
+TEST(InterpnTests, SymbolicValuesInterpn2dLinear) {
+    janus::NumericVector x_pts(2);
+    x_pts << 0.0, 1.0;
+    janus::NumericVector y_pts(2);
+    y_pts << 0.0, 1.0;
+
+    janus::SymbolicScalar v00 = janus::sym("v00");
+    janus::SymbolicScalar v10 = janus::sym("v10");
+    janus::SymbolicScalar v01 = janus::sym("v01");
+    janus::SymbolicScalar v11 = janus::sym("v11");
+    janus::SymbolicMatrix values(2, 2);
+    values(0, 0) = v00;
+    values(1, 0) = v10;
+    values(0, 1) = v01;
+    values(1, 1) = v11;
+
+    janus::NumericMatrix xi(1, 2);
+    xi << 0.25, 0.75;
+
+    auto result = janus::interpn2d(x_pts, y_pts, values, xi, janus::InterpolationMethod::Linear);
+    casadi::Function eval_fn("eval_parametric_linear_2d", {v00, v10, v01, v11},
+                             {janus::to_mx(result)});
+    auto outputs = eval_fn(std::vector<casadi::DM>{casadi::DM(0.0), casadi::DM(1.0),
+                                                   casadi::DM(2.0), casadi::DM(3.0)});
+
+    EXPECT_NEAR(double(outputs[0]), 1.75, 1e-9);
+}
+
+TEST(InterpnTests, SymbolicValuesBSplineConstant) {
+    janus::NumericVector x_pts(4);
+    x_pts << 0.0, 1.0, 2.0, 3.0;
+    janus::NumericVector y_pts(4);
+    y_pts << 0.0, 1.0, 2.0, 3.0;
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
+
+    janus::SymbolicScalar c = janus::sym("c");
+    janus::SymbolicVector values(16);
+    for (int i = 0; i < values.size(); ++i) {
+        values(i) = c;
+    }
+
+    janus::NumericMatrix xi(1, 2);
+    xi << 1.5, 1.5;
+
+    auto result = janus::interpn(points, values, xi, janus::InterpolationMethod::BSpline);
+    auto jac = casadi::MX::jacobian(janus::to_mx(result), c);
+    casadi::Function eval_fn("eval_parametric_bspline", {c}, {janus::to_mx(result), jac});
+    auto outputs = eval_fn(std::vector<casadi::DM>{casadi::DM(3.25)});
+
+    EXPECT_NEAR(double(outputs[0]), 3.25, 1e-9);
+    EXPECT_NEAR(double(outputs[1]), 1.0, 1e-9);
+}
+
+TEST(InterpnTests, SymbolicValuesHermiteNotSupported) {
+    janus::NumericVector x_pts(4);
+    x_pts << 0.0, 1.0, 2.0, 3.0;
+    std::vector<janus::NumericVector> points = {x_pts};
+    auto values = janus::sym_vec("table_values_1d", 4);
+
+    janus::NumericMatrix xi(1, 1);
+    xi << 0.5;
+
+    try {
+        static_cast<void>(janus::interpn(points, values, xi, janus::InterpolationMethod::Hermite));
+        FAIL() << "Expected InterpolationError for Hermite with symbolic table values";
+    } catch (const janus::InterpolationError &err) {
+        expect_symbolic_table_values_error(err);
+    }
 }
 
 TEST(InterpnTests, Numeric3D) {
