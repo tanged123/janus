@@ -28,6 +28,9 @@ target_link_libraries(graph_visualization PRIVATE janus)
 add_executable(deep_graph_demo math/deep_graph_demo.cpp)
 target_link_libraries(deep_graph_demo PRIVATE janus)
 
+add_executable(sparse_derivative_pipeline math/sparse_derivative_pipeline.cpp)
+target_link_libraries(sparse_derivative_pipeline PRIVATE janus)
+
 # =============================================================================
 # Interpolation Examples
 # =============================================================================

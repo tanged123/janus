@@ -23,7 +23,7 @@
 
 - **Doxygen API Docs**: [https://tanged123.github.io/janus/index.html](https://tanged123.github.io/janus/index.html)
 - **Design Overview**: `docs/design_overview.md`
-- **User Guides**: `docs/user_guides/` (10 comprehensive guides)
+- **User Guides**: `docs/user_guides/` (comprehensive guides)
 
 ### Key Documentation Files
 
@@ -35,7 +35,7 @@
 | `docs/user_guides/optimization.md` | Opti interface usage |
 | `docs/user_guides/interpolation.md` | Interpolation utilities |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
-| `docs/user_guides/sparsity.md` | Sparsity pattern analysis |
+| `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
 | `docs/user_guides/collocation.md` | Direct collocation for trajectory optimization |
 | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | `docs/user_guides/transcription_methods.md` | Overview of trajectory optimization methods |
@@ -182,7 +182,7 @@ janus::as_vector(casadi_mx)    // MX → SymbolicVector
 | `JanusError.hpp` | Custom exception types | `InvalidArgument`, `IntegrationError`, `InterpolationError` |
 | `JanusIO.hpp` | I/O and graph visualization | `eval()`, `print()`, `to_dot()`, `graphviz()` |
 | `Function.hpp` | CasADi function wrapper | `Function` class for compiled symbolic functions |
-| `Sparsity.hpp` | Sparsity pattern analysis | `SparsityPattern`, `analyze_sparsity()`, `visualize_sparsity()` |
+| `Sparsity.hpp` | Sparsity analysis and sparse derivative kernels | `SparsityPattern`, `GraphColoring`, `sparse_jacobian()`, `sparse_hessian()`, `nan_propagation_sparsity()` |
 
 #### Key APIs in Core
 
@@ -202,6 +202,11 @@ janus::graphviz(expr, "output.pdf");
 // Function compilation
 janus::Function f("f", {x}, {result});
 auto output = f({5.0});
+
+// Sparse derivative kernels
+auto J = janus::sparse_jacobian(result, x);
+auto H = janus::sparse_hessian(objective, vars);
+auto nz = J.values(x_val);
 ```
 
 ---
@@ -501,7 +506,7 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
 | Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
-| Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, Jacobian structure |
+| Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
 | Collocation | `docs/user_guides/collocation.md` | Direct collocation transcription |
 | Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of trajectory methods |
