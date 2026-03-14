@@ -1,9 +1,12 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
-#include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
+#include <algorithm>
+#include <type_traits>
+#include <utility>
 
 namespace janus {
 
@@ -39,6 +42,34 @@ auto where(const Cond &cond, const T1 &if_true, const T2 &if_false) {
         return if_else(cond, if_true, if_false);
     }
 }
+
+namespace logic_detail {
+
+template <typename Cond, typename DerivedTrue, typename DerivedFalse>
+auto select(const Cond &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
+            const Eigen::MatrixBase<DerivedFalse> &if_false) {
+    if (if_true.rows() != if_false.rows() || if_true.cols() != if_false.cols()) {
+        throw InvalidArgument("select: matrix inputs must have the same shape");
+    }
+
+    using ResultScalar = std::decay_t<decltype(janus::where(
+        std::declval<Cond>(), std::declval<typename DerivedTrue::Scalar>(),
+        std::declval<typename DerivedFalse::Scalar>()))>;
+    using ResultMatrix =
+        Eigen::Matrix<ResultScalar, DerivedTrue::RowsAtCompileTime, DerivedTrue::ColsAtCompileTime,
+                      DerivedTrue::Options, DerivedTrue::MaxRowsAtCompileTime,
+                      DerivedTrue::MaxColsAtCompileTime>;
+
+    ResultMatrix res(if_true.rows(), if_true.cols());
+    for (Eigen::Index i = 0; i < if_true.rows(); ++i) {
+        for (Eigen::Index j = 0; j < if_true.cols(); ++j) {
+            res(i, j) = janus::where(cond, if_true(i, j), if_false(i, j));
+        }
+    }
+    return res;
+}
+
+} // namespace logic_detail
 
 // --- where (Vector/Matrix) ---
 /**

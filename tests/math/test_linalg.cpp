@@ -1,5 +1,7 @@
 #include "../utils/TestUtils.hpp"
+#include <cmath>
 #include <gtest/gtest.h>
+#include <janus/core/Function.hpp>
 #include <janus/core/JanusIO.hpp>
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp>
@@ -155,6 +157,88 @@ TEST(LinalgTests, CoverageEdges) {
     janus::SymbolicVector vs = janus::as_vector(janus::to_mx(v));
     auto n_def = janus::norm(vs, static_cast<janus::NormType>(999));
     EXPECT_DOUBLE_EQ(janus::eval(n_def), 3.0);
+}
+
+namespace {
+
+void expect_eigen_residual(const janus::NumericMatrix &A, const janus::NumericVector &eigenvalues,
+                           const janus::NumericMatrix &eigenvectors, double tol) {
+    EXPECT_TRUE((A * eigenvectors).isApprox(eigenvectors * eigenvalues.asDiagonal(), tol));
+}
+
+} // namespace
+
+TEST(LinalgTests, EigSymmetricNumeric) {
+    janus::NumericMatrix A(2, 2);
+    A << 2.0, 1.0, 1.0, 2.0;
+
+    auto decomp = janus::eig_symmetric(A);
+
+    ASSERT_EQ(decomp.eigenvalues.size(), 2);
+    ASSERT_EQ(decomp.eigenvectors.rows(), 2);
+    ASSERT_EQ(decomp.eigenvectors.cols(), 2);
+    EXPECT_NEAR(decomp.eigenvalues(0), 1.0, 1e-12);
+    EXPECT_NEAR(decomp.eigenvalues(1), 3.0, 1e-12);
+    expect_eigen_residual(A, decomp.eigenvalues, decomp.eigenvectors, 1e-12);
+    EXPECT_TRUE((decomp.eigenvectors.transpose() * decomp.eigenvectors)
+                    .isApprox(janus::NumericMatrix::Identity(2, 2), 1e-12));
+}
+
+TEST(LinalgTests, EigNumericRealSpectrum) {
+    janus::NumericMatrix A(2, 2);
+    A << 1.0, 1.0, 0.0, 2.0;
+
+    auto decomp = janus::eig(A);
+
+    ASSERT_EQ(decomp.eigenvalues.size(), 2);
+    EXPECT_NEAR(decomp.eigenvalues(0), 1.0, 1e-12);
+    EXPECT_NEAR(decomp.eigenvalues(1), 2.0, 1e-12);
+    expect_eigen_residual(A, decomp.eigenvalues, decomp.eigenvectors, 1e-12);
+}
+
+TEST(LinalgTests, EigRejectsComplexSpectrum) {
+    janus::NumericMatrix A(2, 2);
+    A << 0.0, -1.0, 1.0, 0.0;
+
+    EXPECT_THROW(janus::eig(A), janus::InvalidArgument);
+}
+
+TEST(LinalgTests, EigSymmetricRejectsNonsymmetricNumeric) {
+    janus::NumericMatrix A(2, 2);
+    A << 1.0, 2.0, 0.0, 1.0;
+
+    EXPECT_THROW(janus::eig_symmetric(A), janus::InvalidArgument);
+}
+
+TEST(LinalgTests, EigSymmetricSymbolic3x3) {
+    auto t = janus::sym("t");
+    janus::SymbolicMatrix A(3, 3);
+    A << 4.0, t, 0.0, t, 2.0, 0.0, 0.0, 0.0, 1.0;
+
+    auto decomp = janus::eig_symmetric(A);
+    janus::Function f({t}, {janus::to_mx(decomp.eigenvalues), janus::to_mx(decomp.eigenvectors)});
+    auto outputs = f(0.5);
+
+    ASSERT_EQ(outputs.size(), 2);
+    janus::NumericVector eigenvalues = outputs[0].col(0);
+    const janus::NumericMatrix eigenvectors = outputs[1];
+
+    EXPECT_NEAR(eigenvalues(0), 1.0, 1e-9);
+    EXPECT_NEAR(eigenvalues(1), 3.0 - 0.5 * std::sqrt(5.0), 1e-9);
+    EXPECT_NEAR(eigenvalues(2), 3.0 + 0.5 * std::sqrt(5.0), 1e-9);
+
+    janus::NumericMatrix A_eval(3, 3);
+    A_eval << 4.0, 0.5, 0.0, 0.5, 2.0, 0.0, 0.0, 0.0, 1.0;
+    expect_eigen_residual(A_eval, eigenvalues, eigenvectors, 1e-8);
+    EXPECT_TRUE((eigenvectors.transpose() * eigenvectors)
+                    .isApprox(janus::NumericMatrix::Identity(3, 3), 1e-8));
+}
+
+TEST(LinalgTests, EigSymbolicRejectsGeneralMatrices) {
+    auto A_mx = janus::sym("A", 2, 2);
+    auto A = janus::to_eigen(A_mx);
+
+    EXPECT_THROW(janus::eig(A), janus::InvalidArgument);
 }
 
 // =============================================================================

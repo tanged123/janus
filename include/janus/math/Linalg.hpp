@@ -2,8 +2,18 @@
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
+#include "janus/math/Arithmetic.hpp"
+#include "janus/math/Logic.hpp"
+#include "janus/math/Trig.hpp"
 #include <Eigen/Dense>
+#include <algorithm>
+#include <array>
 #include <casadi/casadi.hpp>
+#include <cmath>
+#include <complex>
+#include <limits>
+#include <numeric>
+#include <vector>
 
 namespace janus {
 
@@ -186,6 +196,292 @@ auto norm(const Eigen::MatrixBase<Derived> &x, NormType type = NormType::L2) {
 
 // Backwards compatibility overload for just L2 norm (default handled above really, but if called
 // without args, it works)
+
+template <typename Scalar> struct EigenDecomposition {
+    JanusVector<Scalar> eigenvalues;
+    JanusMatrix<Scalar> eigenvectors;
+};
+
+namespace detail {
+
+template <typename Scalar> JanusVector<Scalar> normalize_vector(const JanusVector<Scalar> &v) {
+    const auto v_norm = janus::norm(v);
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        if (v_norm <= std::numeric_limits<Scalar>::epsilon()) {
+            throw InvalidArgument("eigendecomposition: eigenvector construction failed");
+        }
+    }
+    return v / v_norm;
+}
+
+template <typename Scalar>
+JanusVector<Scalar> best_eigenvector_candidate(const std::array<JanusVector<Scalar>, 3> &cands) {
+    const auto n01 = janus::dot(cands[0], cands[0]);
+    const auto n02 = janus::dot(cands[1], cands[1]);
+    const auto n12 = janus::dot(cands[2], cands[2]);
+
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        const auto *best = &cands[0];
+        Scalar best_norm = n01;
+        if (n02 > best_norm) {
+            best = &cands[1];
+            best_norm = n02;
+        }
+        if (n12 > best_norm) {
+            best = &cands[2];
+        }
+        return normalize_vector(*best);
+    } else {
+        auto best = janus::logic_detail::select(n02 > n01, cands[1], cands[0]);
+        auto best_norm = janus::where(n02 > n01, n02, n01);
+        best = janus::logic_detail::select(n12 > best_norm, cands[2], best);
+        return normalize_vector(best);
+    }
+}
+
+template <typename Scalar>
+JanusVector<Scalar> symmetric_eigenvector_2x2(const JanusMatrix<Scalar> &A, const Scalar &lambda) {
+    JanusVector<Scalar> first(2);
+    first << A(0, 1), lambda - A(0, 0);
+
+    JanusVector<Scalar> second(2);
+    second << lambda - A(1, 1), A(1, 0);
+
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        return normalize_vector(janus::dot(first, first) >= janus::dot(second, second) ? first
+                                                                                       : second);
+    } else {
+        return normalize_vector(janus::logic_detail::select(
+            janus::dot(first, first) >= janus::dot(second, second), first, second));
+    }
+}
+
+template <typename Scalar>
+JanusVector<Scalar> symmetric_eigenvector_3x3(const JanusMatrix<Scalar> &A, const Scalar &lambda) {
+    JanusMatrix<Scalar> shifted = A;
+    shifted(0, 0) = shifted(0, 0) - lambda;
+    shifted(1, 1) = shifted(1, 1) - lambda;
+    shifted(2, 2) = shifted(2, 2) - lambda;
+
+    const JanusVector<Scalar> r0 = shifted.row(0).transpose();
+    const JanusVector<Scalar> r1 = shifted.row(1).transpose();
+    const JanusVector<Scalar> r2 = shifted.row(2).transpose();
+
+    return best_eigenvector_candidate<Scalar>(
+        {janus::cross(r0, r1), janus::cross(r0, r2), janus::cross(r1, r2)});
+}
+
+template <typename Scalar> Scalar determinant_3x3(const JanusMatrix<Scalar> &A) {
+    return A(0, 0) * (A(1, 1) * A(2, 2) - A(1, 2) * A(2, 1)) -
+           A(0, 1) * (A(1, 0) * A(2, 2) - A(1, 2) * A(2, 0)) +
+           A(0, 2) * (A(1, 0) * A(2, 1) - A(1, 1) * A(2, 0));
+}
+
+template <typename Scalar>
+void sort_eigenpairs(JanusVector<Scalar> &eigenvalues, JanusMatrix<Scalar> &eigenvectors) {
+    std::vector<Eigen::Index> order(static_cast<size_t>(eigenvalues.size()));
+    std::iota(order.begin(), order.end(), Eigen::Index{0});
+    std::sort(order.begin(), order.end(), [&](Eigen::Index lhs, Eigen::Index rhs) {
+        return eigenvalues(lhs) < eigenvalues(rhs);
+    });
+
+    JanusVector<Scalar> sorted_values(eigenvalues.size());
+    JanusMatrix<Scalar> sorted_vectors(eigenvectors.rows(), eigenvectors.cols());
+    for (Eigen::Index i = 0; i < eigenvalues.size(); ++i) {
+        sorted_values(i) = eigenvalues(order[static_cast<size_t>(i)]);
+        sorted_vectors.col(i) = eigenvectors.col(order[static_cast<size_t>(i)]);
+    }
+
+    eigenvalues = std::move(sorted_values);
+    eigenvectors = std::move(sorted_vectors);
+}
+
+template <typename Scalar>
+EigenDecomposition<Scalar> eig_symmetric_symbolic(const JanusMatrix<Scalar> &A) {
+    if (A.rows() != A.cols()) {
+        throw InvalidArgument("eig_symmetric: input must be square");
+    }
+
+    if (A.rows() == 1) {
+        EigenDecomposition<Scalar> result;
+        result.eigenvalues.resize(1);
+        result.eigenvalues(0) = A(0, 0);
+        result.eigenvectors = JanusMatrix<Scalar>::Identity(1, 1);
+        return result;
+    }
+
+    if (A.rows() == 2) {
+        const Scalar trace = A(0, 0) + A(1, 1);
+        const Scalar disc = janus::sqrt((A(0, 0) - A(1, 1)) * (A(0, 0) - A(1, 1)) +
+                                        Scalar(4.0) * A(0, 1) * A(0, 1));
+
+        EigenDecomposition<Scalar> result;
+        result.eigenvalues.resize(2);
+        result.eigenvalues(0) = Scalar(0.5) * (trace - disc);
+        result.eigenvalues(1) = Scalar(0.5) * (trace + disc);
+
+        result.eigenvectors.resize(2, 2);
+        result.eigenvectors.col(0) = symmetric_eigenvector_2x2(A, result.eigenvalues(0));
+        result.eigenvectors.col(1) = symmetric_eigenvector_2x2(A, result.eigenvalues(1));
+        return result;
+    }
+
+    if (A.rows() == 3) {
+        const Scalar q = (A(0, 0) + A(1, 1) + A(2, 2)) / Scalar(3.0);
+        const Scalar p1 = A(0, 1) * A(0, 1) + A(0, 2) * A(0, 2) + A(1, 2) * A(1, 2);
+        const Scalar a00 = A(0, 0) - q;
+        const Scalar a11 = A(1, 1) - q;
+        const Scalar a22 = A(2, 2) - q;
+        const Scalar p2 = a00 * a00 + a11 * a11 + a22 * a22 + Scalar(2.0) * p1;
+
+        if constexpr (std::is_floating_point_v<Scalar>) {
+            if (p2 <= std::numeric_limits<Scalar>::epsilon()) {
+                EigenDecomposition<Scalar> result;
+                result.eigenvalues = JanusVector<Scalar>::Constant(3, q);
+                result.eigenvectors = JanusMatrix<Scalar>::Identity(3, 3);
+                return result;
+            }
+        }
+
+        const auto has_spread = p2 > Scalar(0.0);
+        const Scalar p = janus::where(has_spread, janus::sqrt(p2 / Scalar(6.0)), Scalar(1.0));
+
+        JanusMatrix<Scalar> centered = A;
+        centered(0, 0) = centered(0, 0) - q;
+        centered(1, 1) = centered(1, 1) - q;
+        centered(2, 2) = centered(2, 2) - q;
+        const JanusMatrix<Scalar> B = centered / p;
+
+        const Scalar r = janus::clamp(determinant_3x3(B) / Scalar(2.0), -1.0, 1.0);
+        const Scalar phi = janus::where(has_spread, janus::acos(r) / Scalar(3.0), Scalar(0.0));
+
+        constexpr double kTwoPiOverThree = 2.0943951023931954923;
+        Scalar largest = q + Scalar(2.0) * p * janus::cos(phi);
+        Scalar smallest = q + Scalar(2.0) * p * janus::cos(phi + Scalar(kTwoPiOverThree));
+        Scalar middle = Scalar(3.0) * q - largest - smallest;
+
+        largest = janus::where(has_spread, largest, q);
+        middle = janus::where(has_spread, middle, q);
+        smallest = janus::where(has_spread, smallest, q);
+
+        EigenDecomposition<Scalar> result;
+        result.eigenvalues.resize(3);
+        result.eigenvalues << smallest, middle, largest;
+
+        JanusMatrix<Scalar> vectors(3, 3);
+        vectors.col(0) = symmetric_eigenvector_3x3(A, smallest);
+        vectors.col(1) = symmetric_eigenvector_3x3(A, middle);
+        vectors.col(2) = symmetric_eigenvector_3x3(A, largest);
+
+        const JanusMatrix<Scalar> identity = JanusMatrix<Scalar>::Identity(3, 3);
+        result.eigenvectors = janus::logic_detail::select(has_spread, vectors, identity);
+        return result;
+    }
+
+    throw InvalidArgument(
+        "eig_symmetric: symbolic support is limited to 1x1, 2x2, and 3x3 matrices");
+}
+
+} // namespace detail
+
+// --- Eigendecomposition ---
+/**
+ * @brief Computes the eigendecomposition of a square matrix with a real spectrum.
+ *
+ * Returns eigenvalues in ascending order and eigenvectors as columns of the returned matrix.
+ * Numeric matrices use Eigen's general eigensolver. Symbolic MX matrices are not supported in the
+ * general case because CasADi does not expose a compatible MX eigendecomposition.
+ */
+template <typename Derived> auto eig(const Eigen::MatrixBase<Derived> &A) {
+    using Scalar = typename Derived::Scalar;
+
+    if (A.rows() != A.cols()) {
+        throw InvalidArgument("eig: input must be square");
+    }
+
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        using Matrix = JanusMatrix<Scalar>;
+        using Complex = std::complex<Scalar>;
+        using ComplexMatrix = Eigen::Matrix<Complex, Eigen::Dynamic, Eigen::Dynamic>;
+        using ComplexVector = Eigen::Matrix<Complex, Eigen::Dynamic, 1>;
+
+        if (A.rows() == 1) {
+            EigenDecomposition<Scalar> result;
+            result.eigenvalues.resize(1);
+            result.eigenvalues(0) = A(0, 0);
+            result.eigenvectors = Matrix::Identity(1, 1);
+            return result;
+        }
+
+        Eigen::EigenSolver<Matrix> solver(A.eval());
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("eig: EigenSolver failed");
+        }
+
+        const ComplexVector values_complex = solver.eigenvalues();
+        const ComplexMatrix vectors_complex = solver.eigenvectors();
+        constexpr Scalar kImagTol = Scalar(1e-10);
+
+        for (Eigen::Index i = 0; i < values_complex.size(); ++i) {
+            if (std::abs(values_complex(i).imag()) > kImagTol) {
+                throw InvalidArgument("eig: complex eigenvalues are not supported");
+            }
+        }
+
+        for (Eigen::Index i = 0; i < vectors_complex.rows(); ++i) {
+            for (Eigen::Index j = 0; j < vectors_complex.cols(); ++j) {
+                if (std::abs(vectors_complex(i, j).imag()) > kImagTol) {
+                    throw InvalidArgument("eig: complex eigenvectors are not supported");
+                }
+            }
+        }
+
+        EigenDecomposition<Scalar> result;
+        result.eigenvalues = values_complex.real();
+        result.eigenvectors = vectors_complex.real();
+        detail::sort_eigenpairs(result.eigenvalues, result.eigenvectors);
+        return result;
+    } else {
+        throw InvalidArgument(
+            "eig: symbolic general eigendecomposition is not supported for CasADi MX; use "
+            "eig_symmetric() for 1x1, 2x2, or 3x3 symmetric matrices");
+    }
+}
+
+/**
+ * @brief Computes the eigendecomposition of a symmetric matrix.
+ *
+ * Returns eigenvalues in ascending order and orthonormal eigenvectors as columns.
+ * Numeric matrices delegate to Eigen's SelfAdjointEigenSolver. Symbolic MX matrices support only
+ * 1x1, 2x2, and 3x3 symmetric inputs.
+ */
+template <typename Derived> auto eig_symmetric(const Eigen::MatrixBase<Derived> &A) {
+    using Scalar = typename Derived::Scalar;
+
+    if (A.rows() != A.cols()) {
+        throw InvalidArgument("eig_symmetric: input must be square");
+    }
+
+    if constexpr (std::is_floating_point_v<Scalar>) {
+        if (!A.isApprox(A.transpose(), 1e-12)) {
+            throw InvalidArgument("eig_symmetric: numeric input must be symmetric");
+        }
+
+        using Matrix = JanusMatrix<Scalar>;
+        Eigen::SelfAdjointEigenSolver<Matrix> solver(A.eval());
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("eig_symmetric: SelfAdjointEigenSolver failed");
+        }
+
+        EigenDecomposition<Scalar> result;
+        result.eigenvalues = solver.eigenvalues();
+        result.eigenvectors = solver.eigenvectors();
+        detail::sort_eigenpairs(result.eigenvalues, result.eigenvectors);
+        return result;
+    } else {
+        return detail::eig_symmetric_symbolic(A.eval());
+    }
+}
 
 // --- Explicit 3x3 Symmetric Inverse (AeroSandbox Helper) ---
 /**
