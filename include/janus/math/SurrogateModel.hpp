@@ -121,19 +121,31 @@ template <typename T1, typename T2> auto softmin(const T1 &a, const T2 &b, doubl
  *
  * @param x Input value
  * @param beta Sharpness parameter (default 1.0). Higher = closer to ReLU.
- * @param threshold Stability threshold (default 20.0). For beta*x > threshold, returns x (linear).
+ * @param threshold Retained for backwards compatibility. Unused by the smooth implementation.
  * @return Softplus value
  */
-template <typename T> auto softplus(const T &x, double beta = 1.0, double threshold = 20.0) {
-    // Logic:
-    // if (beta * x > threshold) return x
-    // else return (1/beta) * log(1 + exp(beta * x))
+namespace detail {
+template <std::floating_point T> auto softplus_scalar(const T &x, double beta) {
+    const auto bx = beta * x;
+    const auto shift = bx > 0.0 ? bx : 0.0;
+    return (shift + std::log(std::exp(-shift) + std::exp(bx - shift))) / beta;
+}
 
-    auto bx = beta * x;
-    auto linear_approx = x;
-    auto smooth_approx = (1.0 / beta) * janus::log(1.0 + janus::exp(bx));
+inline auto softplus_scalar(const SymbolicScalar &x, double beta) {
+    const auto bx = beta * x;
+    return SymbolicScalar::logsumexp(SymbolicScalar::vertcat({SymbolicScalar(0.0), bx})) / beta;
+}
+} // namespace detail
 
-    return janus::where(bx > threshold, linear_approx, smooth_approx);
+template <JanusScalar T> auto softplus(const T &x, double beta = 1.0, double /*threshold*/ = 20.0) {
+    return detail::softplus_scalar(x, beta);
+}
+
+template <typename Derived>
+auto softplus(const Eigen::MatrixBase<Derived> &x, double beta = 1.0, double threshold = 20.0) {
+    using Scalar = typename Derived::Scalar;
+    return x.derived().unaryExpr(
+        [beta, threshold](const Scalar &v) { return janus::softplus(v, beta, threshold); });
 }
 
 // ======================================================================

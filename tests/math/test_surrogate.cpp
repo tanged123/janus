@@ -5,6 +5,27 @@
 
 namespace janus {
 namespace test {
+namespace {
+
+template <typename Fn> double forward_difference(Fn &&fn, double x, double h) {
+    return (fn(x + h) - fn(x)) / h;
+}
+
+template <typename Fn> double backward_difference(Fn &&fn, double x, double h) {
+    return (fn(x) - fn(x - h)) / h;
+}
+
+template <typename Fn> double forward_second_difference(Fn &&fn, double x, double h) {
+    return (fn(x + 2.0 * h) - 2.0 * fn(x + h) + fn(x)) / (h * h);
+}
+
+template <typename Fn> double backward_second_difference(Fn &&fn, double x, double h) {
+    return (fn(x) - 2.0 * fn(x - h) + fn(x - 2.0 * h)) / (h * h);
+}
+
+double logistic(double x) { return 1.0 / (1.0 + std::exp(-x)); }
+
+} // namespace
 
 // ======================================================================
 // Softmax Tests
@@ -86,14 +107,74 @@ TEST(SurrogateTests, SoftplusNumeric) {
     EXPECT_NEAR(softplus(-100.0), 0.0, 1e-5);
 
     // Large positive -> linear
-    EXPECT_NEAR(softplus(100.0), 100.0, 1e-5);
+    EXPECT_NEAR(softplus(1000.0), 1000.0, 1e-5);
 }
 
 TEST(SurrogateTests, SoftplusSymbolic) {
     auto x = janus::sym("x");
     auto expr = softplus(x);
-    double val = janus::Function({x}, {expr}).eval(0.0)(0, 0);
-    EXPECT_NEAR(val, std::log(2.0), 1e-5);
+    janus::Function f({x}, {expr});
+
+    EXPECT_NEAR(f.eval(0.0)(0, 0), std::log(2.0), 1e-5);
+    EXPECT_NEAR(f.eval(1000.0)(0, 0), 1000.0, 1e-5);
+}
+
+TEST(SurrogateTests, SoftplusNumericDerivativesRemainSmoothAcrossLegacyThreshold) {
+    constexpr double beta = 3.0;
+    constexpr double threshold = 2.0;
+    constexpr double transition = threshold / beta;
+    constexpr double h = 1e-4;
+
+    auto fn = [&](double x) { return softplus(x, beta, threshold); };
+
+    const double d1_left = backward_difference(fn, transition, h);
+    const double d1_right = forward_difference(fn, transition, h);
+    const double d2_left = backward_second_difference(fn, transition, h);
+    const double d2_right = forward_second_difference(fn, transition, h);
+
+    const double sigma = logistic(beta * transition);
+    const double expected_second = beta * sigma * (1.0 - sigma);
+
+    EXPECT_NEAR(d1_left, sigma, 5e-4);
+    EXPECT_NEAR(d1_right, sigma, 5e-4);
+    EXPECT_NEAR(d1_left, d1_right, 5e-4);
+
+    EXPECT_NEAR(d2_left, expected_second, 5e-3);
+    EXPECT_NEAR(d2_right, expected_second, 5e-3);
+    EXPECT_NEAR(d2_left, d2_right, 5e-3);
+}
+
+TEST(SurrogateTests, SoftplusSymbolicDerivativesRemainSmoothAcrossLegacyThreshold) {
+    constexpr double beta = 3.0;
+    constexpr double threshold = 2.0;
+    constexpr double transition = threshold / beta;
+    constexpr double h = 1e-4;
+
+    auto x = janus::sym("x");
+    auto expr = softplus(x, beta, threshold);
+    auto first = janus::jacobian(expr, x);
+    auto second = janus::hessian(expr, x);
+
+    janus::Function first_fn({x}, {first});
+    janus::Function second_fn({x}, {second});
+
+    const double d1_left = first_fn.eval(transition - h)(0, 0);
+    const double d1_right = first_fn.eval(transition + h)(0, 0);
+    const double d2_left = second_fn.eval(transition - h)(0, 0);
+    const double d2_right = second_fn.eval(transition + h)(0, 0);
+
+    const double sigma_left = logistic(beta * (transition - h));
+    const double sigma_right = logistic(beta * (transition + h));
+    const double expected_second_left = beta * sigma_left * (1.0 - sigma_left);
+    const double expected_second_right = beta * sigma_right * (1.0 - sigma_right);
+
+    EXPECT_NEAR(d1_left, sigma_left, 1e-9);
+    EXPECT_NEAR(d1_right, sigma_right, 1e-9);
+    EXPECT_NEAR(d1_left, d1_right, 1e-3);
+
+    EXPECT_NEAR(d2_left, expected_second_left, 1e-9);
+    EXPECT_NEAR(d2_right, expected_second_right, 1e-9);
+    EXPECT_NEAR(d2_left, d2_right, 1e-3);
 }
 
 // ======================================================================

@@ -3,6 +3,18 @@
 #include <janus/core/JanusTypes.hpp>
 #include <janus/janus.hpp>
 #include <janus/math/Interpolate.hpp>
+#include <string>
+
+namespace {
+
+void expect_hermite_symbolic_error(const janus::InterpolationError &err) {
+    const std::string message = err.what();
+    EXPECT_NE(message.find("Hermite/Catmull-Rom"), std::string::npos);
+    EXPECT_NE(message.find("runtime comparisons"), std::string::npos);
+    EXPECT_NE(message.find("BSpline"), std::string::npos);
+}
+
+} // namespace
 
 // ============================================================================
 // Interp1D Tests (1D Interpolation Class)
@@ -157,9 +169,34 @@ TEST(Interp1DTests, HermiteSymbolicNotSupported) {
 
     janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
 
-    // Symbolic should throw
-    janus::SymbolicScalar query = casadi::MX(1.5);
-    EXPECT_THROW(interp(query), janus::InterpolationError);
+    // Symbolic should throw with guidance toward BSpline
+    janus::SymbolicScalar query = janus::sym("q");
+    try {
+        static_cast<void>(interp(query));
+        FAIL() << "Expected InterpolationError for symbolic Hermite query";
+    } catch (const janus::InterpolationError &err) {
+        expect_hermite_symbolic_error(err);
+    }
+}
+
+TEST(Interp1DTests, HermiteSymbolicBatchNotSupported) {
+    janus::NumericVector x(4);
+    x << 0, 1, 2, 3;
+    janus::NumericVector y(4);
+    y << 0, 1, 4, 9;
+
+    janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
+
+    janus::SymbolicMatrix queries(2, 1);
+    queries(0, 0) = janus::sym("q0");
+    queries(1, 0) = janus::sym("q1");
+
+    try {
+        static_cast<void>(interp(queries));
+        FAIL() << "Expected InterpolationError for symbolic Hermite batch query";
+    } catch (const janus::InterpolationError &err) {
+        expect_hermite_symbolic_error(err);
+    }
 }
 
 TEST(Interp1DTests, BSplineSymbolic) {
@@ -1364,9 +1401,13 @@ TEST(InterpnTests, HermiteSymbolicNotSupported) {
     janus::SymbolicMatrix xi(1, 1);
     xi(0, 0) = casadi::MX(0.5);
 
-    EXPECT_THROW(janus::interpn<janus::SymbolicScalar>(points, values, xi,
-                                                       janus::InterpolationMethod::Hermite),
-                 janus::InterpolationError);
+    try {
+        static_cast<void>(janus::interpn<janus::SymbolicScalar>(
+            points, values, xi, janus::InterpolationMethod::Hermite));
+        FAIL() << "Expected InterpolationError for symbolic Hermite interpn query";
+    } catch (const janus::InterpolationError &err) {
+        expect_hermite_symbolic_error(err);
+    }
 }
 
 // ============================================================================

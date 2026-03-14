@@ -92,6 +92,11 @@ inline std::string method_to_casadi_string(InterpolationMethod method) {
     }
 }
 
+inline const char *hermite_symbolic_error_message() {
+    return "Interpolator: Hermite/Catmull-Rom is numeric-only because interval selection "
+           "requires runtime comparisons. Use BSpline for symbolic or optimization queries.";
+}
+
 /**
  * @brief Flatten N-D values array in Fortran order for CasADi
  *
@@ -306,8 +311,9 @@ inline double hermite_interpn_numeric(const std::vector<std::vector<double>> &gr
  * (casadi::MX) evaluation via the same interface.
  *
  * For numeric queries, all methods (Linear, Hermite, BSpline, Nearest) are supported.
- * For symbolic queries, only Linear and BSpline are supported (Hermite and Nearest
- * require runtime interval finding which is incompatible with symbolic graphs).
+ * For symbolic queries, only Linear and BSpline are supported. Hermite requires
+ * runtime interval selection, so symbolic Hermite queries throw InterpolationError
+ * with guidance to use BSpline instead.
  *
  * @example 1D usage:
  * ```cpp
@@ -524,8 +530,7 @@ class Interpolator {
             return eval_numeric_scalar(query);
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             return eval_symbolic_scalar(query);
         }
@@ -559,8 +564,7 @@ class Interpolator {
             return eval_numeric_point(query);
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             return eval_symbolic_point(query);
         }
@@ -627,8 +631,7 @@ class Interpolator {
             }
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             if (m_dims == 1) {
                 for (int i = 0; i < n_points; ++i) {

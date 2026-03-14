@@ -197,8 +197,10 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
 /**
  * @brief Computes gradient with periodic boundary conditions
  *
- * For periodic data (e.g., angles), this computes the gradient assuming
- * the data wraps around at the specified period.
+ * For data defined on a periodic domain, this computes the gradient assuming
+ * the final sample wraps around to the first sample. Samples should span one
+ * cycle without repeating the first point at the end; the wrap interval is
+ * inferred from `period - covered_span`.
  *
  * @tparam DerivedF Eigen vector type
  * @tparam Spacing Spacing type (scalar or vector)
@@ -212,11 +214,76 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
 template <typename DerivedF, typename Spacing = double, typename Period>
 auto gradient_periodic(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx,
                        const Period &period, int edge_order = 1, int n = 1) {
-    // For periodic case, we need to handle wrapping
-    // This is simplified - full implementation would require centered_mod
-    // For now, delegate to standard gradient
-    // TODO: Implement proper periodic gradient with centered_mod
-    return gradient(f, dx, edge_order, n);
+    using Scalar = typename DerivedF::Scalar;
+    using Vector = JanusVector<Scalar>;
+
+    const Eigen::Index N = f.size();
+    Vector grad(N);
+
+    if (edge_order != 1 && edge_order != 2) {
+        throw InvalidArgument("gradient_periodic: edge_order must be 1 or 2");
+    }
+    if (n != 1 && n != 2) {
+        throw InvalidArgument("gradient_periodic: derivative order (n) must be 1 or 2");
+    }
+
+    if (N < 2) {
+        if (N > 0)
+            grad.setZero();
+        return grad;
+    }
+
+    Eigen::VectorXd dx_vec(N - 1);
+    if constexpr (std::is_arithmetic_v<Spacing>) {
+        dx_vec.setConstant(static_cast<double>(dx));
+    } else {
+        if (dx.size() == N) {
+            for (Eigen::Index i = 0; i < N - 1; ++i) {
+                dx_vec(i) = static_cast<double>(dx(i + 1) - dx(i));
+            }
+        } else if (dx.size() == N - 1) {
+            for (Eigen::Index i = 0; i < N - 1; ++i) {
+                dx_vec(i) = static_cast<double>(dx(i));
+            }
+        } else {
+            throw InvalidArgument("gradient_periodic: dx must be scalar, size N, or size N-1");
+        }
+    }
+
+    if (N == 2) {
+        if (n == 1) {
+            grad(0) = (f(1) - f(0)) / dx_vec(0);
+            grad(1) = grad(0);
+        } else {
+            grad.setZero();
+        }
+        return grad;
+    }
+
+    const double wrap_dx = static_cast<double>(period) - dx_vec.sum();
+    if (wrap_dx <= 0.0) {
+        throw InvalidArgument("gradient_periodic: period must exceed the covered span. Exclude "
+                              "duplicate endpoint samples.");
+    }
+
+    for (Eigen::Index i = 0; i < N; ++i) {
+        const Eigen::Index prev = (i == 0) ? N - 1 : i - 1;
+        const Eigen::Index next = (i == N - 1) ? 0 : i + 1;
+
+        const double hm = (i == 0) ? wrap_dx : dx_vec(i - 1);
+        const double hp = (i == N - 1) ? wrap_dx : dx_vec(i);
+
+        const auto dfm = f(i) - f(prev);
+        const auto dfp = f(next) - f(i);
+
+        if (n == 1) {
+            grad(i) = (hm * hm * dfp + hp * hp * dfm) / (hm * hp * (hm + hp));
+        } else {
+            grad(i) = 2.0 / (hm + hp) * (dfp / hp - dfm / hm);
+        }
+    }
+
+    return grad;
 }
 
 } // namespace janus

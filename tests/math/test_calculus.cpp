@@ -243,29 +243,41 @@ TEST(CalculusTests, DiffTrapzGradient1dSymbolic) {
 
 // --- Periodic and Error Tests ---
 
-template <typename Scalar> void test_gradient_periodic_wrapper() {
+template <typename Scalar> void test_gradient_periodic_wraparound() {
     using Vector = janus::JanusVector<Scalar>;
-    Vector x(5);
-    x << 0, 90, 180, 270, 360; // Degrees
-    Vector y(5);
-    // sin(x)
-    y << 0, 1, 0, -1, 0;
+    Vector y(4);
+    y << 0.0, 1.0, 0.0, -1.0; // sin(theta) sampled on [0, 2pi) at 90 deg increments
 
-    // This just dispatches to gradient() for now, but we want to cover the call
-    auto grad = janus::gradient_periodic(y, 90.0, 360.0);
+    auto grad = janus::gradient_periodic(y, M_PI / 2.0, 2.0 * M_PI);
 
-    // Check sizes
+    const double expected = 2.0 / M_PI;
+
     if constexpr (std::is_same_v<Scalar, double>) {
-        EXPECT_EQ(grad.size(), 5);
+        EXPECT_EQ(grad.size(), 4);
+        EXPECT_NEAR(grad(0), expected, 1e-10);
+        EXPECT_NEAR(grad(1), 0.0, 1e-10);
+        EXPECT_NEAR(grad(2), -expected, 1e-10);
+        EXPECT_NEAR(grad(3), 0.0, 1e-10);
     } else {
         auto g = janus::eval(grad);
-        EXPECT_EQ(g.size(), 5);
+        EXPECT_EQ(g.size(), 4);
+        EXPECT_NEAR(g(0), expected, 1e-10);
+        EXPECT_NEAR(g(1), 0.0, 1e-10);
+        EXPECT_NEAR(g(2), -expected, 1e-10);
+        EXPECT_NEAR(g(3), 0.0, 1e-10);
     }
 }
 
 TEST(CalculusTests, GradientPeriodic) {
-    test_gradient_periodic_wrapper<double>();
-    test_gradient_periodic_wrapper<janus::SymbolicScalar>();
+    test_gradient_periodic_wraparound<double>();
+    test_gradient_periodic_wraparound<janus::SymbolicScalar>();
+}
+
+TEST(CalculusTests, GradientPeriodicRejectsDuplicateEndpointSamples) {
+    janus::JanusVector<double> y(5);
+    y << 0.0, 1.0, 0.0, -1.0, 0.0;
+
+    EXPECT_THROW(janus::gradient_periodic(y, M_PI / 2.0, 2.0 * M_PI), janus::InvalidArgument);
 }
 
 TEST(CalculusTests, Errors) {
