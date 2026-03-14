@@ -31,6 +31,9 @@ target_link_libraries(deep_graph_demo PRIVATE janus)
 add_executable(sparse_derivative_pipeline math/sparse_derivative_pipeline.cpp)
 target_link_libraries(sparse_derivative_pipeline PRIVATE janus)
 
+add_executable(sensitivity_jacobian_demo math/sensitivity_jacobian_demo.cpp)
+target_link_libraries(sensitivity_jacobian_demo PRIVATE janus)
+
 # =============================================================================
 # Interpolation Examples
 # =============================================================================

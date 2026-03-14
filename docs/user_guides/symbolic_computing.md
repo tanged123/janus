@@ -63,7 +63,31 @@ auto J = janus::jacobian({y}, {x});
 auto J_full = janus::jacobian({y}, {x, v});
 ```
 
-## 6. Full Workflow Example
+## 6. Sensitivity Regime Switching
+
+For compiled `janus::Function` objects, Janus can now choose between forward and adjoint
+Jacobian construction automatically based on parameter count, output count, and optional
+trajectory hints.
+
+```cpp
+janus::Function f("f", {x}, {y});
+
+auto rec = janus::select_sensitivity_regime(
+    f,
+    0,      // output block
+    0,      // input block
+    400,    // horizon length hint
+    true    // stiff trajectory hint
+);
+
+auto J_fun = janus::sensitivity_jacobian(f, 0, 0, 400, true);
+auto J = J_fun.eval(x_val);
+```
+
+Use `rec.integrator_options()` when you want the same recommendation expressed as
+CasADi/SUNDIALS options (`nfwd` or `nadj`, plus checkpoint settings for long-horizon adjoints).
+
+## 7. Full Workflow Example
 
 ```cpp
 // 1. Symbols
