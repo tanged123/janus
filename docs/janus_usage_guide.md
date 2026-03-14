@@ -37,6 +37,7 @@
 | `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
 | `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
+| `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, and tearing recommendations |
 | `docs/user_guides/collocation.md` | Direct collocation for trajectory optimization |
 | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | `docs/user_guides/transcription_methods.md` | Overview of trajectory optimization methods |
@@ -184,6 +185,7 @@ janus::as_vector(casadi_mx)    // MX → SymbolicVector
 | `JanusIO.hpp` | I/O and graph visualization | `eval()`, `print()`, `to_dot()`, `graphviz()` |
 | `Function.hpp` | CasADi function wrapper | `Function` class for compiled symbolic functions |
 | `Sparsity.hpp` | Sparsity analysis and sparse derivative kernels | `SparsityPattern`, `GraphColoring`, `sparse_jacobian()`, `sparse_hessian()`, `nan_propagation_sparsity()` |
+| `StructuralTransforms.hpp` | Structural reduction and decomposition passes | `alias_eliminate()`, `block_triangularize()`, `structural_analyze()` |
 
 #### Key APIs in Core
 
@@ -208,6 +210,11 @@ auto output = f({5.0});
 auto J = janus::sparse_jacobian(result, x);
 auto H = janus::sparse_hessian(objective, vars);
 auto nz = J.values(x_val);
+
+// Structural reduction and decomposition
+auto alias = janus::alias_eliminate(residual_fn);
+auto blt = janus::block_triangularize(residual_fn);
+auto analysis = janus::structural_analyze(residual_fn);
 ```
 
 ---
@@ -522,6 +529,7 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
 | Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
+| Structural Transforms | `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, tearing recommendations |
 | Collocation | `docs/user_guides/collocation.md` | Direct collocation transcription |
 | Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of trajectory methods |
