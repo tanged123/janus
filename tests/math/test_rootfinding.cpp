@@ -17,11 +17,14 @@ TEST(RootFindingTest, NumericSimpleQuadratic) {
     auto res = rootfinder<double>(f, x0);
 
     EXPECT_TRUE(res.converged);
+    EXPECT_EQ(res.method, RootSolveMethod::TrustRegionNewton);
     EXPECT_NEAR(res.x(0), 2.0, 1e-6);
+    EXPECT_LT(res.residual_norm, 1e-8);
 
     // Guess closer to -2
     x0 << -1.0;
     res = rootfinder<double>(f, x0);
+    EXPECT_EQ(res.method, RootSolveMethod::TrustRegionNewton);
     EXPECT_NEAR(res.x(0), -2.0, 1e-6);
 }
 
@@ -49,12 +52,70 @@ TEST(RootFindingTest, NumericSystem2D) {
     Eigen::VectorXd guess(2);
     guess << 0.5, 0.5;
 
-    auto res = rootfinder<double>(f, guess);
+    RootFinderOptions opts;
+    opts.strategy = RootSolveStrategy::LineSearchNewton;
+    auto res = rootfinder<double>(f, guess, opts);
 
     EXPECT_TRUE(res.converged);
+    EXPECT_EQ(res.method, RootSolveMethod::LineSearchNewton);
     double expected = std::sqrt(0.5);
     EXPECT_NEAR(res.x(0), expected, 1e-6);
     EXPECT_NEAR(res.x(1), expected, 1e-6);
+}
+
+TEST(RootFindingTest, NumericQuasiNewtonBroyden) {
+    auto x = sym("x");
+    auto f_expr = x * x - 9.0;
+    Function f("f_broyden", {x}, {f_expr});
+
+    Eigen::VectorXd x0(1);
+    x0 << 1.0;
+
+    RootFinderOptions opts;
+    opts.strategy = RootSolveStrategy::QuasiNewtonBroyden;
+    auto res = rootfinder<double>(f, x0, opts);
+
+    EXPECT_TRUE(res.converged);
+    EXPECT_EQ(res.method, RootSolveMethod::QuasiNewtonBroyden);
+    EXPECT_NEAR(res.x(0), 3.0, 1e-6);
+}
+
+TEST(RootFindingTest, NumericPseudoTransientContinuation) {
+    auto x = sym("x");
+    auto f_expr = x * x - 1.0;
+    Function f("f_pseudo", {x}, {f_expr});
+
+    Eigen::VectorXd x0(1);
+    x0 << 0.0; // Singular Jacobian for Newton at the initial guess
+
+    RootFinderOptions opts;
+    opts.strategy = RootSolveStrategy::PseudoTransientContinuation;
+    opts.max_iter = 60;
+    opts.pseudo_transient_dt0 = 0.1;
+    auto res = rootfinder<double>(f, x0, opts);
+
+    EXPECT_TRUE(res.converged);
+    EXPECT_EQ(res.method, RootSolveMethod::PseudoTransientContinuation);
+    EXPECT_NEAR(res.x(0), 1.0, 1e-6);
+}
+
+TEST(RootFindingTest, AutoFallbackUsesPseudoTransientContinuation) {
+    auto x = sym("x");
+    auto f_expr = x * x - 1.0;
+    Function f("f_auto_fallback", {x}, {f_expr});
+
+    Eigen::VectorXd x0(1);
+    x0 << 0.0; // Trust-region, line-search, and Broyden all stall here on their first step
+
+    RootFinderOptions opts;
+    opts.max_iter = 60;
+    opts.pseudo_transient_dt0 = 0.1;
+    auto res = rootfinder<double>(f, x0, opts);
+
+    EXPECT_TRUE(res.converged);
+    EXPECT_EQ(res.method, RootSolveMethod::PseudoTransientContinuation);
+    EXPECT_GT(res.iterations, 1);
+    EXPECT_NEAR(res.x(0), 1.0, 1e-6);
 }
 
 TEST(RootFindingTest, SymbolicGraph) {
@@ -199,11 +260,13 @@ TEST(RootFindingTest, NewtonSolverClass) {
     x0 << 1.0;
     auto res1 = solver.solve(x0);
     EXPECT_TRUE(res1.converged);
+    EXPECT_EQ(res1.method, RootSolveMethod::TrustRegionNewton);
     EXPECT_NEAR(res1.x(0), 3.0, 1e-6);
 
     // Solve with second guess
     x0 << -1.0;
     auto res2 = solver.solve(x0);
     EXPECT_TRUE(res2.converged);
+    EXPECT_EQ(res2.method, RootSolveMethod::TrustRegionNewton);
     EXPECT_NEAR(res2.x(0), -3.0, 1e-6);
 }

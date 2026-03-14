@@ -34,6 +34,7 @@
 | `docs/user_guides/numeric_computing.md` | Numeric mode guide |
 | `docs/user_guides/optimization.md` | Opti interface usage |
 | `docs/user_guides/interpolation.md` | Interpolation utilities |
+| `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
 | `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
 | `docs/user_guides/collocation.md` | Direct collocation for trajectory optimization |
@@ -395,9 +396,20 @@ Full quaternion algebra class:
 
 | Function | Description |
 |----------|-------------|
-| `bisection(f, a, b)` | Bisection method |
-| `newton(f, df, x0)` | Newton-Raphson |
-| `find_root(f, x0)` | Automatic method selection |
+| `rootfinder(function, x0, opts)` | Solve `F(x)=0` for a dense column-vector state |
+| `NewtonSolver` | Reusable nonlinear solve wrapper with compiled residual/Jacobian kernels |
+| `create_implicit_function(function, x_guess, opts, implicit_opts)` | Differentiable implicit solve wrapper using CasADi rootfinder sensitivities |
+
+Numeric root finding uses a globalization stack with `RootSolveStrategy::Auto` by default:
+
+- Trust-region Newton (Levenberg-Marquardt)
+- Line-search Newton
+- Quasi-Newton Broyden updates
+- Pseudo-transient continuation
+
+`rootfinder<SymbolicScalar>()` and `create_implicit_function()` remain CasADi-rootfinder-backed so the solve stays differentiable inside symbolic graphs.
+
+See `docs/user_guides/root_finding.md` for strategy guidance, diagnostics, and a walkthrough of `examples/interpolation/rootfinding_demo.cpp`.
 
 ---
 
@@ -507,6 +519,7 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Symbolic Computing | `docs/user_guides/symbolic_computing.md` | Symbolic mode, graph building, MX operations |
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
 | Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
+| Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
 | Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
 | Collocation | `docs/user_guides/collocation.md` | Direct collocation transcription |

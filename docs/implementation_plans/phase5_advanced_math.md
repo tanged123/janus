@@ -165,7 +165,7 @@ class JanusInterpolator {
 
 #### [NEW] `include/janus/math/RootFinding.hpp`
 
-Wrap CasADi's `rootfinder` for solving implicit equations `F(x) = 0`.
+Provide a Janus root-finding layer for solving implicit equations `F(x) = 0`.
 
 ```cpp
 #pragma once
@@ -234,9 +234,10 @@ janus::Function create_implicit_function(
 ```
 
 **Implementation Notes**:
-- Numeric backend: Use CasADi `rootfinder("newton", ...).call()`
-- Symbolic backend: Embed `casadi::rootfinder` in expression graph
-- Differentiable: CasADi provides exact implicit differentiation
+- Numeric backend: Use Janus-compiled residual/Jacobian kernels with a globalization stack
+  (trust-region Newton, line-search Newton, Broyden, pseudo-transient continuation)
+- Symbolic backend: Embed `casadi::rootfinder` in the expression graph
+- Differentiable implicit solves: CasADi provides exact implicit differentiation
 
 > [!IMPORTANT]
 > `create_implicit_function` is particularly powerful for optimization—it allows embedding implicit constraints (like steady-state equations) while maintaining full differentiability.
@@ -352,7 +353,7 @@ Eigen::Matrix<Scalar, Eigen::Dynamic, 1> interpn_hermite(
 - [x] **Task 3.1**: Create `RootFinding.hpp` with `RootFinderOptions`, `RootResult`
 - [x] **Task 3.2**: Implement `rootfinder` function (numeric & symbolic)
 - [x] **Task 3.3**: Implement `create_implicit_function`
-- [ ] **Task 3.4**: Implement `NewtonSolver` wrapper class for fine control
+- [x] **Task 3.4**: Implement `NewtonSolver` wrapper class for fine control
 - [x] **Task 3.5**: Write tests for multi-dimensional root finding
 - [x] **Task 3.6**: Test implicit function differentiation
 
