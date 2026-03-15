@@ -1,6 +1,8 @@
 # ODE Integration
 
-Janus provides explicit ODE integrators for simulation with dual-mode (numeric/symbolic) support.
+Janus provides explicit ODE integrators for simulation with dual-mode (numeric/symbolic) support,
+plus structure-preserving and stiff mass-matrix integrators for the cases where generic RK
+integration is the wrong tool.
 
 ## Quick Start
 
@@ -28,6 +30,8 @@ y = janus::rk4_step(dynamics, y, t, dt);
 | `rk2_step` | 2nd | 2 | Moderate accuracy |
 | `rk4_step` | 4th | 4 | General purpose |
 | `rk45_step` | 4th/5th | 7 | Adaptive stepping |
+| `stormer_verlet_step` | 2nd | 2 accel evals | Symplectic mechanical/orbital systems |
+| `rkn4_step` | 4th | 4 accel evals | Second-order systems without state augmentation |
 
 ### RK4 Step (Recommended)
 
@@ -70,6 +74,33 @@ while (t < t_final) {
 }
 ```
 
+### Structure-Preserving Second-Order Steppers
+
+When your dynamics are naturally written as
+
+`q'' = a(t, q)`
+
+it is better to integrate that form directly than to augment it into a generic
+first-order state and run plain RK4.
+
+```cpp
+janus::NumericVector q(1), v(1);
+q << 1.0;
+v << 0.0;
+
+auto accel = [](double t, const janus::NumericVector& q_state) {
+    return (-q_state).eval();  // Harmonic oscillator
+};
+
+auto step = janus::stormer_verlet_step(accel, q, v, 0.0, 0.1);
+q = step.q;
+v = step.v;
+```
+
+- `stormer_verlet_step(...)` is symplectic and keeps long-horizon energy error bounded for
+  separable Hamiltonian systems.
+- `rkn4_step(...)` is a higher-order Runge-Kutta-Nystrom method for the same `q'' = a(t, q)` API.
+
 ## Trajectory Solver
 
 For full trajectory integration, use `solve_ivp`:
@@ -85,6 +116,63 @@ auto sol = janus::solve_ivp(
 // sol.t - time points
 // sol.y - solution matrix (rows=states, cols=time)
 ```
+
+For second-order systems, use `solve_second_order_ivp(...)` to keep coordinates and velocities
+separate:
+
+```cpp
+janus::SecondOrderIvpOptions opts;
+opts.method = janus::SecondOrderIntegratorMethod::StormerVerlet;
+
+auto sol = janus::solve_second_order_ivp(
+    accel,
+    {0.0, 100.0},
+    {1.0},   // q0
+    {0.0},   // v0
+    1000,
+    opts
+);
+
+// sol.q - generalized coordinates, rows = coordinates, cols = time
+// sol.v - generalized velocities, rows = velocities, cols = time
+```
+
+## Stiff And Mass-Matrix Systems
+
+For systems of the form
+
+`M(t, y) y' = f(t, y)`
+
+Janus now provides a dedicated solver surface:
+
+```cpp
+janus::MassMatrixIvpOptions opts;
+opts.method = janus::MassMatrixIntegratorMethod::Bdf1;
+opts.substeps = 2;
+
+auto sol = janus::solve_ivp_mass_matrix(
+    [](double t, const janus::NumericVector& y) {
+        janus::NumericVector rhs(2);
+        rhs << y(1), 1.0 - y(0) - y(1);
+        return rhs;
+    },
+    [](double t, const janus::NumericVector& y) {
+        janus::NumericMatrix M = janus::NumericMatrix::Zero(2, 2);
+        M(0, 0) = 1.0;  // singular mass matrix encoding an algebraic constraint
+        return M;
+    },
+    {0.0, 1.0},
+    {0.0, 1.0},
+    50,
+    opts
+);
+```
+
+- `MassMatrixIntegratorMethod::RosenbrockEuler` is a one-stage linearly implicit stiff integrator.
+- `MassMatrixIntegratorMethod::Bdf1` solves the backward-Euler residual directly and can handle
+  simple singular mass-matrix systems.
+- `solve_ivp_mass_matrix_expr(...)` uses CasADi IDAS on the symbolic expression path by rewriting
+  the mass-matrix system into a semi-explicit DAE.
 
 ## Symbolic Mode
 
@@ -106,6 +194,20 @@ auto x_next = janus::rk4_step(
 
 // x_next is symbolic - can be used in optimization
 casadi::Function step_fn("step", {janus::to_mx(x), t, dt}, {janus::to_mx(x_next)});
+```
+
+The structure-preserving step APIs are also symbolic-safe:
+
+```cpp
+auto q = janus::sym_vec("q", 1);
+auto v = janus::sym_vec("v", 1);
+auto t = janus::sym("t");
+auto dt = janus::sym("dt");
+
+auto step = janus::stormer_verlet_step(
+    [](auto time, const auto& q_state) { return (-q_state).eval(); },
+    q, v, t, dt
+);
 ```
 
 ## Component-Based Integration (Icarus Pattern)

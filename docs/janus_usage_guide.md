@@ -349,8 +349,13 @@ ODE integration:
 |----------|-------------|
 | `quad(f, a, b)` | Definite integral (Gauss-Kronrod) |
 | `solve_ivp(dynamics, x0, t_span)` | ODE IVP solver |
+| `solve_second_order_ivp(accel, q0, v0, t_span)` | Second-order trajectory solver (`q'' = a(t, q)`) |
+| `solve_ivp_mass_matrix(rhs, M, x0, t_span)` | Native stiff solver for `M(t, y) y' = f(t, y)` |
+| `solve_ivp_mass_matrix_expr(rhs, M, t, y, x0, t_span)` | Symbolic IDAS mass-matrix / DAE solve |
+| `stormer_verlet_step(accel, q, v, t, dt)` | Symplectic single-step integrator |
+| `rkn4_step(accel, q, v, t, dt)` | 4th-order Runge-Kutta-Nystrom step |
 
-Integration methods: `"RK4"`, `"CVODES"`, `"IDAS"`
+Integration methods: `RK4`, `StormerVerlet`, `RKN4`, `RosenbrockEuler`, `BDF1`, `CVODES`, `IDAS`
 
 ---
 

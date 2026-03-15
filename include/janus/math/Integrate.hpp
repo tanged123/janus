@@ -14,10 +14,12 @@
 #include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/IntegratorStep.hpp"
+#include "janus/math/Linalg.hpp"
 #include "janus/math/Spacing.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,6 +54,70 @@ template <typename Scalar> struct OdeResult {
     int status = 0;
 };
 
+/**
+ * @brief Stepper selection for second-order systems q'' = a(t, q).
+ */
+enum class SecondOrderIntegratorMethod {
+    StormerVerlet,      ///< Symplectic Stormer-Verlet / velocity-Verlet
+    RungeKuttaNystrom4, ///< Classical 4th-order Runge-Kutta-Nystrom
+};
+
+/**
+ * @brief Stepper selection for mass-matrix systems M(t, y) y' = f(t, y).
+ */
+enum class MassMatrixIntegratorMethod {
+    RosenbrockEuler, ///< One-stage linearly implicit Rosenbrock-Euler
+    Bdf1,            ///< Backward Euler / first-order BDF with Newton iterations
+};
+
+/**
+ * @brief Result structure for second-order IVP solvers.
+ *
+ * @tparam Scalar numeric or symbolic scalar type
+ */
+template <typename Scalar> struct SecondOrderOdeResult {
+    /// Time points where solution was computed
+    JanusVector<Scalar> t;
+
+    /// Generalized coordinates at each time point (each column is q(t[i]))
+    JanusMatrix<Scalar> q;
+
+    /// Generalized velocities at each time point (each column is v(t[i]))
+    JanusMatrix<Scalar> v;
+
+    /// Whether integration was successful
+    bool success = true;
+
+    /// Descriptive message
+    std::string message = "";
+
+    /// Status code (0 = success)
+    int status = 0;
+};
+
+/**
+ * @brief Options for second-order structure-preserving trajectory integration.
+ */
+struct SecondOrderIvpOptions {
+    SecondOrderIntegratorMethod method = SecondOrderIntegratorMethod::StormerVerlet;
+    int substeps = 1;
+};
+
+/**
+ * @brief Options for stiff mass-matrix integration.
+ */
+struct MassMatrixIvpOptions {
+    MassMatrixIntegratorMethod method = MassMatrixIntegratorMethod::RosenbrockEuler;
+    int substeps = 1;
+    double abstol = 1e-8;
+    double reltol = 1e-6;
+    double finite_difference_epsilon = 1e-7;
+    int max_newton_iterations = 10;
+    double newton_tolerance = 1e-10;
+    LinearSolvePolicy linear_solve_policy = LinearSolvePolicy();
+    casadi::Dict symbolic_integrator_options;
+};
+
 // ============================================================================
 // Quadrature Result structure
 // ============================================================================
@@ -68,6 +134,178 @@ template <typename Scalar> struct QuadResult {
     /// Estimated error (only meaningful for numeric backend)
     double error = 0.0;
 };
+
+namespace integrate_detail {
+
+inline const char *method_name(SecondOrderIntegratorMethod method) {
+    switch (method) {
+    case SecondOrderIntegratorMethod::StormerVerlet:
+        return "Stormer-Verlet";
+    case SecondOrderIntegratorMethod::RungeKuttaNystrom4:
+        return "RKN4";
+    }
+    throw InvalidArgument("solve_second_order_ivp: unsupported second-order method");
+}
+
+inline const char *method_name(MassMatrixIntegratorMethod method) {
+    switch (method) {
+    case MassMatrixIntegratorMethod::RosenbrockEuler:
+        return "Rosenbrock-Euler";
+    case MassMatrixIntegratorMethod::Bdf1:
+        return "BDF1";
+    }
+    throw InvalidArgument("solve_ivp_mass_matrix: unsupported mass-matrix method");
+}
+
+inline void validate_eval_count(const std::string &context, int n_eval) {
+    if (n_eval < 2) {
+        throw IntegrationError(context + ": n_eval must be at least 2");
+    }
+}
+
+inline void validate_second_order_options(const SecondOrderIvpOptions &opts,
+                                          const std::string &context) {
+    if (opts.substeps <= 0) {
+        throw IntegrationError(context + ": substeps must be positive");
+    }
+}
+
+inline void validate_mass_matrix_options(const MassMatrixIvpOptions &opts,
+                                         const std::string &context) {
+    if (opts.substeps <= 0) {
+        throw IntegrationError(context + ": substeps must be positive");
+    }
+    if (opts.abstol <= 0.0) {
+        throw IntegrationError(context + ": abstol must be positive");
+    }
+    if (opts.reltol <= 0.0) {
+        throw IntegrationError(context + ": reltol must be positive");
+    }
+    if (opts.finite_difference_epsilon <= 0.0) {
+        throw IntegrationError(context + ": finite_difference_epsilon must be positive");
+    }
+    if (opts.max_newton_iterations <= 0) {
+        throw IntegrationError(context + ": max_newton_iterations must be positive");
+    }
+    if (opts.newton_tolerance <= 0.0) {
+        throw IntegrationError(context + ": newton_tolerance must be positive");
+    }
+}
+
+inline void validate_second_order_initial_state(const NumericVector &q0, const NumericVector &v0) {
+    if (q0.size() == 0) {
+        throw IntegrationError("solve_second_order_ivp: q0 must be non-empty");
+    }
+    if (q0.size() != v0.size()) {
+        throw IntegrationError("solve_second_order_ivp: q0 and v0 must have the same size");
+    }
+}
+
+inline double inf_norm(const NumericVector &x) { return x.lpNorm<Eigen::Infinity>(); }
+
+inline bool is_constant_zero(const SymbolicScalar &expr) {
+    if (expr.is_zero()) {
+        return true;
+    }
+
+    try {
+        casadi::Function probe("integrate_zero_probe", std::vector<casadi::MX>{},
+                               std::vector<casadi::MX>{expr});
+        std::vector<casadi::DM> res = probe(std::vector<casadi::DM>{});
+        return std::abs(static_cast<double>(res.at(0))) <= 1e-14;
+    } catch (...) {
+        return false;
+    }
+}
+
+template <typename VectorFunc>
+NumericMatrix finite_difference_jacobian(VectorFunc &&func, const NumericVector &x,
+                                         double epsilon) {
+    NumericVector f0 = func(x);
+    NumericMatrix J(f0.size(), x.size());
+
+    for (Eigen::Index j = 0; j < x.size(); ++j) {
+        const double step = epsilon * std::max(1.0, std::abs(x(j)));
+        NumericVector x_plus = x;
+        NumericVector x_minus = x;
+        x_plus(j) += step;
+        x_minus(j) -= step;
+        J.col(j) = ((func(x_plus) - func(x_minus)) / (2.0 * step)).eval();
+    }
+
+    return J;
+}
+
+template <typename MassFunc>
+NumericMatrix evaluate_mass_matrix(MassFunc &&mass_matrix, double t, const NumericVector &y,
+                                   const std::string &context) {
+    NumericMatrix M = mass_matrix(t, y);
+    if (M.rows() != y.size() || M.cols() != y.size()) {
+        throw IntegrationError(context + ": mass matrix must be square with size matching y");
+    }
+    return M;
+}
+
+template <typename RhsFunc, typename MassFunc>
+NumericVector rosenbrock_euler_step(RhsFunc &&rhs, MassFunc &&mass_matrix, const NumericVector &y,
+                                    double t, double dt, const MassMatrixIvpOptions &opts) {
+    NumericVector f = rhs(t, y);
+    if (f.size() != y.size()) {
+        throw IntegrationError("solve_ivp_mass_matrix: rhs dimension must match y");
+    }
+
+    NumericMatrix M = evaluate_mass_matrix(mass_matrix, t, y, "solve_ivp_mass_matrix");
+    auto rhs_at_t = [&](const NumericVector &state) { return rhs(t, state); };
+    NumericMatrix J = finite_difference_jacobian(rhs_at_t, y, opts.finite_difference_epsilon);
+    NumericMatrix A = (M - dt * J).eval();
+    NumericVector k = janus::solve(A, f, opts.linear_solve_policy);
+    return (y + dt * k).eval();
+}
+
+template <typename RhsFunc, typename MassFunc>
+NumericVector bdf1_step(RhsFunc &&rhs, MassFunc &&mass_matrix, const NumericVector &y, double t,
+                        double dt, const MassMatrixIvpOptions &opts) {
+    const double t_next = t + dt;
+
+    auto residual = [&](const NumericVector &trial) {
+        NumericVector f = rhs(t_next, trial);
+        if (f.size() != y.size()) {
+            throw IntegrationError("solve_ivp_mass_matrix: rhs dimension must match y");
+        }
+        NumericMatrix M = evaluate_mass_matrix(mass_matrix, t_next, trial, "solve_ivp_mass_matrix");
+        return (M * ((trial - y) / dt) - f).eval();
+    };
+
+    NumericVector guess = y;
+    try {
+        NumericVector f0 = rhs(t, y);
+        NumericMatrix M0 = evaluate_mass_matrix(mass_matrix, t, y, "solve_ivp_mass_matrix");
+        guess = (y + dt * janus::solve(M0, f0, opts.linear_solve_policy)).eval();
+    } catch (...) {
+    }
+
+    for (int iter = 0; iter < opts.max_newton_iterations; ++iter) {
+        NumericVector r = residual(guess);
+        if (inf_norm(r) <= opts.newton_tolerance) {
+            return guess;
+        }
+
+        NumericMatrix J =
+            finite_difference_jacobian(residual, guess, opts.finite_difference_epsilon);
+        NumericVector delta = janus::solve(J, -r, opts.linear_solve_policy);
+        guess += delta;
+        if (inf_norm(delta) <= opts.newton_tolerance) {
+            return guess;
+        }
+    }
+
+    NumericVector r = residual(guess);
+    throw IntegrationError("solve_ivp_mass_matrix: BDF1 Newton solve failed to converge; residual "
+                           "inf-norm = " +
+                           std::to_string(inf_norm(r)));
+}
+
+} // namespace integrate_detail
 
 // ============================================================================
 // quad: Definite Integral
@@ -313,6 +551,419 @@ OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span,
         y0(idx++) = val;
     }
     return solve_ivp(std::forward<Func>(fun), t_span, y0, n_eval, abstol, reltol);
+}
+
+/**
+ * @brief Solve a second-order IVP q'' = a(t, q), q(t0) = q0, v(t0) = v0.
+ *
+ * This interface targets mechanical and orbital systems directly instead of
+ * forcing them through a first-order state augmentation. `StormerVerlet`
+ * preserves the geometric structure of separable Hamiltonian systems, while
+ * `RungeKuttaNystrom4` provides a higher-order non-symplectic alternative.
+ *
+ * @tparam AccelFunc Callable type a(t, q) -> qdd
+ * @param acceleration Acceleration function
+ * @param t_span Integration interval
+ * @param q0 Initial generalized coordinates
+ * @param v0 Initial generalized velocities
+ * @param n_eval Number of output points
+ * @param opts Integration options
+ * @return SecondOrderOdeResult with q(t) and v(t)
+ */
+template <typename AccelFunc>
+SecondOrderOdeResult<double>
+solve_second_order_ivp(AccelFunc &&acceleration, std::pair<double, double> t_span,
+                       const NumericVector &q0, const NumericVector &v0, int n_eval = 100,
+                       const SecondOrderIvpOptions &opts = {}) {
+    integrate_detail::validate_eval_count("solve_second_order_ivp", n_eval);
+    integrate_detail::validate_second_order_options(opts, "solve_second_order_ivp");
+    integrate_detail::validate_second_order_initial_state(q0, v0);
+
+    const double t0 = t_span.first;
+    const double tf = t_span.second;
+
+    SecondOrderOdeResult<double> result;
+    result.t = linspace(t0, tf, n_eval);
+    result.q.resize(q0.size(), n_eval);
+    result.v.resize(v0.size(), n_eval);
+    result.q.col(0) = q0;
+    result.v.col(0) = v0;
+
+    NumericVector q = q0;
+    NumericVector v = v0;
+    const double dt_base = (tf - t0) / static_cast<double>(n_eval - 1);
+
+    for (int i = 1; i < n_eval; ++i) {
+        double t = result.t(i - 1);
+        const double dt = dt_base / static_cast<double>(opts.substeps);
+
+        for (int s = 0; s < opts.substeps; ++s) {
+            SecondOrderStepResult<double> step;
+            if (opts.method == SecondOrderIntegratorMethod::StormerVerlet) {
+                step = stormer_verlet_step(acceleration, q, v, t, dt);
+            } else {
+                step = rkn4_step(acceleration, q, v, t, dt);
+            }
+            q = step.q;
+            v = step.v;
+            t += dt;
+        }
+
+        result.q.col(i) = q;
+        result.v.col(i) = v;
+    }
+
+    result.success = true;
+    result.message =
+        std::string("Integration successful (") + integrate_detail::method_name(opts.method) + ")";
+    result.status = 0;
+    return result;
+}
+
+/**
+ * @brief Convenience overload for second-order IVPs using initializer lists.
+ */
+template <typename AccelFunc>
+SecondOrderOdeResult<double>
+solve_second_order_ivp(AccelFunc &&acceleration, std::pair<double, double> t_span,
+                       std::initializer_list<double> q0_init, std::initializer_list<double> v0_init,
+                       int n_eval = 100, const SecondOrderIvpOptions &opts = {}) {
+    NumericVector q0(q0_init.size());
+    NumericVector v0(v0_init.size());
+
+    int idx = 0;
+    for (double value : q0_init) {
+        q0(idx++) = value;
+    }
+    idx = 0;
+    for (double value : v0_init) {
+        v0(idx++) = value;
+    }
+
+    return solve_second_order_ivp(std::forward<AccelFunc>(acceleration), t_span, q0, v0, n_eval,
+                                  opts);
+}
+
+/**
+ * @brief Solve M(t, y) y' = f(t, y) with a native numeric stiff integrator.
+ *
+ * `RosenbrockEuler` is a one-stage linearly implicit method that handles stiff
+ * ODEs well when the mass matrix is nonsingular. `Bdf1` works on the residual
+ * equation directly and also supports singular mass matrices that encode
+ * simple index-1 constrained systems.
+ *
+ * @tparam RhsFunc Callable type f(t, y) -> rhs
+ * @tparam MassFunc Callable type M(t, y) -> mass matrix
+ * @param rhs Right-hand side function
+ * @param mass_matrix Mass matrix function
+ * @param t_span Integration interval
+ * @param y0 Initial state
+ * @param n_eval Number of output points
+ * @param opts Integration options
+ * @return OdeResult with solution samples
+ */
+template <typename RhsFunc, typename MassFunc>
+OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
+                                        std::pair<double, double> t_span, const NumericVector &y0,
+                                        int n_eval = 100, const MassMatrixIvpOptions &opts = {}) {
+    integrate_detail::validate_eval_count("solve_ivp_mass_matrix", n_eval);
+    integrate_detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix");
+
+    const double t0 = t_span.first;
+    const double tf = t_span.second;
+    if (y0.size() == 0) {
+        throw IntegrationError("solve_ivp_mass_matrix: y0 must be non-empty");
+    }
+
+    OdeResult<double> result;
+    result.t = linspace(t0, tf, n_eval);
+    result.y.resize(y0.size(), n_eval);
+    result.y.col(0) = y0;
+
+    NumericVector y = y0;
+    const double dt_base = (tf - t0) / static_cast<double>(n_eval - 1);
+
+    for (int i = 1; i < n_eval; ++i) {
+        double t = result.t(i - 1);
+        const double dt = dt_base / static_cast<double>(opts.substeps);
+
+        for (int s = 0; s < opts.substeps; ++s) {
+            if (opts.method == MassMatrixIntegratorMethod::RosenbrockEuler) {
+                y = integrate_detail::rosenbrock_euler_step(rhs, mass_matrix, y, t, dt, opts);
+            } else {
+                y = integrate_detail::bdf1_step(rhs, mass_matrix, y, t, dt, opts);
+            }
+            t += dt;
+        }
+
+        result.y.col(i) = y;
+    }
+
+    result.success = true;
+    result.message =
+        std::string("Integration successful (") + integrate_detail::method_name(opts.method) + ")";
+    result.status = 0;
+    return result;
+}
+
+/**
+ * @brief Convenience overload for mass-matrix IVPs using initializer lists.
+ */
+template <typename RhsFunc, typename MassFunc>
+OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
+                                        std::pair<double, double> t_span,
+                                        std::initializer_list<double> y0_init, int n_eval = 100,
+                                        const MassMatrixIvpOptions &opts = {}) {
+    NumericVector y0(y0_init.size());
+    int idx = 0;
+    for (double value : y0_init) {
+        y0(idx++) = value;
+    }
+    return solve_ivp_mass_matrix(std::forward<RhsFunc>(rhs), std::forward<MassFunc>(mass_matrix),
+                                 t_span, y0, n_eval, opts);
+}
+
+/**
+ * @brief Solve a symbolic mass-matrix IVP using CasADi IDAS.
+ *
+ * The original real-time system M(t, y) y' = f(t, y) is converted into the
+ * semi-explicit DAE
+ *
+ * x' = z
+ * 0  = M(t, x) z - f(t, x)
+ *
+ * after the same time normalization already used by `solve_ivp_expr`.
+ *
+ * @param rhs_expr Symbolic right-hand side f(t, y)
+ * @param mass_expr Symbolic mass matrix M(t, y)
+ * @param t_var Time variable symbol
+ * @param y_var State variable symbol(s)
+ * @param t_span Integration interval
+ * @param y0 Initial state
+ * @param n_eval Number of output points
+ * @param opts Integration options
+ * @return OdeResult with sampled numeric solution
+ */
+inline OdeResult<double>
+solve_ivp_mass_matrix_expr(const SymbolicScalar &rhs_expr, const SymbolicScalar &mass_expr,
+                           const SymbolicScalar &t_var, const SymbolicScalar &y_var,
+                           std::pair<double, double> t_span, const NumericVector &y0,
+                           int n_eval = 100, const MassMatrixIvpOptions &opts = {}) {
+    integrate_detail::validate_eval_count("solve_ivp_mass_matrix_expr", n_eval);
+    integrate_detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix_expr");
+
+    const double t0 = t_span.first;
+    const double tf = t_span.second;
+    const int n_state = static_cast<int>(y0.size());
+    if (n_state == 0) {
+        throw IntegrationError("solve_ivp_mass_matrix_expr: y0 must be non-empty");
+    }
+
+    SymbolicScalar t_normalized = SymbolicScalar::sym("t_norm");
+    SymbolicScalar rhs_sub =
+        SymbolicScalar::substitute(rhs_expr, t_var, t0 + (tf - t0) * t_normalized);
+    SymbolicScalar mass_sub =
+        SymbolicScalar::substitute(mass_expr, t_var, t0 + (tf - t0) * t_normalized);
+
+    if (mass_sub.size1() != n_state || mass_sub.size2() != n_state) {
+        throw IntegrationError(
+            "solve_ivp_mass_matrix_expr: mass matrix must be square with size matching y0");
+    }
+    if (rhs_sub.size1() != n_state || rhs_sub.size2() != 1) {
+        throw IntegrationError("solve_ivp_mass_matrix_expr: rhs must be a column vector matching "
+                               "the size of y0");
+    }
+
+    casadi::DM y0_dm_full(n_state, 1);
+    for (int i = 0; i < n_state; ++i) {
+        y0_dm_full(i) = y0(i);
+    }
+
+    std::vector<double> t_eval_normalized(n_eval);
+    for (int i = 0; i < n_eval; ++i) {
+        t_eval_normalized[i] = static_cast<double>(i) / static_cast<double>(n_eval - 1);
+    }
+
+    SymbolicScalar mass_probe_expr =
+        SymbolicScalar::substitute(mass_sub, y_var, casadi::MX(y0_dm_full));
+
+    std::vector<bool> row_has_structural_nnz(static_cast<std::size_t>(n_state), false);
+    for (int row = 0; row < n_state; ++row) {
+        for (int col = 0; col < n_state; ++col) {
+            if (!integrate_detail::is_constant_zero(mass_probe_expr(row, col))) {
+                row_has_structural_nnz[static_cast<std::size_t>(row)] = true;
+                break;
+            }
+        }
+    }
+
+    std::vector<int> differential_indices;
+    std::vector<int> algebraic_indices;
+    for (int i = 0; i < n_state; ++i) {
+        if (row_has_structural_nnz[static_cast<std::size_t>(i)]) {
+            differential_indices.push_back(i);
+        } else {
+            algebraic_indices.push_back(i);
+        }
+    }
+
+    auto is_component_of = [](const casadi::MX &var, const casadi::MX &vector_expr) {
+        for (int i = 0; i < vector_expr.nnz(); ++i) {
+            if (casadi::MX::is_equal(var, vector_expr(i))) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    casadi::Dict integrator_opts = {
+        {"abstol", opts.abstol}, {"reltol", opts.reltol}, {"calc_ic", true}};
+    for (const auto &kv : opts.symbolic_integrator_options) {
+        integrator_opts[kv.first] = kv.second;
+    }
+
+    OdeResult<double> result;
+    result.t.resize(n_eval);
+    for (int i = 0; i < n_eval; ++i) {
+        result.t(i) = t0 + (tf - t0) * t_eval_normalized[i];
+    }
+    result.y.resize(n_state, n_eval);
+
+    if (algebraic_indices.empty()) {
+        SymbolicScalar z_var = SymbolicScalar::sym("y_dot_norm", n_state, 1);
+        SymbolicScalar alg = casadi::MX::mtimes(mass_sub, z_var) - (tf - t0) * rhs_sub;
+
+        std::vector<casadi::MX> all_vars = casadi::MX::symvar(casadi::MX::vertcat({rhs_sub, alg}));
+        std::vector<casadi::MX> parameters;
+        for (const auto &var : all_vars) {
+            if (casadi::MX::is_equal(var, t_normalized) || casadi::MX::is_equal(var, y_var) ||
+                casadi::MX::is_equal(var, z_var) || is_component_of(var, y_var) ||
+                is_component_of(var, z_var)) {
+                continue;
+            }
+            parameters.push_back(var);
+        }
+
+        casadi::MX p = casadi::MX::vertcat(parameters);
+        casadi::MXDict dae = {{"x", y_var}, {"z", z_var},   {"t", t_normalized},
+                              {"p", p},     {"ode", z_var}, {"alg", alg}};
+
+        casadi::Function integrator = casadi::integrator("mass_matrix_ivp_integrator", "idas", dae,
+                                                         0.0, t_eval_normalized, integrator_opts);
+
+        casadi::DMDict integrator_args;
+        integrator_args["x0"] = y0_dm_full;
+        integrator_args["z0"] = casadi::DM::zeros(n_state, 1);
+        integrator_args["p"] = casadi::DM::zeros(p.size1(), p.size2());
+        casadi::DMDict res_dm = integrator(integrator_args);
+
+        casadi::DM xf = res_dm.at("xf");
+        for (int i = 0; i < n_state; ++i) {
+            for (int j = 0; j < n_eval; ++j) {
+                result.y(i, j) = static_cast<double>(xf(i, j));
+            }
+        }
+    } else {
+        if (differential_indices.empty()) {
+            throw IntegrationError("solve_ivp_mass_matrix_expr: fully algebraic systems are not "
+                                   "supported");
+        }
+
+        const int n_diff = static_cast<int>(differential_indices.size());
+        const int n_alg = static_cast<int>(algebraic_indices.size());
+
+        SymbolicScalar x_var = SymbolicScalar::sym("y_diff", n_diff, 1);
+        SymbolicScalar z_var = SymbolicScalar::sym("y_alg", n_alg, 1);
+
+        SymbolicScalar partitioned_y = SymbolicScalar(n_state, 1);
+        int diff_cursor = 0;
+        int alg_cursor = 0;
+        for (int i = 0; i < n_state; ++i) {
+            if (row_has_structural_nnz[static_cast<std::size_t>(i)]) {
+                partitioned_y(i) = x_var(diff_cursor++);
+            } else {
+                partitioned_y(i) = z_var(alg_cursor++);
+            }
+        }
+
+        SymbolicScalar rhs_partitioned = SymbolicScalar::substitute(rhs_sub, y_var, partitioned_y);
+        SymbolicScalar mass_partitioned =
+            SymbolicScalar::substitute(mass_sub, y_var, partitioned_y);
+
+        SymbolicScalar rhs_diff(n_diff, 1);
+        SymbolicScalar rhs_alg(n_alg, 1);
+        for (int i = 0; i < n_diff; ++i) {
+            rhs_diff(i) = rhs_partitioned(differential_indices[static_cast<std::size_t>(i)]);
+        }
+        for (int i = 0; i < n_alg; ++i) {
+            rhs_alg(i) = rhs_partitioned(algebraic_indices[static_cast<std::size_t>(i)]);
+        }
+
+        SymbolicScalar mass_diff(n_diff, n_diff);
+        for (int i = 0; i < n_diff; ++i) {
+            for (int j = 0; j < n_diff; ++j) {
+                mass_diff(i, j) =
+                    mass_partitioned(differential_indices[static_cast<std::size_t>(i)],
+                                     differential_indices[static_cast<std::size_t>(j)]);
+            }
+        }
+
+        SymbolicScalar ode = casadi::MX::solve(mass_diff, (tf - t0) * rhs_diff);
+
+        std::vector<casadi::MX> all_vars = casadi::MX::symvar(casadi::MX::vertcat(
+            {rhs_partitioned, casadi::MX::reshape(mass_partitioned, n_state * n_state, 1)}));
+        std::vector<casadi::MX> parameters;
+        for (const auto &var : all_vars) {
+            if (casadi::MX::is_equal(var, t_normalized) || casadi::MX::is_equal(var, x_var) ||
+                casadi::MX::is_equal(var, z_var) || is_component_of(var, x_var) ||
+                is_component_of(var, z_var)) {
+                continue;
+            }
+            parameters.push_back(var);
+        }
+
+        casadi::MX p = casadi::MX::vertcat(parameters);
+        casadi::MXDict dae = {{"x", x_var}, {"z", z_var}, {"t", t_normalized},
+                              {"p", p},     {"ode", ode}, {"alg", rhs_alg}};
+
+        casadi::Function integrator =
+            casadi::integrator("mass_matrix_ivp_integrator_partitioned", "idas", dae, 0.0,
+                               t_eval_normalized, integrator_opts);
+
+        casadi::DM x0_dm(n_diff, 1);
+        casadi::DM z0_dm(n_alg, 1);
+        for (int i = 0; i < n_diff; ++i) {
+            x0_dm(i) = y0(differential_indices[static_cast<std::size_t>(i)]);
+        }
+        for (int i = 0; i < n_alg; ++i) {
+            z0_dm(i) = y0(algebraic_indices[static_cast<std::size_t>(i)]);
+        }
+
+        casadi::DMDict integrator_args;
+        integrator_args["x0"] = x0_dm;
+        integrator_args["z0"] = z0_dm;
+        integrator_args["p"] = casadi::DM::zeros(p.size1(), p.size2());
+        casadi::DMDict res_dm = integrator(integrator_args);
+
+        casadi::DM xf = res_dm.at("xf");
+        casadi::DM zf = res_dm.at("zf");
+        for (int i = 0; i < n_eval; ++i) {
+            int diff_out = 0;
+            int alg_out = 0;
+            for (int state = 0; state < n_state; ++state) {
+                if (row_has_structural_nnz[static_cast<std::size_t>(state)]) {
+                    result.y(state, i) = static_cast<double>(xf(diff_out++, i));
+                } else {
+                    result.y(state, i) = static_cast<double>(zf(alg_out++, i));
+                }
+            }
+        }
+    }
+
+    result.success = true;
+    result.message = "Integration successful (IDAS mass matrix)";
+    result.status = 0;
+    return result;
 }
 
 /**

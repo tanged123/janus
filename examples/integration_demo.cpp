@@ -2,11 +2,15 @@
  * @file integration_demo.cpp
  * @brief Demo: Using Janus integrators with Icarus-style component models
  *
- * This example explores two patterns for integrating ODE state with component models:
+ * This example explores several integration patterns:
  * 1. Monolithic state vector (traditional approach)
  * 2. Component-based state management (Icarus-style)
+ * 3. Structure-preserving second-order propagation
+ * 4. Stiff and constrained mass-matrix systems
  */
 
+#include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <janus/janus.hpp>
 
@@ -45,6 +49,88 @@ void monolithic_example() {
     }
 
     std::cout << "t=1: y=" << state(0) << " (expected: " << std::cos(omega) << ")\n\n";
+}
+
+// ============================================================================
+// Pattern 1b: Structure-Preserving Second-Order Integration
+// ============================================================================
+
+double oscillator_energy(double q, double v, double omega) {
+    return 0.5 * (v * v + omega * omega * q * q);
+}
+
+void structure_preserving_example() {
+    std::cout << "=== Pattern 1b: Structure-Preserving Second-Order Integration ===\n";
+
+    const double omega = 1.0;
+    const double dt = 0.2;
+    const int n_steps = 20000;
+
+    auto accel = [omega](double t, const NumericVector &q_state) {
+        return (-omega * omega * q_state).eval();
+    };
+
+    NumericVector first_order_state(2);
+    first_order_state << 1.0, 0.0;
+
+    NumericVector q(1);
+    NumericVector v(1);
+    q << 1.0;
+    v << 0.0;
+
+    const double energy0 = oscillator_energy(1.0, 0.0, omega);
+    double rk4_max_drift = 0.0;
+    double verlet_max_drift = 0.0;
+    double rk4_final_drift = 0.0;
+    double verlet_final_drift = 0.0;
+    double t = 0.0;
+
+    auto first_order_dynamics = [omega](double t, const NumericVector &state) {
+        NumericVector dydt(2);
+        dydt << state(1), -omega * omega * state(0);
+        return dydt;
+    };
+
+    for (int i = 0; i < n_steps; ++i) {
+        first_order_state = rk4_step(first_order_dynamics, first_order_state, t, dt);
+        auto verlet_step = stormer_verlet_step(accel, q, v, t, dt);
+        q = verlet_step.q;
+        v = verlet_step.v;
+        t += dt;
+
+        rk4_max_drift =
+            std::max(rk4_max_drift,
+                     std::abs(oscillator_energy(first_order_state(0), first_order_state(1), omega) -
+                              energy0));
+        verlet_max_drift =
+            std::max(verlet_max_drift, std::abs(oscillator_energy(q(0), v(0), omega) - energy0));
+    }
+
+    rk4_final_drift =
+        std::abs(oscillator_energy(first_order_state(0), first_order_state(1), omega) - energy0);
+    verlet_final_drift = std::abs(oscillator_energy(q(0), v(0), omega) - energy0);
+
+    std::cout << "Long-horizon harmonic oscillator with dt=" << dt << " for " << n_steps
+              << " steps\n";
+    std::cout << "  RK4 final energy drift          = " << rk4_final_drift
+              << " (max: " << rk4_max_drift << ")\n";
+    std::cout << "  Stormer-Verlet final drift      = " << verlet_final_drift
+              << " (bounded max: " << verlet_max_drift << ")\n";
+
+    SecondOrderIvpOptions verlet_opts;
+    verlet_opts.method = SecondOrderIntegratorMethod::StormerVerlet;
+    auto verlet_traj =
+        solve_second_order_ivp(accel, {0.0, 2.0 * M_PI}, {1.0}, {0.0}, 200, verlet_opts);
+
+    SecondOrderIvpOptions rkn_opts;
+    rkn_opts.method = SecondOrderIntegratorMethod::RungeKuttaNystrom4;
+    auto rkn_traj = solve_second_order_ivp(accel, {0.0, 2.0 * M_PI}, {1.0}, {0.0}, 200, rkn_opts);
+
+    std::cout << "One-period solve_second_order_ivp comparison\n";
+    std::cout << "  Stormer-Verlet: q(tf)=" << verlet_traj.q(0, verlet_traj.q.cols() - 1)
+              << ", v(tf)=" << verlet_traj.v(0, verlet_traj.v.cols() - 1) << "\n";
+    std::cout << "  RKN4:            q(tf)=" << rkn_traj.q(0, rkn_traj.q.cols() - 1)
+              << ", v(tf)=" << rkn_traj.v(0, rkn_traj.v.cols() - 1) << "\n\n";
 }
 
 // ============================================================================
@@ -225,22 +311,98 @@ void ode_var_example() {
 }
 
 // ============================================================================
+// Pattern 4: Stiff And Constrained Mass-Matrix Systems
+// ============================================================================
+
+void mass_matrix_example() {
+    std::cout << "=== Pattern 4: Stiff And Constrained Mass-Matrix Systems ===\n";
+
+    MassMatrixIvpOptions rosen_opts;
+    rosen_opts.method = MassMatrixIntegratorMethod::RosenbrockEuler;
+    rosen_opts.substeps = 2;
+
+    auto stiff_sol = solve_ivp_mass_matrix(
+        [](double t, const NumericVector &y) {
+            NumericVector rhs(1);
+            rhs(0) = -20.0 * y(0);
+            return rhs;
+        },
+        [](double t, const NumericVector &y) {
+            NumericMatrix M(1, 1);
+            M(0, 0) = 2.0;
+            return M;
+        },
+        {0.0, 0.5}, {1.0}, 80, rosen_opts);
+
+    std::cout << "Rosenbrock-Euler on 2*y' = -20*y\n";
+    std::cout << "  y(0.5) = " << stiff_sol.y(0, stiff_sol.y.cols() - 1)
+              << " (exact: " << std::exp(-5.0) << ")\n";
+
+    MassMatrixIvpOptions bdf_opts;
+    bdf_opts.method = MassMatrixIntegratorMethod::Bdf1;
+    bdf_opts.substeps = 2;
+
+    auto constrained_sol = solve_ivp_mass_matrix(
+        [](double t, const NumericVector &y) {
+            NumericVector rhs(2);
+            rhs << y(1), 1.0 - y(0) - y(1);
+            return rhs;
+        },
+        [](double t, const NumericVector &y) {
+            NumericMatrix M = NumericMatrix::Zero(2, 2);
+            M(0, 0) = 1.0;
+            return M;
+        },
+        {0.0, 1.0}, {0.0, 1.0}, 50, bdf_opts);
+
+    std::cout << "BDF1 on a singular-mass constrained system\n";
+    std::cout << "  x(tf) = " << constrained_sol.y(0, constrained_sol.y.cols() - 1)
+              << ", z(tf) = " << constrained_sol.y(1, constrained_sol.y.cols() - 1) << "\n";
+
+    auto t_sym = janus::sym("t");
+    auto y_sym = janus::sym("y", 2);
+
+    casadi::MX rhs_sym = casadi::MX::vertcat({y_sym(1), 1.0 - y_sym(0) - y_sym(1)});
+    casadi::MX M_sym = casadi::MX::zeros(2, 2);
+    M_sym(0, 0) = 1.0;
+
+    MassMatrixIvpOptions idas_opts;
+    idas_opts.abstol = 1e-10;
+    idas_opts.reltol = 1e-10;
+
+    NumericVector y0(2);
+    y0 << 0.0, 1.0;
+    auto symbolic_sol =
+        solve_ivp_mass_matrix_expr(rhs_sym, M_sym, t_sym, y_sym, {0.0, 1.0}, y0, 40, idas_opts);
+
+    std::cout << "IDAS symbolic mass-matrix path on the same constrained system\n";
+    std::cout << "  x(tf) = " << symbolic_sol.y(0, symbolic_sol.y.cols() - 1)
+              << ", z(tf) = " << symbolic_sol.y(1, symbolic_sol.y.cols() - 1) << "\n\n";
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 int main() {
-    std::cout << "Janus Integration Demo for Icarus-Style Simulations\n";
-    std::cout << "===================================================\n\n";
+    std::cout << "Janus Integration Demo\n";
+    std::cout << "======================\n\n";
+    std::cout << std::fixed << std::setprecision(6);
 
     monolithic_example();
+    structure_preserving_example();
     component_based_example();
     ode_var_example();
+    mass_matrix_example();
 
     std::cout << "Recommendation for Icarus:\n";
     std::cout << "--------------------------\n";
     std::cout << "Use Pattern 2 (Component-Based) for simulation.\n";
     std::cout << "Each component implements IntegrableState interface.\n";
     std::cout << "Integrator collects all components and steps them together.\n";
+    std::cout << "Use Pattern 1b when the system is naturally second-order and long-horizon\n";
+    std::cout << "energy behavior matters.\n";
+    std::cout << "Use Pattern 4 when the system is stiff or carries algebraic constraints.\n";
 
     return 0;
 }
