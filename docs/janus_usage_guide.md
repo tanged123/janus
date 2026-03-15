@@ -288,6 +288,8 @@ Symbolic-compatible branching and comparisons:
 |----------|-------------|
 | `jacobian({outputs}, {inputs})` | Multi-input/output Jacobian |
 | `hessian(output, inputs)` | Hessian matrix |
+| `hessian_vector_product(output, inputs, direction)` | Matrix-free Hessian action `H * v` |
+| `lagrangian_hessian_vector_product(...)` | Matrix-free second-order adjoint `∇²L(x, λ) v` |
 | `select_sensitivity_regime(...)` | Choose forward, adjoint, or checkpointed adjoint |
 | `sensitivity_jacobian(function, output_idx, input_idx, ...)` | Build a Jacobian function through the selected regime |
 

@@ -364,3 +364,150 @@ TEST(AutoDiffTests, SensitivityJacobianBuildsAdjointJacobianForSelectedBlock) {
     EXPECT_NEAR(J(0, 2), 12.0, 1e-10);
     EXPECT_NEAR(J(0, 3), 9.0, 1e-10);
 }
+
+TEST(AutoDiffTests, HessianVectorProductMatchesDenseHessian) {
+    auto x = janus::sym("x", 2);
+    auto v = janus::sym("v", 2);
+    casadi::MX x0 = x(0);
+    casadi::MX x1 = x(1);
+
+    auto f = x0 * x0 * x1 + janus::sin(x1);
+
+    janus::Function hvp_fun("expr_hvp", {x, v}, {janus::hessian_vector_product(f, x, v)});
+    janus::Function H_fun("expr_hess", {x}, {janus::hessian(f, x)});
+
+    janus::NumericVector x_val(2);
+    x_val << 1.5, -0.3;
+    janus::NumericVector v_val(2);
+    v_val << 0.2, -0.7;
+
+    auto hvp = hvp_fun.eval(x_val, v_val);
+    janus::NumericMatrix H = H_fun.eval(x_val);
+    janus::NumericVector expected = H * v_val;
+
+    ASSERT_EQ(hvp.rows(), 2);
+    ASSERT_EQ(hvp.cols(), 1);
+    EXPECT_NEAR(hvp(0, 0), expected(0), 1e-10);
+    EXPECT_NEAR(hvp(1, 0), expected(1), 1e-10);
+}
+
+TEST(AutoDiffTests, FunctionHessianVectorProductBuildsScalarBlockAction) {
+    auto x = janus::sym("x");
+    auto p = janus::sym("p", 3);
+    casadi::MX p0 = p(0);
+    casadi::MX p1 = p(1);
+    casadi::MX p2 = p(2);
+
+    auto y0 = casadi::MX::vertcat({x + p0, p1 - p2});
+    auto y1 = p0 * p0 * p1 + janus::sin(p2) + x * p1;
+
+    janus::Function f("function_hvp_model", {x, p}, {y0, y1});
+    janus::Function hvp_fun = janus::hessian_vector_product(f, 1, 1);
+    janus::Function H_fun("function_hvp_ref", {x, p}, {janus::hessian(y1, p)});
+
+    const double x_val = 0.5;
+    janus::NumericVector p_val(3);
+    p_val << 2.0, -1.0, 0.3;
+    janus::NumericVector v_val(3);
+    v_val << 0.1, -0.2, 0.4;
+
+    auto hvp = hvp_fun.eval(x_val, p_val, v_val);
+    janus::NumericMatrix H = H_fun.eval(x_val, p_val);
+    janus::NumericVector expected = H * v_val;
+
+    ASSERT_EQ(hvp.rows(), 3);
+    ASSERT_EQ(hvp.cols(), 1);
+    EXPECT_NEAR(hvp(0, 0), expected(0), 1e-10);
+    EXPECT_NEAR(hvp(1, 0), expected(1), 1e-10);
+    EXPECT_NEAR(hvp(2, 0), expected(2), 1e-10);
+}
+
+TEST(AutoDiffTests, LagrangianHessianVectorProductMatchesDenseHessian) {
+    auto x = janus::sym("x", 2);
+    auto lam = janus::sym("lam", 2);
+    auto v = janus::sym("v", 2);
+    casadi::MX x0 = x(0);
+    casadi::MX x1 = x(1);
+
+    auto objective = x0 * x0 + x0 * x1 + janus::sin(x1);
+    auto constraints = casadi::MX::vertcat({x0 * x1, x0 + x1 * x1});
+
+    janus::Function hvp_fun(
+        "lagrangian_hvp_expr", {x, lam, v},
+        {janus::lagrangian_hessian_vector_product(objective, constraints, x, lam, v)});
+    janus::Function H_fun("lagrangian_hess_expr", {x, lam},
+                          {janus::hessian_lagrangian(objective, constraints, x, lam)});
+
+    janus::NumericVector x_val(2);
+    x_val << 0.7, -1.2;
+    janus::NumericVector lam_val(2);
+    lam_val << 1.5, -0.4;
+    janus::NumericVector v_val(2);
+    v_val << -0.2, 0.6;
+
+    auto hvp = hvp_fun.eval(x_val, lam_val, v_val);
+    janus::NumericMatrix H = H_fun.eval(x_val, lam_val);
+    janus::NumericVector expected = H * v_val;
+
+    ASSERT_EQ(hvp.rows(), 2);
+    ASSERT_EQ(hvp.cols(), 1);
+    EXPECT_NEAR(hvp(0, 0), expected(0), 1e-10);
+    EXPECT_NEAR(hvp(1, 0), expected(1), 1e-10);
+}
+
+TEST(AutoDiffTests, FunctionLagrangianHessianVectorProductBuildsSecondOrderAdjointAction) {
+    auto x = janus::sym("x", 2);
+    auto p = janus::sym("p", 2);
+    casadi::MX x0 = x(0);
+    casadi::MX x1 = x(1);
+    casadi::MX p0 = p(0);
+    casadi::MX p1 = p(1);
+
+    auto measurement = x0 + 2.0 * p0;
+    auto objective = janus::pow(x0 - p0, 2.0) + x1 * p1 + janus::sin(x0 * x1);
+    auto constraints = casadi::MX::vertcat({x0 + p0 * x1, x0 * x0 + x1 - p1});
+    auto lam = janus::sym("lam", 2);
+
+    janus::Function f("lagrangian_hvp_model", {x, p}, {measurement, objective, constraints});
+    janus::Function hvp_fun = janus::lagrangian_hessian_vector_product(f, 1, 2, 0);
+    janus::Function H_fun("lagrangian_hvp_ref", {x, p, lam},
+                          {janus::hessian_lagrangian(objective, constraints, x, lam)});
+
+    janus::NumericVector x_val(2);
+    x_val << 0.4, -0.7;
+    janus::NumericVector p_val(2);
+    p_val << 1.2, -0.8;
+    janus::NumericVector lam_val(2);
+    lam_val << 0.5, -1.1;
+    janus::NumericVector v_val(2);
+    v_val << 0.3, -0.2;
+
+    auto hvp = hvp_fun.eval(x_val, p_val, lam_val, v_val);
+    janus::NumericMatrix H = H_fun.eval(x_val, p_val, lam_val);
+    janus::NumericVector expected = H * v_val;
+
+    ASSERT_EQ(hvp.rows(), 2);
+    ASSERT_EQ(hvp.cols(), 1);
+    EXPECT_NEAR(hvp(0, 0), expected(0), 1e-10);
+    EXPECT_NEAR(hvp(1, 0), expected(1), 1e-10);
+}
+
+TEST(AutoDiffTests, HessianVectorProductValidationErrors) {
+    auto x = janus::sym("x", 2);
+    auto v_bad = janus::sym("v_bad", 3);
+    casadi::MX x0 = x(0);
+    casadi::MX x1 = x(1);
+    auto f = x0 * x0 + x0 * x1;
+
+    EXPECT_THROW(janus::hessian_vector_product(f, x, v_bad), janus::InvalidArgument);
+
+    auto vec_out = casadi::MX::vertcat({x0, x1});
+    janus::Function block_fn("nonscalar_output", {x}, {vec_out});
+    EXPECT_THROW(janus::hessian_vector_product(block_fn), janus::InvalidArgument);
+
+    auto lam_bad = janus::sym("lam_bad", 3);
+    auto constraints = casadi::MX::vertcat({x0 + x1, x0 - x1});
+    auto v = janus::sym("v", 2);
+    EXPECT_THROW(janus::lagrangian_hessian_vector_product(f, constraints, x, lam_bad, v),
+                 janus::InvalidArgument);
+}

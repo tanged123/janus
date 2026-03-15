@@ -69,7 +69,9 @@ using janus::where;
 // Calculus
 using janus::gradient;
 using janus::hessian;
+using janus::hessian_vector_product;
 using janus::jacobian;
+using janus::lagrangian_hessian_vector_product;
 
 // Spacing
 using janus::linspace;

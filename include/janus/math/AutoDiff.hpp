@@ -149,6 +149,20 @@ inline int output_numel(const Function &fn, int output_idx) {
     return cas_fn.size1_out(output_idx) * cas_fn.size2_out(output_idx);
 }
 
+inline void validate_scalar_output(const Function &fn, int output_idx, const std::string &context) {
+    if (output_numel(fn, output_idx) != 1) {
+        throw InvalidArgument(context + ": selected function output must be scalar");
+    }
+}
+
+inline void validate_same_shape(const casadi::MX &lhs, const casadi::MX &rhs,
+                                const std::string &context, const std::string &rhs_name) {
+    if (lhs.size1() != rhs.size1() || lhs.size2() != rhs.size2()) {
+        throw InvalidArgument(context + ": " + rhs_name +
+                              " must have the same shape as the differentiation variables");
+    }
+}
+
 inline std::vector<casadi::MX> symbolic_inputs_like(const Function &fn) {
     return fn.casadi_function().mx_in();
 }
@@ -198,6 +212,40 @@ inline std::string sensitivity_function_name(const Function &fn, const std::stri
                                              int output_idx, int input_idx) {
     return fn.casadi_function().name() + "_" + suffix + "_o" + std::to_string(output_idx) + "_i" +
            std::to_string(input_idx);
+}
+
+inline std::string lagrangian_function_name(const Function &fn, const std::string &suffix,
+                                            int objective_output_idx, int constraint_output_idx,
+                                            int input_idx) {
+    return fn.casadi_function().name() + "_" + suffix + "_obj" +
+           std::to_string(objective_output_idx) + "_con" + std::to_string(constraint_output_idx) +
+           "_i" + std::to_string(input_idx);
+}
+
+inline void validate_scalar_expression(const casadi::MX &expr, const std::string &context,
+                                       const std::string &name) {
+    if (expr.numel() != 1) {
+        throw InvalidArgument(context + ": " + name + " must be scalar");
+    }
+}
+
+inline casadi::MX lagrangian_scalar(const SymbolicArg &objective, const SymbolicArg &constraints,
+                                    const SymbolicArg &multipliers, const std::string &context) {
+    const casadi::MX objective_mx = objective.get();
+    const casadi::MX constraints_mx = constraints.get();
+    const casadi::MX multipliers_mx = multipliers.get();
+
+    validate_scalar_expression(objective_mx, context, "objective");
+    if (constraints_mx.numel() != multipliers_mx.numel()) {
+        throw InvalidArgument(context + ": multipliers must have the same number of entries as "
+                                        "the constraint output");
+    }
+
+    const casadi::MX constraints_vec =
+        casadi::MX::reshape(constraints_mx, constraints_mx.numel(), 1);
+    const casadi::MX multipliers_vec =
+        casadi::MX::reshape(multipliers_mx, multipliers_mx.numel(), 1);
+    return objective_mx + casadi::MX::dot(multipliers_vec, constraints_vec);
 }
 
 inline casadi::MX forward_block_jacobian(const Function &fn, int output_idx, int input_idx) {
@@ -435,15 +483,122 @@ inline SymbolicMatrix hessian(const SymbolicArg &expr, const SymbolicArg &vars) 
 inline SymbolicMatrix hessian_lagrangian(const SymbolicArg &objective,
                                          const SymbolicArg &constraints, const SymbolicArg &vars,
                                          const SymbolicArg &multipliers) {
-    // L = f + lambda' * g
-    SymbolicScalar f = objective.get();
-    SymbolicScalar g = constraints.get();
-    SymbolicScalar lam = multipliers.get();
+    return janus::hessian(autodiff_detail::lagrangian_scalar(objective, constraints, multipliers,
+                                                             "hessian_lagrangian"),
+                          vars);
+}
 
-    // Robust dot product
-    SymbolicScalar lagrangian = f + SymbolicScalar::dot(lam, g);
+/**
+ * @brief Hessian-vector product for a scalar expression without forming the dense Hessian.
+ *
+ * This uses CasADi's directional derivative of the reverse-mode gradient, i.e.
+ * forward-over-reverse AD.
+ *
+ * @param expr Scalar expression f(x)
+ * @param vars Differentiation variables x
+ * @param direction Direction vector/matrix v with the same shape as x
+ * @return Matrix/vector with the same shape as x containing ∇²f(x) v
+ */
+inline SymbolicMatrix hessian_vector_product(const SymbolicArg &expr, const SymbolicArg &vars,
+                                             const SymbolicArg &direction) {
+    const casadi::MX expr_mx = expr.get();
+    const casadi::MX vars_mx = vars.get();
+    const casadi::MX direction_mx = direction.get();
 
-    return janus::hessian(lagrangian, vars);
+    autodiff_detail::validate_scalar_expression(expr_mx, "hessian_vector_product", "expression");
+    autodiff_detail::validate_same_shape(vars_mx, direction_mx, "hessian_vector_product",
+                                         "direction");
+
+    const casadi::MX gradient_mx = casadi::MX::gradient(expr_mx, vars_mx);
+    return to_eigen(casadi::MX::jtimes(gradient_mx, vars_mx, direction_mx, false));
+}
+
+/**
+ * @brief Hessian-vector product of a Lagrangian, i.e. a second-order adjoint action.
+ *
+ * Computes ∇²L(x, λ) v for L(x, λ) = f(x) + λᵀ g(x) without forming the dense Hessian.
+ *
+ * @param objective Objective function f(x) (scalar)
+ * @param constraints Constraint function g(x)
+ * @param vars Decision variables x
+ * @param multipliers Lagrange multipliers λ (same number of entries as g)
+ * @param direction Direction vector/matrix v with the same shape as x
+ * @return Matrix/vector with the same shape as x containing ∇²L(x, λ) v
+ */
+inline SymbolicMatrix lagrangian_hessian_vector_product(const SymbolicArg &objective,
+                                                        const SymbolicArg &constraints,
+                                                        const SymbolicArg &vars,
+                                                        const SymbolicArg &multipliers,
+                                                        const SymbolicArg &direction) {
+    return hessian_vector_product(
+        autodiff_detail::lagrangian_scalar(objective, constraints, multipliers,
+                                           "lagrangian_hessian_vector_product"),
+        vars, direction);
+}
+
+/**
+ * @brief Build a matrix-free Hessian-vector product function for one scalar output/input block.
+ *
+ * The returned function takes the original function inputs followed by one extra direction input
+ * matching the selected input block shape. Its single output is ∇²y_i / ∇x_j² times that
+ * direction, reshaped like the selected input block.
+ */
+inline Function hessian_vector_product(const Function &fn, int output_idx = 0, int input_idx = 0) {
+    autodiff_detail::validate_function_indices(fn, output_idx, input_idx, "hessian_vector_product");
+    autodiff_detail::validate_scalar_output(fn, output_idx, "hessian_vector_product");
+
+    const auto &cas_fn = fn.casadi_function();
+    std::vector<casadi::MX> inputs = autodiff_detail::symbolic_inputs_like(fn);
+    std::vector<casadi::MX> outputs = cas_fn(inputs);
+    casadi::MX direction =
+        casadi::MX::sym("hvp_direction", cas_fn.size1_in(input_idx), cas_fn.size2_in(input_idx));
+
+    casadi::MX hvp_expr = as_mx(
+        janus::hessian_vector_product(outputs.at(output_idx), inputs.at(input_idx), direction));
+
+    std::vector<SymbolicArg> args = autodiff_detail::to_symbolic_args(inputs);
+    args.emplace_back(direction);
+
+    return Function(autodiff_detail::sensitivity_function_name(fn, "hvp", output_idx, input_idx),
+                    args, std::vector<SymbolicArg>{SymbolicArg(hvp_expr)});
+}
+
+/**
+ * @brief Build a Lagrangian Hessian-vector product function for optimization workflows.
+ *
+ * The returned function takes the original function inputs, then the constraint multipliers λ for
+ * the selected constraint output block, and finally the direction v for the selected input block.
+ * The output is ∇²L(x, λ) v, reshaped like the selected input block.
+ */
+inline Function lagrangian_hessian_vector_product(const Function &fn, int objective_output_idx,
+                                                  int constraint_output_idx, int input_idx = 0) {
+    autodiff_detail::validate_function_indices(fn, objective_output_idx, input_idx,
+                                               "lagrangian_hessian_vector_product");
+    autodiff_detail::validate_function_indices(fn, constraint_output_idx, input_idx,
+                                               "lagrangian_hessian_vector_product");
+    autodiff_detail::validate_scalar_output(fn, objective_output_idx,
+                                            "lagrangian_hessian_vector_product");
+
+    const auto &cas_fn = fn.casadi_function();
+    std::vector<casadi::MX> inputs = autodiff_detail::symbolic_inputs_like(fn);
+    std::vector<casadi::MX> outputs = cas_fn(inputs);
+    casadi::MX multipliers =
+        casadi::MX::sym("lagrange_multipliers", cas_fn.size1_out(constraint_output_idx),
+                        cas_fn.size2_out(constraint_output_idx));
+    casadi::MX direction = casadi::MX::sym("lagrangian_hvp_direction", cas_fn.size1_in(input_idx),
+                                           cas_fn.size2_in(input_idx));
+
+    casadi::MX hvp_expr = as_mx(janus::lagrangian_hessian_vector_product(
+        outputs.at(objective_output_idx), outputs.at(constraint_output_idx), inputs.at(input_idx),
+        multipliers, direction));
+
+    std::vector<SymbolicArg> args = autodiff_detail::to_symbolic_args(inputs);
+    args.emplace_back(multipliers);
+    args.emplace_back(direction);
+
+    return Function(autodiff_detail::lagrangian_function_name(fn, "lag_hvp", objective_output_idx,
+                                                              constraint_output_idx, input_idx),
+                    args, std::vector<SymbolicArg>{SymbolicArg(hvp_expr)});
 }
 
 // --- Overloads for vector inputs (convenience) ---
@@ -473,6 +628,28 @@ inline SymbolicMatrix hessian_lagrangian(const SymbolicArg &objective,
                                          const SymbolicArg &multipliers) {
     SymbolicScalar v_cat = SymbolicScalar::vertcat(detail::to_mx_vector(vars));
     return hessian_lagrangian(objective, constraints, v_cat, multipliers);
+}
+
+/**
+ * @brief Hessian-vector product with vector of variables
+ */
+inline SymbolicMatrix hessian_vector_product(const SymbolicArg &expr,
+                                             const std::vector<SymbolicArg> &vars,
+                                             const SymbolicArg &direction) {
+    SymbolicScalar v_cat = SymbolicScalar::vertcat(detail::to_mx_vector(vars));
+    return hessian_vector_product(expr, v_cat, direction);
+}
+
+/**
+ * @brief Lagrangian Hessian-vector product with vector of variables
+ */
+inline SymbolicMatrix lagrangian_hessian_vector_product(const SymbolicArg &objective,
+                                                        const SymbolicArg &constraints,
+                                                        const std::vector<SymbolicArg> &vars,
+                                                        const SymbolicArg &multipliers,
+                                                        const SymbolicArg &direction) {
+    SymbolicScalar v_cat = SymbolicScalar::vertcat(detail::to_mx_vector(vars));
+    return lagrangian_hessian_vector_product(objective, constraints, v_cat, multipliers, direction);
 }
 
 } // namespace janus
