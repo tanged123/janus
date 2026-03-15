@@ -6,13 +6,20 @@
 #include "janus/math/Logic.hpp"
 #include "janus/math/Trig.hpp"
 #include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/SparseCholesky>
+#include <Eigen/SparseLU>
+#include <Eigen/SparseQR>
 #include <algorithm>
 #include <array>
 #include <casadi/casadi.hpp>
 #include <cmath>
 #include <complex>
+#include <functional>
 #include <limits>
 #include <numeric>
+#include <string>
+#include <unsupported/Eigen/IterativeSolvers>
 #include <vector>
 
 namespace janus {
@@ -20,10 +27,345 @@ namespace janus {
 // --- Conversion Helpers ---
 // (Moved to JanusTypes.hpp: to_mx, to_eigen, as_vector)
 
+enum class LinearSolveBackend { Dense, SparseDirect, IterativeKrylov };
+
+enum class DenseLinearSolver {
+    ColPivHouseholderQR,
+    PartialPivLU,
+    FullPivLU,
+    LLT,
+    LDLT,
+};
+
+enum class SparseDirectLinearSolver {
+    SparseLU,
+    SparseQR,
+    SimplicialLLT,
+    SimplicialLDLT,
+};
+
+enum class IterativeKrylovSolver { BiCGSTAB, GMRES };
+
+enum class IterativePreconditioner { None, Diagonal };
+
+struct LinearSolvePolicy {
+    LinearSolveBackend backend = LinearSolveBackend::Dense;
+    DenseLinearSolver dense_solver = DenseLinearSolver::ColPivHouseholderQR;
+    SparseDirectLinearSolver sparse_direct_solver = SparseDirectLinearSolver::SparseLU;
+    IterativeKrylovSolver iterative_solver = IterativeKrylovSolver::BiCGSTAB;
+    IterativePreconditioner iterative_preconditioner = IterativePreconditioner::Diagonal;
+    double tolerance = 1e-10;
+    int max_iterations = 500;
+    int gmres_restart = 30;
+    std::function<NumericVector(const NumericVector &)> preconditioner_hook;
+    std::string symbolic_linear_solver;
+    casadi::Dict symbolic_options;
+
+    static LinearSolvePolicy
+    dense(DenseLinearSolver solver = DenseLinearSolver::ColPivHouseholderQR) {
+        LinearSolvePolicy policy;
+        policy.backend = LinearSolveBackend::Dense;
+        policy.dense_solver = solver;
+        return policy;
+    }
+
+    static LinearSolvePolicy
+    sparse_direct(SparseDirectLinearSolver solver = SparseDirectLinearSolver::SparseLU) {
+        LinearSolvePolicy policy;
+        policy.backend = LinearSolveBackend::SparseDirect;
+        policy.sparse_direct_solver = solver;
+        return policy;
+    }
+
+    static LinearSolvePolicy
+    iterative(IterativeKrylovSolver solver = IterativeKrylovSolver::BiCGSTAB,
+              IterativePreconditioner preconditioner = IterativePreconditioner::Diagonal) {
+        LinearSolvePolicy policy;
+        policy.backend = LinearSolveBackend::IterativeKrylov;
+        policy.iterative_solver = solver;
+        policy.iterative_preconditioner = preconditioner;
+        return policy;
+    }
+
+    LinearSolvePolicy &set_tolerance(double value) {
+        tolerance = value;
+        return *this;
+    }
+
+    LinearSolvePolicy &set_max_iterations(int value) {
+        max_iterations = value;
+        return *this;
+    }
+
+    LinearSolvePolicy &set_gmres_restart(int value) {
+        gmres_restart = value;
+        return *this;
+    }
+
+    LinearSolvePolicy &
+    set_preconditioner_hook(std::function<NumericVector(const NumericVector &)> hook) {
+        preconditioner_hook = std::move(hook);
+        return *this;
+    }
+
+    LinearSolvePolicy &set_symbolic_solver(const std::string &solver,
+                                           const casadi::Dict &opts = casadi::Dict()) {
+        symbolic_linear_solver = solver;
+        symbolic_options = opts;
+        return *this;
+    }
+};
+
+namespace detail {
+
+class FunctionalPreconditioner {
+  public:
+    using Scalar = double;
+    using RealScalar = double;
+    using StorageIndex = int;
+    enum { ColsAtCompileTime = Eigen::Dynamic, MaxColsAtCompileTime = Eigen::Dynamic };
+
+    FunctionalPreconditioner() = default;
+
+    void set_apply(std::function<NumericVector(const NumericVector &)> apply) {
+        apply_ = std::move(apply);
+    }
+
+    Eigen::Index rows() const noexcept { return size_; }
+    Eigen::Index cols() const noexcept { return size_; }
+
+    template <typename MatType> FunctionalPreconditioner &analyzePattern(const MatType &) {
+        return *this;
+    }
+
+    template <typename MatType> FunctionalPreconditioner &factorize(const MatType &mat) {
+        size_ = mat.cols();
+        initialized_ = true;
+        return *this;
+    }
+
+    template <typename MatType> FunctionalPreconditioner &compute(const MatType &mat) {
+        return factorize(mat);
+    }
+
+    template <typename Rhs, typename Dest> void _solve_impl(const Rhs &b, Dest &x) const {
+        NumericVector rhs = b;
+        x = apply_ ? apply_(rhs) : rhs;
+    }
+
+    template <typename Rhs>
+    inline const Eigen::Solve<FunctionalPreconditioner, Rhs>
+    solve(const Eigen::MatrixBase<Rhs> &b) const {
+        eigen_assert(initialized_ && "FunctionalPreconditioner is not initialized.");
+        eigen_assert(size_ == b.rows() && "FunctionalPreconditioner::solve(): invalid rhs size");
+        return Eigen::Solve<FunctionalPreconditioner, Rhs>(*this, b.derived());
+    }
+
+    Eigen::ComputationInfo info() const { return Eigen::Success; }
+
+  private:
+    std::function<NumericVector(const NumericVector &)> apply_;
+    Eigen::Index size_ = 0;
+    bool initialized_ = false;
+};
+
+inline void validate_linear_solve_dims(Eigen::Index a_rows, Eigen::Index a_cols,
+                                       Eigen::Index b_rows, const std::string &context) {
+    if (a_rows == 0 || a_cols == 0) {
+        throw InvalidArgument(context + ": coefficient matrix must be non-empty");
+    }
+    if (b_rows != a_rows) {
+        throw InvalidArgument(context + ": rhs row count must match coefficient matrix rows");
+    }
+}
+
+inline void validate_square_required(Eigen::Index rows, Eigen::Index cols,
+                                     const std::string &context, const std::string &solver_name) {
+    if (rows != cols) {
+        throw InvalidArgument(context + ": " + solver_name + " requires a square matrix");
+    }
+}
+
+inline void validate_iterative_policy(const LinearSolvePolicy &policy, const std::string &context) {
+    if (policy.tolerance <= 0.0) {
+        throw InvalidArgument(context + ": tolerance must be positive");
+    }
+    if (policy.max_iterations <= 0) {
+        throw InvalidArgument(context + ": max_iterations must be positive");
+    }
+    if (policy.gmres_restart <= 0) {
+        throw InvalidArgument(context + ": gmres_restart must be positive");
+    }
+}
+
+inline std::function<NumericVector(const NumericVector &)>
+make_preconditioner(const SparseMatrix &A, const LinearSolvePolicy &policy) {
+    if (policy.preconditioner_hook) {
+        return policy.preconditioner_hook;
+    }
+
+    switch (policy.iterative_preconditioner) {
+    case IterativePreconditioner::None:
+        return [](const NumericVector &rhs) { return rhs; };
+    case IterativePreconditioner::Diagonal: {
+        NumericVector inv_diag(A.rows());
+        const double eps = std::numeric_limits<double>::epsilon();
+        for (int i = 0; i < A.rows(); ++i) {
+            const double diag = A.coeff(i, i);
+            inv_diag(i) = std::abs(diag) > eps ? 1.0 / diag : 1.0;
+        }
+        return [inv_diag](const NumericVector &rhs) { return inv_diag.array() * rhs.array(); };
+    }
+    }
+    throw InvalidArgument("solve: unsupported iterative preconditioner");
+}
+
+template <typename MatrixLike> SparseMatrix dense_to_sparse(const MatrixLike &A) {
+    SparseMatrix sparse = A.sparseView();
+    sparse.makeCompressed();
+    return sparse;
+}
+
+inline NumericMatrix sparse_to_dense(const SparseMatrix &A) { return NumericMatrix(A); }
+
+template <typename DerivedB>
+auto solve_sparse_direct_numeric(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b,
+                                 const LinearSolvePolicy &policy) {
+    using Result = Eigen::Matrix<double, Eigen::Dynamic, DerivedB::ColsAtCompileTime>;
+
+    SparseMatrix matrix = A;
+    matrix.makeCompressed();
+
+    switch (policy.sparse_direct_solver) {
+    case SparseDirectLinearSolver::SparseLU: {
+        Eigen::SparseLU<SparseMatrix> solver;
+        solver.compute(matrix);
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: SparseLU factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    case SparseDirectLinearSolver::SparseQR: {
+        Eigen::SparseQR<SparseMatrix, Eigen::COLAMDOrdering<int>> solver;
+        solver.compute(matrix);
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: SparseQR factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    case SparseDirectLinearSolver::SimplicialLLT: {
+        validate_square_required(matrix.rows(), matrix.cols(), "solve", "SimplicialLLT");
+        Eigen::SimplicialLLT<SparseMatrix> solver;
+        solver.compute(matrix);
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: SimplicialLLT factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    case SparseDirectLinearSolver::SimplicialLDLT: {
+        validate_square_required(matrix.rows(), matrix.cols(), "solve", "SimplicialLDLT");
+        Eigen::SimplicialLDLT<SparseMatrix> solver;
+        solver.compute(matrix);
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: SimplicialLDLT factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    }
+
+    return Result();
+}
+
+template <typename Solver, typename DerivedB>
+auto solve_iterative_with_solver(Solver &solver, const Eigen::MatrixBase<DerivedB> &b) {
+    using Result = Eigen::Matrix<double, Eigen::Dynamic, DerivedB::ColsAtCompileTime>;
+
+    Result x(b.rows(), b.cols());
+    for (int col = 0; col < b.cols(); ++col) {
+        NumericVector rhs = b.col(col);
+        NumericVector sol = solver.solve(rhs);
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: iterative solver failed to converge");
+        }
+        x.col(col) = sol;
+    }
+    return x;
+}
+
+template <typename DerivedB>
+auto solve_iterative_numeric(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b,
+                             const LinearSolvePolicy &policy) {
+    validate_square_required(A.rows(), A.cols(), "solve", "iterative Krylov backends");
+    validate_iterative_policy(policy, "solve");
+
+    FunctionalPreconditioner preconditioner;
+    preconditioner.set_apply(make_preconditioner(A, policy));
+
+    switch (policy.iterative_solver) {
+    case IterativeKrylovSolver::BiCGSTAB: {
+        Eigen::BiCGSTAB<SparseMatrix, FunctionalPreconditioner> solver;
+        solver.setTolerance(policy.tolerance);
+        solver.setMaxIterations(policy.max_iterations);
+        solver.preconditioner() = preconditioner;
+        solver.compute(A);
+        return solve_iterative_with_solver(solver, b);
+    }
+    case IterativeKrylovSolver::GMRES: {
+        Eigen::GMRES<SparseMatrix, FunctionalPreconditioner> solver;
+        solver.setTolerance(policy.tolerance);
+        solver.setMaxIterations(policy.max_iterations);
+        solver.set_restart(policy.gmres_restart);
+        solver.preconditioner() = preconditioner;
+        solver.compute(A);
+        return solve_iterative_with_solver(solver, b);
+    }
+    }
+
+    using Result = Eigen::Matrix<double, Eigen::Dynamic, DerivedB::ColsAtCompileTime>;
+    return Result();
+}
+
+template <typename DerivedA, typename DerivedB>
+auto solve_dense_numeric(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<DerivedB> &b,
+                         const LinearSolvePolicy &policy) {
+    switch (policy.dense_solver) {
+    case DenseLinearSolver::ColPivHouseholderQR:
+        return A.colPivHouseholderQr().solve(b).eval();
+    case DenseLinearSolver::PartialPivLU:
+        validate_square_required(A.rows(), A.cols(), "solve", "PartialPivLU");
+        return A.partialPivLu().solve(b).eval();
+    case DenseLinearSolver::FullPivLU:
+        validate_square_required(A.rows(), A.cols(), "solve", "FullPivLU");
+        return A.fullPivLu().solve(b).eval();
+    case DenseLinearSolver::LLT: {
+        validate_square_required(A.rows(), A.cols(), "solve", "LLT");
+        Eigen::LLT<NumericMatrix> solver(A.eval());
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: LLT factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    case DenseLinearSolver::LDLT: {
+        validate_square_required(A.rows(), A.cols(), "solve", "LDLT");
+        Eigen::LDLT<NumericMatrix> solver(A.eval());
+        if (solver.info() != Eigen::Success) {
+            throw InvalidArgument("solve: LDLT factorization failed");
+        }
+        return solver.solve(b).eval();
+    }
+    }
+
+    return A.colPivHouseholderQr().solve(b).eval();
+}
+
+} // namespace detail
+
 // --- solve(A, b) ---
 /**
- * @brief Solves linear system Ax = b
- * Uses QR decomposition for numeric types, and symbolic solve for CasADi types.
+ * @brief Solves linear system Ax = b using the default backend policy.
+ *
+ * Numeric dense matrices default to column-pivoted Householder QR. Symbolic MX matrices keep
+ * CasADi's default linear solver selection.
  *
  * @param A Coefficient matrix
  * @param b Right-hand side vector
@@ -31,19 +373,73 @@ namespace janus {
  */
 template <typename DerivedA, typename DerivedB>
 auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<DerivedB> &b) {
+    return solve(A, b, LinearSolvePolicy());
+}
+
+/**
+ * @brief Solves linear system Ax = b using an explicit backend policy.
+ */
+template <typename DerivedA, typename DerivedB>
+auto solve(const Eigen::MatrixBase<DerivedA> &A, const Eigen::MatrixBase<DerivedB> &b,
+           const LinearSolvePolicy &policy) {
     using Scalar = typename DerivedA::Scalar;
+    detail::validate_linear_solve_dims(A.rows(), A.cols(), b.rows(), "solve");
 
     if constexpr (std::is_floating_point_v<Scalar>) {
-        // Numeric: Use reliable QR solver
-        return A.colPivHouseholderQr().solve(b).eval();
+        switch (policy.backend) {
+        case LinearSolveBackend::Dense:
+            return detail::solve_dense_numeric(A, b, policy);
+        case LinearSolveBackend::SparseDirect:
+            return detail::solve_sparse_direct_numeric(detail::dense_to_sparse(A.eval()), b,
+                                                       policy);
+        case LinearSolveBackend::IterativeKrylov:
+            return detail::solve_iterative_numeric(detail::dense_to_sparse(A.eval()), b, policy);
+        }
     } else {
-        // Symbolic: Use SymbolicScalar::solve
         SymbolicScalar A_mx = to_mx(A);
         SymbolicScalar b_mx = to_mx(b);
-        // SymbolicScalar::solve(A, b) returns SymbolicScalar
-        SymbolicScalar x_mx = SymbolicScalar::solve(A_mx, b_mx);
+        if (policy.symbolic_linear_solver.empty()) {
+            if (!policy.symbolic_options.empty()) {
+                throw InvalidArgument(
+                    "solve: symbolic_options require a non-empty symbolic_linear_solver");
+            }
+            SymbolicScalar x_mx = SymbolicScalar::solve(A_mx, b_mx);
+            return to_eigen(x_mx);
+        }
+        SymbolicScalar x_mx = SymbolicScalar::solve(A_mx, b_mx, policy.symbolic_linear_solver,
+                                                    policy.symbolic_options);
         return to_eigen(x_mx);
     }
+}
+
+/**
+ * @brief Solve a numeric sparse linear system with a sparse-aware default backend.
+ *
+ * Sparse input defaults to `SparseLU`, since there was no previous sparse overload to preserve.
+ */
+template <typename DerivedB>
+auto solve(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b) {
+    return solve(A, b, LinearSolvePolicy::sparse_direct());
+}
+
+/**
+ * @brief Solve a numeric sparse linear system using an explicit backend policy.
+ */
+template <typename DerivedB>
+auto solve(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b,
+           const LinearSolvePolicy &policy) {
+    detail::validate_linear_solve_dims(A.rows(), A.cols(), b.rows(), "solve");
+
+    switch (policy.backend) {
+    case LinearSolveBackend::Dense:
+        return detail::solve_dense_numeric(detail::sparse_to_dense(A), b, policy);
+    case LinearSolveBackend::SparseDirect:
+        return detail::solve_sparse_direct_numeric(A, b, policy);
+    case LinearSolveBackend::IterativeKrylov:
+        return detail::solve_iterative_numeric(A, b, policy);
+    }
+
+    return detail::solve_sparse_direct_numeric(A, b, policy);
 }
 
 // --- outer(x, y) ---

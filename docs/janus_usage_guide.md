@@ -301,6 +301,8 @@ Symbolic-compatible branching and comparisons:
 |----------|-------------|
 | `dot(a, b)` | Dot product |
 | `cross(a, b)` | Cross product (3D) |
+| `solve(A, b)` | Default linear solve backend |
+| `solve(A, b, policy)` | Policy-selected dense, sparse-direct, or iterative linear solve |
 | `norm(v)` | Euclidean norm |
 | `normalize(v)` | Unit vector |
 | `trace(M)` | Matrix trace |

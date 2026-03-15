@@ -27,9 +27,15 @@ using janus::sym_vec_pair;
 using janus::sym_vector;
 
 // Type aliases
+using janus::DenseLinearSolver;
+using janus::IterativeKrylovSolver;
+using janus::IterativePreconditioner;
+using janus::LinearSolveBackend;
+using janus::LinearSolvePolicy;
 using janus::NumericMatrix;
 using janus::NumericScalar;
 using janus::NumericVector;
+using janus::SparseDirectLinearSolver;
 using janus::SymbolicMatrix;
 using janus::SymbolicScalar;
 using janus::SymbolicVector;
