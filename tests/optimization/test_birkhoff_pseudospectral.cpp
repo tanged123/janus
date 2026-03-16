@@ -37,7 +37,7 @@ double solve_double_integrator_birkhoff(BirkhoffScheme scheme, int n_nodes) {
     Opti opti;
     BirkhoffPseudospectral bk(opti);
 
-    BirkhoffOptions opts;
+    BirkhoffPseudospectralOptions opts;
     opts.scheme = scheme;
     opts.n_nodes = n_nodes;
 
@@ -71,7 +71,7 @@ double solve_brachistochrone_birkhoff(int n_nodes) {
 
     auto T = opti.variable(2.0, std::nullopt, 0.1, 10.0);
 
-    BirkhoffOptions opts;
+    BirkhoffPseudospectralOptions opts;
     opts.scheme = BirkhoffScheme::LGL;
     opts.n_nodes = n_nodes;
 

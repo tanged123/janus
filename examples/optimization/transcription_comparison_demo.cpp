@@ -203,7 +203,7 @@ RunResult solve_birkhoff(int n_nodes, double ref_time) {
     BirkhoffPseudospectral bk(opti);
     auto T = opti.variable(2.0, std::nullopt, 0.1, 10.0);
 
-    BirkhoffOptions opts;
+    BirkhoffPseudospectralOptions opts;
     opts.scheme = BirkhoffScheme::LGL;
     opts.n_nodes = n_nodes;
 
