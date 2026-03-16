@@ -14,6 +14,9 @@ namespace janus {
 
 namespace detail {
 
+/// Small epsilon to prevent division by zero in RMS fusion
+constexpr double rms_fusion_epsilon = 1e-100;
+
 // Helper to compute dx
 template <typename DerivedX> auto compute_dx(const Eigen::MatrixBase<DerivedX> &x) {
     return (x.tail(x.size() - 1) - x.head(x.size() - 1)).eval();
@@ -226,7 +229,7 @@ integrate_discrete_intervals(const Eigen::MatrixBase<DerivedF> &f,
         auto b = detail::slice(res_fwd, 1, res_fwd.size());
 
         // RMS fusion for middle intervals
-        auto mid_sq = (a.array().square() + b.array().square()) * 0.5 + 1e-100;
+        auto mid_sq = (a.array().square() + b.array().square()) * 0.5 + detail::rms_fusion_epsilon;
         JanusVector<Scalar> mid = janus::sqrt(mid_sq.matrix());
 
         auto tmp = detail::concatenate(first, mid);
@@ -406,7 +409,7 @@ integrate_discrete_squared_curvature(const Eigen::MatrixBase<DerivedF> &f,
         auto b = detail::slice(res_forward.matrix(), 1, res_forward.size());
 
         // RMS fusion: sqrt((a^2 + b^2)/2 + eps)
-        auto mid_sq = (a.array().square() + b.array().square()) * 0.5 + 1e-100;
+        auto mid_sq = (a.array().square() + b.array().square()) * 0.5 + detail::rms_fusion_epsilon;
         JanusVector<Scalar> mid = janus::sqrt(mid_sq.matrix());
 
         auto tmp = detail::concatenate(first_interval, mid);
