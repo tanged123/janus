@@ -15,6 +15,7 @@
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/IntegratorStep.hpp"
 #include "janus/math/Linalg.hpp"
+#include "janus/math/Quadrature.hpp"
 #include "janus/math/Spacing.hpp"
 #include <Eigen/Dense>
 #include <casadi/casadi.hpp>
@@ -339,31 +340,7 @@ template <typename Func, typename T>
 QuadResult<T> quad(Func &&func, T a, T b, double abstol = 1e-8, double reltol = 1e-6) {
     // For numeric types, use Gauss-Kronrod quadrature
     if constexpr (std::is_floating_point_v<T>) {
-        // Gauss-Kronrod 15-point rule on [a, b]
-        // Nodes and weights for G7K15 rule, transformed from [-1, 1]
-
-        static constexpr int n = 15;
-        // Kronrod nodes on [-1, 1]
-        static constexpr double xk[15] = {-0.991455371120812639, -0.949107912342758525,
-                                          -0.864864423359769073, -0.741531185599394440,
-                                          -0.586087235467691130, -0.405845151377397167,
-                                          -0.207784955007898468, 0.0,
-                                          0.207784955007898468,  0.405845151377397167,
-                                          0.586087235467691130,  0.741531185599394440,
-                                          0.864864423359769073,  0.949107912342758525,
-                                          0.991455371120812639};
-
-        // Kronrod weights
-        static constexpr double wk[15] = {
-            0.022935322010529225, 0.063092092629978553, 0.104790010322250184, 0.140653259715525919,
-            0.169004726639267903, 0.190350578064785410, 0.204432940075298892, 0.209482141084727828,
-            0.204432940075298892, 0.190350578064785410, 0.169004726639267903, 0.140653259715525919,
-            0.104790010322250184, 0.063092092629978553, 0.022935322010529225};
-
-        // Gauss weights (for error estimation, at odd indices 1,3,5,...,13)
-        static constexpr double wg[7] = {
-            0.129484966168869693, 0.279705391489276668, 0.381830050505118945, 0.417959183673469388,
-            0.381830050505118945, 0.279705391489276668, 0.129484966168869693};
+        const auto &embedded = quadrature_detail::gauss_kronrod_15_rule();
 
         // Transform to [a, b]
         T center = (a + b) / 2.0;
@@ -372,15 +349,11 @@ QuadResult<T> quad(Func &&func, T a, T b, double abstol = 1e-8, double reltol = 
         T kronrod_sum = 0.0;
         T gauss_sum = 0.0;
 
-        for (int i = 0; i < n; ++i) {
-            T x = center + halfwidth * xk[i];
+        for (int i = 0; i < 15; ++i) {
+            T x = center + halfwidth * embedded.nodes[static_cast<std::size_t>(i)];
             T fx = func(x);
-            kronrod_sum += wk[i] * fx;
-
-            // Check if this is a Gauss node (i = 1, 3, 5, 7, 9, 11, 13)
-            if (i % 2 == 1 && i < 14) {
-                gauss_sum += wg[i / 2] * fx;
-            }
+            kronrod_sum += embedded.primary_weights[static_cast<std::size_t>(i)] * fx;
+            gauss_sum += embedded.embedded_weights[static_cast<std::size_t>(i)] * fx;
         }
 
         kronrod_sum *= halfwidth;

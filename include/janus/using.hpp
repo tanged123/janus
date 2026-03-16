@@ -41,7 +41,10 @@ using janus::PolynomialChaosDimension;
 using janus::PolynomialChaosFamily;
 using janus::PolynomialChaosTerm;
 using janus::PolynomialChaosTruncation;
+using janus::SmolyakQuadratureOptions;
 using janus::SparseDirectLinearSolver;
+using janus::StochasticQuadratureGrid;
+using janus::StochasticQuadratureRule;
 using janus::StructuralDiagnosticsOptions;
 using janus::StructuralDiagnosticsReport;
 using janus::StructuralSensitivityOptions;
@@ -49,6 +52,7 @@ using janus::StructuralSensitivityReport;
 using janus::SymbolicMatrix;
 using janus::SymbolicScalar;
 using janus::SymbolicVector;
+using janus::UnivariateQuadratureRule;
 
 // Conversion helpers
 using janus::as_mx;
@@ -103,6 +107,10 @@ using janus::pce_projection_coefficients;
 using janus::pce_regression_coefficients;
 using janus::pce_squared_norm;
 using janus::pce_variance;
+using janus::smolyak_sparse_grid;
+using janus::stochastic_quadrature_level;
+using janus::stochastic_quadrature_rule;
+using janus::tensor_product_quadrature;
 
 // Spacing
 using janus::linspace;

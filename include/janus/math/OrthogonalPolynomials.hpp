@@ -52,6 +52,13 @@ inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
 } // namespace detail
 
 /**
+ * @brief Gauss-Legendre nodes and weights on [-1, 1].
+ */
+inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
+    return detail::gauss_legendre_rule(n);
+}
+
+/**
  * @brief Evaluate Legendre polynomial P_n(x) and derivative P'_n(x)
  */
 inline std::pair<double, double> legendre_poly(int n, double x) {

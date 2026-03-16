@@ -19,6 +19,7 @@
 #include "janus/math/Logic.hpp"
 #include "janus/math/OrthogonalPolynomials.hpp"
 #include "janus/math/PolynomialChaos.hpp"
+#include "janus/math/Quadrature.hpp"
 #include "janus/math/Quaternion.hpp"
 #include "janus/math/RootFinding.hpp"
 #include "janus/math/Rotations.hpp"

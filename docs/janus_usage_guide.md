@@ -35,6 +35,7 @@
 | `docs/user_guides/optimization.md` | Opti interface usage |
 | `docs/user_guides/interpolation.md` | Interpolation utilities |
 | `docs/user_guides/polynomial_chaos.md` | Polynomial chaos basis construction, coefficient fitting, symbolic moments |
+| `docs/user_guides/stochastic_quadrature.md` | Probability-measure quadrature rules, tensor grids, and Smolyak sparse grids |
 | `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
 | `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
@@ -353,6 +354,21 @@ See `docs/user_guides/polynomial_chaos.md` for sample layout, normalization, and
 
 ---
 
+#### Stochastic Quadrature (`Quadrature.hpp`)
+
+| Function | Description |
+|----------|-------------|
+| `stochastic_quadrature_rule(dim, order, rule)` | One-dimensional probability-measure quadrature rule |
+| `stochastic_quadrature_level(dim, level, rule)` | Refinement-level rule, including nested Clenshaw-Curtis |
+| `tensor_product_quadrature(rules)` | Tensor-product grid with Janus sample layout |
+| `smolyak_sparse_grid(dimensions, level, options)` | Sparse-grid collocation for higher-dimensional problems |
+| `pce_projection_coefficients(basis, rule, values)` | Direct projection from a univariate quadrature rule |
+| `pce_projection_coefficients(basis, grid, values)` | Direct projection from a tensor or Smolyak grid |
+
+See `docs/user_guides/stochastic_quadrature.md` for rule families, nesting behavior, and sparse-grid usage.
+
+---
+
 #### Spacing (`Spacing.hpp`)
 
 | Function | Description |
@@ -565,6 +581,7 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
 | Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
 | Polynomial Chaos | `docs/user_guides/polynomial_chaos.md` | Askey-scheme bases, projection/regression fitting, symbolic moments |
+| Stochastic Quadrature | `docs/user_guides/stochastic_quadrature.md` | Probability-measure nodes, tensor grids, Smolyak sparse grids |
 | Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
 | Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
