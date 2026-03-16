@@ -589,13 +589,13 @@ class Opti {
 
         // Configure solver-specific options
         switch (options.solver) {
-        case Solver::SNOPT:
+        case Solver::Snopt:
             configure_snopt_opts(solver_opts, options);
             break;
-        case Solver::QPOASES:
+        case Solver::QpOases:
             configure_qpoases_opts(solver_opts, options);
             break;
-        case Solver::IPOPT:
+        case Solver::Ipopt:
         default:
             configure_ipopt_opts(solver_opts, options);
             break;
@@ -651,13 +651,13 @@ class Opti {
         casadi::Dict solver_opts;
 
         switch (options.solver) {
-        case Solver::SNOPT:
+        case Solver::Snopt:
             configure_snopt_opts(solver_opts, options);
             break;
-        case Solver::QPOASES:
+        case Solver::QpOases:
             configure_qpoases_opts(solver_opts, options);
             break;
-        case Solver::IPOPT:
+        case Solver::Ipopt:
         default:
             configure_ipopt_opts(solver_opts, options);
             // Enable warm-start for parameter sweeps

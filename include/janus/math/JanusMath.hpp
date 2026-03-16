@@ -6,7 +6,6 @@
  * Includes all math sub-modules.
  */
 
-#include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
 #include "janus/math/AutoDiff.hpp"
 #include "janus/math/Calculus.hpp"
@@ -27,6 +26,3 @@
 #include "janus/math/Spacing.hpp"
 #include "janus/math/SurrogateModel.hpp"
 #include "janus/math/Trig.hpp"
-
-// Deprecated headers (for backward compatibility if needed, but discouraged in new code)
-// #include "janus/math/DiffOps.hpp"
