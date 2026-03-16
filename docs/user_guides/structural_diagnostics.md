@@ -1,0 +1,139 @@
+# Structural Diagnostics in Janus
+
+Janus now exposes a structural preflight layer for two common model-quality questions:
+
+1. Are the selected states structurally observable from the chosen outputs?
+2. Are the selected parameters structurally identifiable from the chosen outputs?
+
+The implementation lives in `<janus/core/Diagnostics.hpp>` and works from the symbolic Jacobian sparsity pattern of a `janus::Function`.
+
+This is intentionally a structural analysis, not a numeric proof. It answers whether the measurement layout can separate variables based on symbolic dependence alone.
+
+## When To Use This
+
+Use structural diagnostics before:
+- fitting parameters against a measurement model
+- introducing estimator states into a filter or smoother
+- sending a large reduced-order model into an optimizer and wondering why some degrees of freedom drift
+
+Typical setup:
+
+```cpp
+janus::Function h("h", {x, p}, {y});
+```
+
+where `x` is a dense column-vector state block, `p` is a dense column-vector parameter block, and `y` contains the measured or otherwise selected outputs.
+
+## Core API
+
+```cpp
+#include <janus/janus.hpp>
+
+auto obs = janus::analyze_structural_observability(h, 0);
+auto id = janus::analyze_structural_identifiability(h, 1);
+
+janus::StructuralDiagnosticsOptions opts;
+opts.state_input_idx = 0;
+opts.parameter_input_idx = 1;
+auto both = janus::analyze_structural_diagnostics(h, opts);
+```
+
+`StructuralSensitivityOptions` currently exposes:
+- `output_indices`: optional subset of function outputs to flatten and analyze; defaults to all outputs
+
+`StructuralDiagnosticsOptions` adds:
+- `state_input_idx`: input block interpreted as the state vector
+- `parameter_input_idx`: input block interpreted as the parameter vector
+
+At least one of `state_input_idx` or `parameter_input_idx` must be provided for the combined helper.
+
+## What The Report Contains
+
+`StructuralSensitivityReport` returns:
+- `structural_rank`: structural rank of the selected Jacobian block
+- `rank_deficiency`: `n_variables - structural_rank`
+- `deficient_local_indices`: all input entries that belong to a deficient structural component
+- `zero_sensitivity_local_indices`: entries with no structural dependence on the chosen outputs
+- `deficiency_groups`: connected variable/output groups where the structural rank is too small
+- `issues`: user-facing remediation hints
+
+The report also carries flattened input and output labels so you can connect a deficiency back to the original function blocks.
+
+## Observability Example
+
+```cpp
+auto x = janus::sym("x", 3, 1);
+auto y = janus::SymbolicScalar::vertcat({
+    x(0) + x(1),
+    x(1),
+});
+
+janus::Function h("sensor_model", {x}, {y});
+auto obs = janus::analyze_structural_observability(h);
+```
+
+Here:
+- `x[2]` has zero structural sensitivity
+- the structural rank is `2 / 3`
+- the diagnostic suggests adding a sensor depending on `x[2]` or constraining/fixing it
+
+## Identifiability Example
+
+```cpp
+auto x = janus::sym("x");
+auto p = janus::sym("p", 4, 1);
+auto y = janus::SymbolicScalar::vertcat({
+    p(0) + p(1) + x,
+    p(1) + p(2),
+});
+
+janus::Function h("calibration_model", {x, p}, {y});
+auto id = janus::analyze_structural_identifiability(h, 1);
+```
+
+Here:
+- `p[3]` is unused and therefore immediately unidentifiable
+- `p[0]`, `p[1]`, and `p[2]` share only two structurally independent output rows
+- the report surfaces one coupled deficiency group and recommends adding measurements that separate that block
+
+## Combined Diagnostics
+
+If one measurement model carries both estimation states and calibration parameters, run both checks together:
+
+```cpp
+janus::StructuralDiagnosticsOptions opts;
+opts.state_input_idx = 0;
+opts.parameter_input_idx = 1;
+
+auto report = janus::analyze_structural_diagnostics(h, opts);
+```
+
+This returns:
+- `report.observability`
+- `report.identifiability`
+- `report.has_deficiency()`
+
+## Example Walkthrough: `structural_diagnostics_demo.cpp`
+
+The example `examples/math/structural_diagnostics_demo.cpp` demonstrates:
+
+1. An observability gap caused by an unmeasured state.
+2. An identifiability gap caused by a coupled parameter block plus an unused parameter.
+3. The combined state-plus-parameter report on a shared measurement model.
+
+Build and run it with:
+
+```bash
+ninja -C build structural_diagnostics_demo
+./build/examples/structural_diagnostics_demo
+```
+
+## Current Limits
+
+The current implementation is deliberately structural and local:
+- selected input blocks must be dense column vectors
+- selected outputs must be dense
+- conclusions are based on symbolic Jacobian sparsity, not numeric coefficient values
+- a structurally full-rank report does not guarantee good conditioning or practical estimator quality
+
+That makes this pass useful as an early symbolic filter before you spend time on solver tuning, experiment design, or estimator debugging.

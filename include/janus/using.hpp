@@ -36,6 +36,10 @@ using janus::NumericMatrix;
 using janus::NumericScalar;
 using janus::NumericVector;
 using janus::SparseDirectLinearSolver;
+using janus::StructuralDiagnosticsOptions;
+using janus::StructuralDiagnosticsReport;
+using janus::StructuralSensitivityOptions;
+using janus::StructuralSensitivityReport;
 using janus::SymbolicMatrix;
 using janus::SymbolicScalar;
 using janus::SymbolicVector;
@@ -45,6 +49,11 @@ using janus::as_mx;
 using janus::as_vector;
 using janus::to_eigen;
 using janus::to_mx;
+
+// Structural diagnostics
+using janus::analyze_structural_diagnostics;
+using janus::analyze_structural_identifiability;
+using janus::analyze_structural_observability;
 
 // Math functions
 using janus::abs;

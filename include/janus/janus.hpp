@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Diagnostics.hpp"
 #include "core/Function.hpp"
 #include "core/JanusConcepts.hpp"
 #include "core/JanusIO.hpp"

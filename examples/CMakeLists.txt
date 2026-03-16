@@ -37,6 +37,9 @@ target_link_libraries(sensitivity_jacobian_demo PRIVATE janus)
 add_executable(structural_transforms_demo math/structural_transforms_demo.cpp)
 target_link_libraries(structural_transforms_demo PRIVATE janus)
 
+add_executable(structural_diagnostics_demo math/structural_diagnostics_demo.cpp)
+target_link_libraries(structural_diagnostics_demo PRIVATE janus)
+
 add_executable(linear_solve_policy_demo math/linear_solve_policy_demo.cpp)
 target_link_libraries(linear_solve_policy_demo PRIVATE janus)
 

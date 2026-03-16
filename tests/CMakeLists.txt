@@ -2,6 +2,7 @@ find_package(GTest REQUIRED)
 
 add_executable(test_core 
     test_core.cpp
+    core/test_diagnostics.cpp
     core/test_janus_io.cpp
     core/test_janus_types.cpp
     core/test_io_coverage.cpp
