@@ -88,7 +88,7 @@ struct StructuralAnalysis {
     BLTDecomposition blt;
 };
 
-namespace structural_detail {
+namespace detail {
 
 inline void validate_options(const StructuralTransformOptions &opts, const std::string &context) {
     if (opts.input_idx < 0) {
@@ -385,7 +385,7 @@ inline std::vector<int> tearing_recommendation(const casadi::Sparsity &incidence
     return tears;
 }
 
-} // namespace structural_detail
+} // namespace detail
 
 /**
  * @brief Eliminate trivial affine alias rows from a selected residual block.
@@ -397,8 +397,8 @@ inline std::vector<int> tearing_recommendation(const casadi::Sparsity &incidence
  */
 inline AliasEliminationResult alias_eliminate(const Function &fn,
                                               const StructuralTransformOptions &opts = {}) {
-    structural_detail::validate_options(opts, "alias_eliminate");
-    structural_detail::validate_selected_block(fn, opts, "alias_eliminate");
+    detail::validate_options(opts, "alias_eliminate");
+    detail::validate_selected_block(fn, opts, "alias_eliminate");
 
     const auto &cfn = fn.casadi_function();
     const auto inputs = cfn.mx_in();
@@ -409,17 +409,15 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
 
     const casadi::MX state_symbol =
         janus::sym(cfn.name_in(opts.input_idx) + "_struct", selected_input.nnz(), 1);
-    std::vector<casadi::MX> state_exprs = structural_detail::mx_elements(state_symbol);
-    std::vector<casadi::MX> residuals = structural_detail::mx_elements(
-        casadi::MX::substitute(std::vector<casadi::MX>{selected_output},
-                               std::vector<casadi::MX>{selected_input},
-                               std::vector<casadi::MX>{state_symbol})
-            .front());
+    std::vector<casadi::MX> state_exprs = detail::mx_elements(state_symbol);
+    std::vector<casadi::MX> residuals =
+        detail::mx_elements(casadi::MX::substitute(std::vector<casadi::MX>{selected_output},
+                                                   std::vector<casadi::MX>{selected_input},
+                                                   std::vector<casadi::MX>{state_symbol})
+                                .front());
 
-    std::vector<int> active_var_indices =
-        structural_detail::make_index_vector(selected_input.nnz());
-    std::vector<int> active_residual_indices =
-        structural_detail::make_index_vector(selected_output.nnz());
+    std::vector<int> active_var_indices = detail::make_index_vector(selected_input.nnz());
+    std::vector<int> active_residual_indices = detail::make_index_vector(selected_output.nnz());
 
     struct RawAlias {
         int residual_index;
@@ -432,16 +430,15 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
     while (progress) {
         progress = false;
         for (int residual_index : active_residual_indices) {
-            structural_detail::AliasCandidate candidate;
-            if (!structural_detail::try_make_alias_candidate(
+            detail::AliasCandidate candidate;
+            if (!detail::try_make_alias_candidate(
                     residuals.at(static_cast<std::size_t>(residual_index)), state_symbol,
                     active_var_indices, opts, candidate)) {
                 continue;
             }
 
             const int pivot_original = candidate.pivot_index;
-            std::vector<casadi::MX> substitution_exprs =
-                structural_detail::mx_elements(state_symbol);
+            std::vector<casadi::MX> substitution_exprs = detail::mx_elements(state_symbol);
             substitution_exprs.at(static_cast<std::size_t>(pivot_original)) = candidate.replacement;
             const casadi::MX substitution_vector = casadi::MX::vertcat(substitution_exprs);
 
@@ -451,9 +448,8 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
                                                  std::vector<casadi::MX>{substitution_vector});
 
             raw_aliases.push_back(RawAlias{residual_index, pivot_original, candidate.replacement});
-            active_var_indices = structural_detail::erase_value(active_var_indices, pivot_original);
-            active_residual_indices =
-                structural_detail::erase_value(active_residual_indices, residual_index);
+            active_var_indices = detail::erase_value(active_var_indices, pivot_original);
+            active_residual_indices = detail::erase_value(active_residual_indices, residual_index);
             progress = true;
             break;
         }
@@ -513,7 +509,7 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
         casadi::MX::substitute(state_exprs, subs_from, subs_to);
 
     const casadi::MX reduced_residual =
-        structural_detail::vertcat_subset(reduced_residual_exprs, active_residual_indices);
+        detail::vertcat_subset(reduced_residual_exprs, active_residual_indices);
     const casadi::MX reconstructed_state =
         full_state_exprs.empty() ? casadi::MX(0, 1) : casadi::MX::vertcat(full_state_exprs);
 
@@ -549,8 +545,8 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
  */
 inline BLTDecomposition block_triangularize(const Function &fn,
                                             const StructuralTransformOptions &opts = {}) {
-    structural_detail::validate_options(opts, "block_triangularize");
-    structural_detail::validate_selected_block(fn, opts, "block_triangularize");
+    detail::validate_options(opts, "block_triangularize");
+    detail::validate_selected_block(fn, opts, "block_triangularize");
 
     const casadi::Sparsity incidence_sp =
         get_jacobian_sparsity(fn, opts.output_idx, opts.input_idx).casadi_sparsity();
@@ -574,19 +570,15 @@ inline BLTDecomposition block_triangularize(const Function &fn,
         blocks.push_back(StructuralBlock{
             block_rows,
             block_cols,
-            structural_detail::tearing_recommendation(incidence_sp, block_rows, block_cols),
+            detail::tearing_recommendation(incidence_sp, block_rows, block_cols),
         });
     }
 
     return BLTDecomposition{
-        SparsityPattern(incidence_sp),
-        structural_detail::casadi_to_int(rowperm),
-        structural_detail::casadi_to_int(colperm),
-        structural_detail::casadi_to_int(rowblock),
-        structural_detail::casadi_to_int(colblock),
-        structural_detail::casadi_to_int(coarse_rowblock),
-        structural_detail::casadi_to_int(coarse_colblock),
-        blocks,
+        SparsityPattern(incidence_sp),          detail::casadi_to_int(rowperm),
+        detail::casadi_to_int(colperm),         detail::casadi_to_int(rowblock),
+        detail::casadi_to_int(colblock),        detail::casadi_to_int(coarse_rowblock),
+        detail::casadi_to_int(coarse_colblock), blocks,
     };
 }
 

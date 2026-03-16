@@ -228,19 +228,58 @@ template <typename Scalar> class Quaternion {
                 }
             }
         } else {
-            // Symbolic implementation: Assume trace > 0 (safe for small deviations)
-            // Or use logic::where if available.
-            // Implementing full symbolic 4-way branch is heavy.
-            // For Beta, we'll assume the primary branch (trace > 0) works, which is true for small
-            // rotations. WARNING: This will fail for large rotations (180 deg).
+            // Symbolic: Full 4-branch using nested janus::where (Shepperd's method)
 
-            // TODO: Use janus::where for robust symbolic implementation.
-            // For now, basic trace method.
-            Scalar s = half / janus::sqrt(trace + one);
-            q_w = static_cast<Scalar>(0.25) / s;
-            q_x = (mat(2, 1) - mat(1, 2)) * s;
-            q_y = (mat(0, 2) - mat(2, 0)) * s;
-            q_z = (mat(1, 0) - mat(0, 1)) * s;
+            // Branch 0: trace > 0
+            Scalar s0 = half / janus::sqrt(trace + one);
+            Scalar w0 = static_cast<Scalar>(0.25) / s0;
+            Scalar x0 = (mat(2, 1) - mat(1, 2)) * s0;
+            Scalar y0 = (mat(0, 2) - mat(2, 0)) * s0;
+            Scalar z0 = (mat(1, 0) - mat(0, 1)) * s0;
+
+            // Branch 1: mat(0,0) is largest diagonal
+            Scalar s1 = two * janus::sqrt(one + mat(0, 0) - mat(1, 1) - mat(2, 2));
+            Scalar w1 = (mat(2, 1) - mat(1, 2)) / s1;
+            Scalar x1 = static_cast<Scalar>(0.25) * s1;
+            Scalar y1 = (mat(0, 1) + mat(1, 0)) / s1;
+            Scalar z1 = (mat(0, 2) + mat(2, 0)) / s1;
+
+            // Branch 2: mat(1,1) is largest diagonal
+            Scalar s2 = two * janus::sqrt(one + mat(1, 1) - mat(0, 0) - mat(2, 2));
+            Scalar w2 = (mat(0, 2) - mat(2, 0)) / s2;
+            Scalar x2 = (mat(0, 1) + mat(1, 0)) / s2;
+            Scalar y2 = static_cast<Scalar>(0.25) * s2;
+            Scalar z2 = (mat(1, 2) + mat(2, 1)) / s2;
+
+            // Branch 3: mat(2,2) is largest diagonal
+            Scalar s3 = two * janus::sqrt(one + mat(2, 2) - mat(0, 0) - mat(1, 1));
+            Scalar w3 = (mat(1, 0) - mat(0, 1)) / s3;
+            Scalar x3 = (mat(0, 2) + mat(2, 0)) / s3;
+            Scalar y3 = (mat(1, 2) + mat(2, 1)) / s3;
+            Scalar z3 = static_cast<Scalar>(0.25) * s3;
+
+            // Select via nested where
+            auto cond_trace = trace > static_cast<Scalar>(0.0);
+            auto cond_r00 = janus::logical_and(mat(0, 0) > mat(1, 1), mat(0, 0) > mat(2, 2));
+            auto cond_r11 = mat(1, 1) > mat(2, 2);
+
+            // Inner: branch2 vs branch3
+            Scalar wi = janus::where(cond_r11, w2, w3);
+            Scalar xi = janus::where(cond_r11, x2, x3);
+            Scalar yi = janus::where(cond_r11, y2, y3);
+            Scalar zi = janus::where(cond_r11, z2, z3);
+
+            // Middle: branch1 vs inner
+            Scalar wm = janus::where(cond_r00, w1, wi);
+            Scalar xm = janus::where(cond_r00, x1, xi);
+            Scalar ym = janus::where(cond_r00, y1, yi);
+            Scalar zm = janus::where(cond_r00, z1, zi);
+
+            // Outer: branch0 vs middle
+            q_w = janus::where(cond_trace, w0, wm);
+            q_x = janus::where(cond_trace, x0, xm);
+            q_y = janus::where(cond_trace, y0, ym);
+            q_z = janus::where(cond_trace, z0, zm);
         }
         return Quaternion(q_w, q_x, q_y, q_z);
     }

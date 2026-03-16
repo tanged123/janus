@@ -43,7 +43,7 @@ auto where(const Cond &cond, const T1 &if_true, const T2 &if_false) {
     }
 }
 
-namespace logic_detail {
+namespace detail {
 
 template <typename Cond, typename DerivedTrue, typename DerivedFalse>
 auto select(const Cond &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
@@ -103,7 +103,7 @@ SymbolicScalar count_symbolic_truthy(const Eigen::MatrixBase<Derived> &a) {
     return result;
 }
 
-} // namespace logic_detail
+} // namespace detail
 
 // --- where (Vector/Matrix) ---
 /**
@@ -481,7 +481,7 @@ template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a
 template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        return logic_detail::count_symbolic_truthy(a) == static_cast<double>(a.size());
+        return detail::count_symbolic_truthy(a) == static_cast<double>(a.size());
     } else {
         return (a.array() != 0).all();
     }
@@ -496,7 +496,7 @@ template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
 template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        return logic_detail::count_symbolic_truthy(a) >= 1.0;
+        return detail::count_symbolic_truthy(a) >= 1.0;
     } else {
         return (a.array() != 0).any();
     }
@@ -544,11 +544,5 @@ Scalar select(std::initializer_list<CondType> conditions, std::initializer_list<
               const Scalar &default_value) {
     return select(std::vector<CondType>(conditions), std::vector<Scalar>(values), default_value);
 }
-
-// --- Clip ---
-/**
- * @brief Alias for clamp
- */
-template <typename... Args> auto clip(Args &&...args) { return clamp(std::forward<Args>(args)...); }
 
 } // namespace janus

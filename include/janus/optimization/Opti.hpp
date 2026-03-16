@@ -21,7 +21,7 @@
 
 namespace janus {
 
-namespace opti_detail {
+namespace detail {
 
 inline double validate_positive_scale(double scale, const std::string &context) {
     if (!(scale > 0.0) || !std::isfinite(scale)) {
@@ -106,7 +106,7 @@ inline ScalingIssueLevel issue_level(double normalized, const ScalingAnalysisOpt
                                                       : ScalingIssueLevel::Warning;
 }
 
-} // namespace opti_detail
+} // namespace detail
 
 /**
  * @brief Options for variable creation
@@ -213,8 +213,8 @@ class Opti {
 
         // Determine scale
         double s = scale.has_value()
-                       ? opti_detail::validate_positive_scale(scale.value(), "Opti::variable")
-                       : opti_detail::suggest_scalar_scale(init_guess, lower_bound, upper_bound);
+                       ? detail::validate_positive_scale(scale.value(), "Opti::variable")
+                       : detail::suggest_scalar_scale(init_guess, lower_bound, upper_bound);
 
         SymbolicScalar scaled_var;
 
@@ -267,8 +267,8 @@ class Opti {
                             std::optional<double> upper_bound = std::nullopt) {
         // Determine scale
         double s = scale.has_value()
-                       ? opti_detail::validate_positive_scale(scale.value(), "Opti::variable")
-                       : opti_detail::suggest_scalar_scale(init_guess, lower_bound, upper_bound);
+                       ? detail::validate_positive_scale(scale.value(), "Opti::variable")
+                       : detail::suggest_scalar_scale(init_guess, lower_bound, upper_bound);
 
         // Create scaled variable
         SymbolicScalar raw_var = opti_.variable(n_vars, 1);
@@ -308,8 +308,8 @@ class Opti {
 
         // Determine scale from initial guess and finite bounds
         double s = scale.has_value()
-                       ? opti_detail::validate_positive_scale(scale.value(), "Opti::variable")
-                       : opti_detail::suggest_vector_scale(init_guess, lower_bound, upper_bound);
+                       ? detail::validate_positive_scale(scale.value(), "Opti::variable")
+                       : detail::suggest_vector_scale(init_guess, lower_bound, upper_bound);
 
         // Create scaled variable
         SymbolicScalar raw_var = opti_.variable(n_vars, 1);
@@ -393,7 +393,7 @@ class Opti {
      * `constraint / linear_scale`.
      */
     void subject_to(const SymbolicScalar &constraint, double linear_scale) {
-        opti_.subject_to(constraint, casadi::DM(opti_detail::validate_positive_scale(
+        opti_.subject_to(constraint, casadi::DM(detail::validate_positive_scale(
                                          linear_scale, "Opti::subject_to")));
     }
 
@@ -412,7 +412,7 @@ class Opti {
      * @brief Add multiple constraints with one shared linear scale
      */
     void subject_to(const std::vector<SymbolicScalar> &constraints, double linear_scale) {
-        double s = opti_detail::validate_positive_scale(linear_scale, "Opti::subject_to");
+        double s = detail::validate_positive_scale(linear_scale, "Opti::subject_to");
         for (const auto &c : constraints) {
             opti_.subject_to(c, casadi::DM(s));
         }
@@ -440,7 +440,7 @@ class Opti {
      * @brief Add an initializer-list of constraints with one shared linear scale
      */
     void subject_to(std::initializer_list<SymbolicScalar> constraints, double linear_scale) {
-        double s = opti_detail::validate_positive_scale(linear_scale, "Opti::subject_to");
+        double s = detail::validate_positive_scale(linear_scale, "Opti::subject_to");
         for (const auto &c : constraints) {
             opti_.subject_to(c, casadi::DM(s));
         }
@@ -544,9 +544,8 @@ class Opti {
      * The solver sees `objective / objective_scale`.
      */
     void minimize(const SymbolicScalar &objective, double objective_scale) {
-        set_objective(objective,
-                      opti_detail::validate_positive_scale(objective_scale, "Opti::minimize"), true,
-                      false);
+        set_objective(objective, detail::validate_positive_scale(objective_scale, "Opti::minimize"),
+                      true, false);
     }
 
     /**
@@ -562,9 +561,8 @@ class Opti {
      * The solver sees `-objective / objective_scale`.
      */
     void maximize(const SymbolicScalar &objective, double objective_scale) {
-        set_objective(objective,
-                      opti_detail::validate_positive_scale(objective_scale, "Opti::maximize"), true,
-                      true);
+        set_objective(objective, detail::validate_positive_scale(objective_scale, "Opti::maximize"),
+                      true, true);
     }
 
     // =========================================================================
@@ -669,21 +667,23 @@ class Opti {
 
         opti_.solver(solver_name(options.solver), solver_opts);
 
-        for (double val : values) {
-            // Update parameter value
+        for (size_t idx = 0; idx < values.size(); ++idx) {
+            double val = values[idx];
             opti_.set_value(param, val);
 
             try {
-                // Solve (CasADi automatically warm-starts from previous solution)
                 auto sol = opti_.solve();
                 result.solutions.emplace_back(sol);
                 result.iterations.push_back(sol.stats().count("iter_count")
                                                 ? static_cast<int>(sol.stats().at("iter_count"))
                                                 : -1);
-            } catch (const std::exception &) {
+                result.converged.push_back(true);
+                result.errors.emplace_back();
+            } catch (const std::exception &e) {
                 result.all_converged = false;
-                // Store empty solution marker - could also rethrow
-                break;
+                result.converged.push_back(false);
+                result.errors.push_back(e.what());
+                result.iterations.push_back(-1);
             }
         }
 
@@ -839,7 +839,7 @@ class Opti {
                      record.suggested_scale});
             } else if (info.normalized_init_abs_max > opts.normalized_high_warn) {
                 report.issues.push_back(
-                    {opti_detail::issue_level(info.normalized_init_abs_max, opts),
+                    {detail::issue_level(info.normalized_init_abs_max, opts),
                      ScalingIssueKind::Variable, static_cast<int>(i),
                      "variable[" + std::to_string(i) + "]",
                      "initial guess is much larger than the applied variable scale",
@@ -860,7 +860,7 @@ class Opti {
             }
         }
 
-        std::vector<casadi::MX> assignments = opti_detail::current_assignments(opti_);
+        std::vector<casadi::MX> assignments = detail::current_assignments(opti_);
 
         if (objective_expr_.has_value()) {
             report.objective.configured = true;
@@ -868,7 +868,7 @@ class Opti {
             report.objective.user_supplied_scale = objective_scale_user_supplied_;
             report.objective.scale = objective_scale_;
             report.objective.value_at_initial =
-                opti_detail::dm_to_scalar(opti_.value(objective_expr_.value(), assignments));
+                detail::dm_to_scalar(opti_.value(objective_expr_.value(), assignments));
             report.objective.normalized_value =
                 std::abs(report.objective.value_at_initial) / objective_scale_;
             report.objective.suggested_scale =
@@ -876,7 +876,7 @@ class Opti {
 
             if (report.objective.normalized_value > opts.normalized_high_warn) {
                 report.issues.push_back(
-                    {opti_detail::issue_level(report.objective.normalized_value, opts),
+                    {detail::issue_level(report.objective.normalized_value, opts),
                      ScalingIssueKind::Objective, 0, "objective",
                      "objective magnitude is large relative to the applied objective scale",
                      std::abs(report.objective.value_at_initial), objective_scale_,
@@ -886,12 +886,12 @@ class Opti {
 
         if (opti_.ng() > 0) {
             std::vector<double> g_values =
-                opti_detail::dm_to_vector(opti_.value(opti_.g(), assignments));
+                detail::dm_to_vector(opti_.value(opti_.g(), assignments));
             std::vector<double> lbg_values =
-                opti_detail::dm_to_vector(opti_.value(opti_.lbg(), assignments));
+                detail::dm_to_vector(opti_.value(opti_.lbg(), assignments));
             std::vector<double> ubg_values =
-                opti_detail::dm_to_vector(opti_.value(opti_.ubg(), assignments));
-            std::vector<double> g_scales = opti_detail::dm_to_vector(opti_.g_linear_scale());
+                detail::dm_to_vector(opti_.value(opti_.ubg(), assignments));
+            std::vector<double> g_scales = detail::dm_to_vector(opti_.g_linear_scale());
 
             for (int i = 0; i < static_cast<int>(g_values.size()); ++i) {
                 ConstraintScalingInfo info;
@@ -905,25 +905,25 @@ class Opti {
                 info.has_upper_bound =
                     i < static_cast<int>(ubg_values.size()) && std::isfinite(info.upper_bound);
                 info.equality = info.has_lower_bound && info.has_upper_bound &&
-                                opti_detail::nearly_equal(info.lower_bound, info.upper_bound);
+                                detail::nearly_equal(info.lower_bound, info.upper_bound);
                 info.normalized_magnitude =
-                    opti_detail::constraint_magnitude(info.value_at_initial, info.lower_bound,
-                                                      info.has_lower_bound, info.upper_bound,
-                                                      info.has_upper_bound) /
+                    detail::constraint_magnitude(info.value_at_initial, info.lower_bound,
+                                                 info.has_lower_bound, info.upper_bound,
+                                                 info.has_upper_bound) /
                     info.scale;
                 info.normalized_violation =
-                    opti_detail::constraint_violation(info.value_at_initial, info.lower_bound,
-                                                      info.has_lower_bound, info.upper_bound,
-                                                      info.has_upper_bound) /
+                    detail::constraint_violation(info.value_at_initial, info.lower_bound,
+                                                 info.has_lower_bound, info.upper_bound,
+                                                 info.has_upper_bound) /
                     info.scale;
-                info.suggested_scale = opti_detail::constraint_magnitude(
+                info.suggested_scale = detail::constraint_magnitude(
                     info.value_at_initial, info.lower_bound, info.has_lower_bound, info.upper_bound,
                     info.has_upper_bound);
                 report.constraints.push_back(info);
 
                 if (info.normalized_magnitude > opts.normalized_high_warn) {
                     report.issues.push_back(
-                        {opti_detail::issue_level(info.normalized_magnitude, opts),
+                        {detail::issue_level(info.normalized_magnitude, opts),
                          ScalingIssueKind::Constraint, i, "constraint[" + std::to_string(i) + "]",
                          "constraint magnitude or bound magnitude is large relative to its scale",
                          info.suggested_scale, info.scale, info.normalized_magnitude,
@@ -1074,22 +1074,22 @@ class Opti {
         record.size = static_cast<int>(init_guess.size());
         record.category = category;
         record.user_supplied_scale = user_supplied_scale;
-        record.scale = opti_detail::validate_positive_scale(scale, "Opti::variable");
+        record.scale = detail::validate_positive_scale(scale, "Opti::variable");
         record.init_abs_mean = init_guess.size() > 0 ? init_guess.cwiseAbs().mean() : 0.0;
         record.init_abs_max = init_guess.size() > 0 ? init_guess.cwiseAbs().maxCoeff() : 0.0;
         record.lower_bound = lower_bound;
         record.upper_bound = upper_bound;
         record.suggested_scale =
             init_guess.size() == 1
-                ? opti_detail::suggest_scalar_scale(init_guess(0), lower_bound, upper_bound)
-                : opti_detail::suggest_vector_scale(init_guess, lower_bound, upper_bound);
+                ? detail::suggest_scalar_scale(init_guess(0), lower_bound, upper_bound)
+                : detail::suggest_vector_scale(init_guess, lower_bound, upper_bound);
         variable_records_.push_back(record);
     }
 
     void set_objective(const SymbolicScalar &objective, double scale, bool user_supplied_scale,
                        bool maximize) {
         objective_expr_ = objective;
-        objective_scale_ = opti_detail::validate_positive_scale(scale, "Opti objective");
+        objective_scale_ = detail::validate_positive_scale(scale, "Opti objective");
         objective_scale_user_supplied_ = user_supplied_scale;
         objective_is_maximize_ = maximize;
         opti_.minimize((maximize ? -objective : objective) / objective_scale_);

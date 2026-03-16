@@ -62,7 +62,7 @@ struct SmolyakQuadratureOptions {
     double zero_weight_tolerance = 1e-14;
 };
 
-namespace quadrature_detail {
+namespace detail {
 
 struct EmbeddedQuadratureRule {
     std::array<double, 15> nodes;
@@ -252,7 +252,7 @@ make_gauss_from_jacobi_matrix(const NumericVector &diag, const NumericVector &of
 inline UnivariateQuadratureRule gauss_rule(const PolynomialChaosDimension &dimension, int order,
                                            int level) {
     validate_order(order, "gauss_rule");
-    polynomial_chaos_detail::validate_dimension(dimension, "gauss_rule");
+    detail::validate_dimension(dimension, "gauss_rule");
 
     switch (dimension.family) {
     case PolynomialChaosFamily::Legendre: {
@@ -406,7 +406,7 @@ inline std::string sample_key(const NumericVector &point, double tolerance) {
     return key;
 }
 
-} // namespace quadrature_detail
+} // namespace detail
 
 /**
  * @brief Build a one-dimensional stochastic quadrature rule with a fixed order.
@@ -416,19 +416,19 @@ stochastic_quadrature_rule(const PolynomialChaosDimension &dimension, int order,
                            StochasticQuadratureRule rule = StochasticQuadratureRule::Gauss) {
     switch (rule) {
     case StochasticQuadratureRule::Gauss:
-        return quadrature_detail::gauss_rule(dimension, order, order);
+        return detail::gauss_rule(dimension, order, order);
 
     case StochasticQuadratureRule::ClenshawCurtis:
-        return quadrature_detail::clenshaw_curtis_rule(dimension, order, order);
+        return detail::clenshaw_curtis_rule(dimension, order, order);
 
     case StochasticQuadratureRule::GaussKronrod15:
-        return quadrature_detail::gauss_kronrod_rule(dimension, order, order);
+        return detail::gauss_kronrod_rule(dimension, order, order);
 
     case StochasticQuadratureRule::AutoNested:
-        if (quadrature_detail::is_bounded_support(dimension)) {
-            return quadrature_detail::clenshaw_curtis_rule(dimension, order, order);
+        if (detail::is_bounded_support(dimension)) {
+            return detail::clenshaw_curtis_rule(dimension, order, order);
         }
-        return quadrature_detail::gauss_rule(dimension, order, order);
+        return detail::gauss_rule(dimension, order, order);
     }
 
     throw InvalidArgument("stochastic_quadrature_rule: unsupported rule");
@@ -440,32 +440,30 @@ stochastic_quadrature_rule(const PolynomialChaosDimension &dimension, int order,
 inline UnivariateQuadratureRule
 stochastic_quadrature_level(const PolynomialChaosDimension &dimension, int level,
                             StochasticQuadratureRule rule = StochasticQuadratureRule::AutoNested) {
-    quadrature_detail::validate_level(level, "stochastic_quadrature_level");
+    detail::validate_level(level, "stochastic_quadrature_level");
 
     switch (rule) {
     case StochasticQuadratureRule::Gauss:
-        return quadrature_detail::gauss_rule(
-            dimension, quadrature_detail::gauss_order_from_level(level), level);
+        return detail::gauss_rule(dimension, detail::gauss_order_from_level(level), level);
 
     case StochasticQuadratureRule::ClenshawCurtis:
-        return quadrature_detail::clenshaw_curtis_rule(
-            dimension, quadrature_detail::clenshaw_curtis_order_from_level(level), level);
+        return detail::clenshaw_curtis_rule(dimension,
+                                            detail::clenshaw_curtis_order_from_level(level), level);
 
     case StochasticQuadratureRule::GaussKronrod15: {
         if (level > 2) {
             throw InvalidArgument("stochastic_quadrature_level: Gauss-Kronrod 15 only supports "
                                   "levels 1 (7-point) and 2 (15-point)");
         }
-        return quadrature_detail::gauss_kronrod_rule(dimension, level == 1 ? 7 : 15, level);
+        return detail::gauss_kronrod_rule(dimension, level == 1 ? 7 : 15, level);
     }
 
     case StochasticQuadratureRule::AutoNested:
-        if (quadrature_detail::is_bounded_support(dimension)) {
-            return quadrature_detail::clenshaw_curtis_rule(
-                dimension, quadrature_detail::clenshaw_curtis_order_from_level(level), level);
+        if (detail::is_bounded_support(dimension)) {
+            return detail::clenshaw_curtis_rule(
+                dimension, detail::clenshaw_curtis_order_from_level(level), level);
         }
-        return quadrature_detail::gauss_rule(
-            dimension, quadrature_detail::gauss_order_from_level(level), level);
+        return detail::gauss_rule(dimension, detail::gauss_order_from_level(level), level);
     }
 
     throw InvalidArgument("stochastic_quadrature_level: unsupported rule");
@@ -536,7 +534,7 @@ smolyak_sparse_grid(const std::vector<PolynomialChaosDimension> &dimensions, int
     if (dimensions.empty()) {
         throw InvalidArgument("smolyak_sparse_grid: need at least one stochastic dimension");
     }
-    quadrature_detail::validate_level(level, "smolyak_sparse_grid");
+    detail::validate_level(level, "smolyak_sparse_grid");
     if (options.merge_tolerance <= 0.0) {
         throw InvalidArgument("smolyak_sparse_grid: merge_tolerance must be positive");
     }
@@ -556,12 +554,12 @@ smolyak_sparse_grid(const std::vector<PolynomialChaosDimension> &dimensions, int
 
     for (int sum = level; sum <= q; ++sum) {
         const double combination =
-            (((q - sum) % 2) == 0 ? 1.0 : -1.0) * quadrature_detail::binomial(dim - 1, q - sum);
+            (((q - sum) % 2) == 0 ? 1.0 : -1.0) * detail::binomial(dim - 1, q - sum);
         if (combination == 0.0) {
             continue;
         }
 
-        for (const auto &index : quadrature_detail::positive_compositions(dim, sum)) {
+        for (const auto &index : detail::positive_compositions(dim, sum)) {
             std::vector<UnivariateQuadratureRule> rules;
             rules.reserve(dimensions.size());
             for (int axis = 0; axis < dim; ++axis) {
@@ -575,8 +573,7 @@ smolyak_sparse_grid(const std::vector<PolynomialChaosDimension> &dimensions, int
             StochasticQuadratureGrid tensor = tensor_product_quadrature(rules);
             for (Eigen::Index row = 0; row < tensor.samples.rows(); ++row) {
                 NumericVector point = tensor.samples.row(row).transpose();
-                const std::string key =
-                    quadrature_detail::sample_key(point, options.merge_tolerance);
+                const std::string key = detail::sample_key(point, options.merge_tolerance);
                 auto &entry = merged[key];
                 if (entry.point.size() == 0) {
                     entry.point = std::move(point);

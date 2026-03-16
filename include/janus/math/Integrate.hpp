@@ -136,7 +136,7 @@ template <typename Scalar> struct QuadResult {
     double error = 0.0;
 };
 
-namespace integrate_detail {
+namespace detail {
 
 inline const char *method_name(SecondOrderIntegratorMethod method) {
     switch (method) {
@@ -306,7 +306,7 @@ NumericVector bdf1_step(RhsFunc &&rhs, MassFunc &&mass_matrix, const NumericVect
                            std::to_string(inf_norm(r)));
 }
 
-} // namespace integrate_detail
+} // namespace detail
 
 // ============================================================================
 // quad: Definite Integral
@@ -340,7 +340,7 @@ template <typename Func, typename T>
 QuadResult<T> quad(Func &&func, T a, T b, double abstol = 1e-8, double reltol = 1e-6) {
     // For numeric types, use Gauss-Kronrod quadrature
     if constexpr (std::is_floating_point_v<T>) {
-        const auto &embedded = quadrature_detail::gauss_kronrod_15_rule();
+        const auto &embedded = detail::gauss_kronrod_15_rule();
 
         // Transform to [a, b]
         T center = (a + b) / 2.0;
@@ -548,9 +548,9 @@ SecondOrderOdeResult<double>
 solve_second_order_ivp(AccelFunc &&acceleration, std::pair<double, double> t_span,
                        const NumericVector &q0, const NumericVector &v0, int n_eval = 100,
                        const SecondOrderIvpOptions &opts = {}) {
-    integrate_detail::validate_eval_count("solve_second_order_ivp", n_eval);
-    integrate_detail::validate_second_order_options(opts, "solve_second_order_ivp");
-    integrate_detail::validate_second_order_initial_state(q0, v0);
+    detail::validate_eval_count("solve_second_order_ivp", n_eval);
+    detail::validate_second_order_options(opts, "solve_second_order_ivp");
+    detail::validate_second_order_initial_state(q0, v0);
 
     const double t0 = t_span.first;
     const double tf = t_span.second;
@@ -588,7 +588,7 @@ solve_second_order_ivp(AccelFunc &&acceleration, std::pair<double, double> t_spa
 
     result.success = true;
     result.message =
-        std::string("Integration successful (") + integrate_detail::method_name(opts.method) + ")";
+        std::string("Integration successful (") + detail::method_name(opts.method) + ")";
     result.status = 0;
     return result;
 }
@@ -639,8 +639,8 @@ template <typename RhsFunc, typename MassFunc>
 OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
                                         std::pair<double, double> t_span, const NumericVector &y0,
                                         int n_eval = 100, const MassMatrixIvpOptions &opts = {}) {
-    integrate_detail::validate_eval_count("solve_ivp_mass_matrix", n_eval);
-    integrate_detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix");
+    detail::validate_eval_count("solve_ivp_mass_matrix", n_eval);
+    detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix");
 
     const double t0 = t_span.first;
     const double tf = t_span.second;
@@ -662,9 +662,9 @@ OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
 
         for (int s = 0; s < opts.substeps; ++s) {
             if (opts.method == MassMatrixIntegratorMethod::RosenbrockEuler) {
-                y = integrate_detail::rosenbrock_euler_step(rhs, mass_matrix, y, t, dt, opts);
+                y = detail::rosenbrock_euler_step(rhs, mass_matrix, y, t, dt, opts);
             } else {
-                y = integrate_detail::bdf1_step(rhs, mass_matrix, y, t, dt, opts);
+                y = detail::bdf1_step(rhs, mass_matrix, y, t, dt, opts);
             }
             t += dt;
         }
@@ -674,7 +674,7 @@ OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
 
     result.success = true;
     result.message =
-        std::string("Integration successful (") + integrate_detail::method_name(opts.method) + ")";
+        std::string("Integration successful (") + detail::method_name(opts.method) + ")";
     result.status = 0;
     return result;
 }
@@ -722,8 +722,8 @@ solve_ivp_mass_matrix_expr(const SymbolicScalar &rhs_expr, const SymbolicScalar 
                            const SymbolicScalar &t_var, const SymbolicScalar &y_var,
                            std::pair<double, double> t_span, const NumericVector &y0,
                            int n_eval = 100, const MassMatrixIvpOptions &opts = {}) {
-    integrate_detail::validate_eval_count("solve_ivp_mass_matrix_expr", n_eval);
-    integrate_detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix_expr");
+    detail::validate_eval_count("solve_ivp_mass_matrix_expr", n_eval);
+    detail::validate_mass_matrix_options(opts, "solve_ivp_mass_matrix_expr");
 
     const double t0 = t_span.first;
     const double tf = t_span.second;
@@ -763,7 +763,7 @@ solve_ivp_mass_matrix_expr(const SymbolicScalar &rhs_expr, const SymbolicScalar 
     std::vector<bool> row_has_structural_nnz(static_cast<std::size_t>(n_state), false);
     for (int row = 0; row < n_state; ++row) {
         for (int col = 0; col < n_state; ++col) {
-            if (!integrate_detail::is_constant_zero(mass_probe_expr(row, col))) {
+            if (!detail::is_constant_zero(mass_probe_expr(row, col))) {
                 row_has_structural_nnz[static_cast<std::size_t>(row)] = true;
                 break;
             }

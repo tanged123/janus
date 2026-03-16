@@ -1091,21 +1091,6 @@ class Interpolator {
 };
 
 // ============================================================================
-// Backwards Compatibility
-// ============================================================================
-
-/**
- * @brief Alias for 1D interpolation (backwards compatibility)
- * @deprecated Use Interpolator directly
- */
-using Interp1D = Interpolator;
-
-/**
- * @deprecated Use Interpolator directly
- */
-using JanusInterpolator = Interpolator;
-
-// ============================================================================
 // Free Function API (Backwards Compatibility)
 // ============================================================================
 
@@ -1232,46 +1217,6 @@ SymbolicVector interpn(const std::vector<NumericVector> &points, const SymbolicV
     }
 
     return result;
-}
-
-/**
- * @brief Convenience overload for 2D interpolation with Eigen matrix values
- *
- * @deprecated Use Interpolator class instead
- */
-template <typename Scalar>
-JanusVector<Scalar> interpn2d(const NumericVector &x_points, const NumericVector &y_points,
-                              const NumericMatrix &values, const JanusMatrix<Scalar> &xi,
-                              InterpolationMethod method = InterpolationMethod::Linear) {
-
-    // Validate dimensions
-    if (values.rows() != x_points.size() || values.cols() != y_points.size()) {
-        throw InterpolationError(
-            "interpn2d: values shape must match (x_points.size(), y_points.size())");
-    }
-
-    // Build points vector
-    std::vector<NumericVector> points = {x_points, y_points};
-
-    // Flatten values in Fortran order (column-major)
-    NumericVector values_flat = detail::flatten_fortran_order(values);
-
-    return interpn<Scalar>(points, values_flat, xi, method);
-}
-
-template <typename Scalar>
-SymbolicVector interpn2d(const NumericVector &x_points, const NumericVector &y_points,
-                         const SymbolicMatrix &values, const JanusMatrix<Scalar> &xi,
-                         InterpolationMethod method = InterpolationMethod::Linear) {
-
-    if (values.rows() != x_points.size() || values.cols() != y_points.size()) {
-        throw InterpolationError(
-            "interpn2d: values shape must match (x_points.size(), y_points.size())");
-    }
-
-    std::vector<NumericVector> points = {x_points, y_points};
-    SymbolicVector values_flat = detail::flatten_fortran_order(values);
-    return interpn<Scalar>(points, values_flat, xi, method);
 }
 
 } // namespace janus

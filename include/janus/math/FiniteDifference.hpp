@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/JanusError.hpp"
-#include "../core/JanusTypes.hpp"
+#include "janus/core/JanusError.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include <Eigen/Dense>
 #include <cmath>
 #include <string>

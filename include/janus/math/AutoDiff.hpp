@@ -126,7 +126,7 @@ inline std::vector<SymbolicScalar> to_mx_vector(const std::vector<SymbolicArg> &
 }
 } // namespace detail
 
-namespace autodiff_detail {
+namespace detail {
 
 inline void validate_function_indices(const Function &fn, int output_idx, int input_idx,
                                       const std::string &context) {
@@ -306,7 +306,7 @@ inline casadi::MX reverse_block_jacobian(const Function &fn, int output_idx, int
     return jac_t.T();
 }
 
-} // namespace autodiff_detail
+} // namespace detail
 
 /**
  * @brief Recommend a sensitivity regime from parameter/output counts.
@@ -379,11 +379,10 @@ inline SensitivityRecommendation
 select_sensitivity_regime(const Function &fn, int output_idx = 0, int input_idx = 0,
                           int horizon_length = 1, bool stiff = false,
                           const SensitivitySwitchOptions &opts = SensitivitySwitchOptions()) {
-    autodiff_detail::validate_function_indices(fn, output_idx, input_idx,
-                                               "select_sensitivity_regime");
-    return select_sensitivity_regime(autodiff_detail::input_numel(fn, input_idx),
-                                     autodiff_detail::output_numel(fn, output_idx), horizon_length,
-                                     stiff, opts);
+    detail::validate_function_indices(fn, output_idx, input_idx, "select_sensitivity_regime");
+    return select_sensitivity_regime(detail::input_numel(fn, input_idx),
+                                     detail::output_numel(fn, output_idx), horizon_length, stiff,
+                                     opts);
 }
 
 /**
@@ -396,20 +395,19 @@ inline Function
 sensitivity_jacobian(const Function &fn, int output_idx = 0, int input_idx = 0,
                      int horizon_length = 1, bool stiff = false,
                      const SensitivitySwitchOptions &opts = SensitivitySwitchOptions()) {
-    autodiff_detail::validate_function_indices(fn, output_idx, input_idx, "sensitivity_jacobian");
+    detail::validate_function_indices(fn, output_idx, input_idx, "sensitivity_jacobian");
 
     const SensitivityRecommendation recommendation =
         select_sensitivity_regime(fn, output_idx, input_idx, horizon_length, stiff, opts);
 
-    casadi::MX jacobian_expr =
-        recommendation.uses_forward_mode()
-            ? autodiff_detail::forward_block_jacobian(fn, output_idx, input_idx)
-            : autodiff_detail::reverse_block_jacobian(fn, output_idx, input_idx);
+    casadi::MX jacobian_expr = recommendation.uses_forward_mode()
+                                   ? detail::forward_block_jacobian(fn, output_idx, input_idx)
+                                   : detail::reverse_block_jacobian(fn, output_idx, input_idx);
 
     return Function(
-        autodiff_detail::sensitivity_function_name(
+        detail::sensitivity_function_name(
             fn, recommendation.uses_forward_mode() ? "fwd_jac" : "adj_jac", output_idx, input_idx),
-        autodiff_detail::to_symbolic_args(autodiff_detail::symbolic_inputs_like(fn)),
+        detail::to_symbolic_args(detail::symbolic_inputs_like(fn)),
         std::vector<SymbolicArg>{SymbolicArg(jacobian_expr)});
 }
 
@@ -483,9 +481,8 @@ inline SymbolicMatrix hessian(const SymbolicArg &expr, const SymbolicArg &vars) 
 inline SymbolicMatrix hessian_lagrangian(const SymbolicArg &objective,
                                          const SymbolicArg &constraints, const SymbolicArg &vars,
                                          const SymbolicArg &multipliers) {
-    return janus::hessian(autodiff_detail::lagrangian_scalar(objective, constraints, multipliers,
-                                                             "hessian_lagrangian"),
-                          vars);
+    return janus::hessian(
+        detail::lagrangian_scalar(objective, constraints, multipliers, "hessian_lagrangian"), vars);
 }
 
 /**
@@ -505,9 +502,8 @@ inline SymbolicMatrix hessian_vector_product(const SymbolicArg &expr, const Symb
     const casadi::MX vars_mx = vars.get();
     const casadi::MX direction_mx = direction.get();
 
-    autodiff_detail::validate_scalar_expression(expr_mx, "hessian_vector_product", "expression");
-    autodiff_detail::validate_same_shape(vars_mx, direction_mx, "hessian_vector_product",
-                                         "direction");
+    detail::validate_scalar_expression(expr_mx, "hessian_vector_product", "expression");
+    detail::validate_same_shape(vars_mx, direction_mx, "hessian_vector_product", "direction");
 
     const casadi::MX gradient_mx = casadi::MX::gradient(expr_mx, vars_mx);
     return to_eigen(casadi::MX::jtimes(gradient_mx, vars_mx, direction_mx, false));
@@ -530,10 +526,9 @@ inline SymbolicMatrix lagrangian_hessian_vector_product(const SymbolicArg &objec
                                                         const SymbolicArg &vars,
                                                         const SymbolicArg &multipliers,
                                                         const SymbolicArg &direction) {
-    return hessian_vector_product(
-        autodiff_detail::lagrangian_scalar(objective, constraints, multipliers,
-                                           "lagrangian_hessian_vector_product"),
-        vars, direction);
+    return hessian_vector_product(detail::lagrangian_scalar(objective, constraints, multipliers,
+                                                            "lagrangian_hessian_vector_product"),
+                                  vars, direction);
 }
 
 /**
@@ -544,11 +539,11 @@ inline SymbolicMatrix lagrangian_hessian_vector_product(const SymbolicArg &objec
  * direction, reshaped like the selected input block.
  */
 inline Function hessian_vector_product(const Function &fn, int output_idx = 0, int input_idx = 0) {
-    autodiff_detail::validate_function_indices(fn, output_idx, input_idx, "hessian_vector_product");
-    autodiff_detail::validate_scalar_output(fn, output_idx, "hessian_vector_product");
+    detail::validate_function_indices(fn, output_idx, input_idx, "hessian_vector_product");
+    detail::validate_scalar_output(fn, output_idx, "hessian_vector_product");
 
     const auto &cas_fn = fn.casadi_function();
-    std::vector<casadi::MX> inputs = autodiff_detail::symbolic_inputs_like(fn);
+    std::vector<casadi::MX> inputs = detail::symbolic_inputs_like(fn);
     std::vector<casadi::MX> outputs = cas_fn(inputs);
     casadi::MX direction =
         casadi::MX::sym("hvp_direction", cas_fn.size1_in(input_idx), cas_fn.size2_in(input_idx));
@@ -556,11 +551,11 @@ inline Function hessian_vector_product(const Function &fn, int output_idx = 0, i
     casadi::MX hvp_expr = as_mx(
         janus::hessian_vector_product(outputs.at(output_idx), inputs.at(input_idx), direction));
 
-    std::vector<SymbolicArg> args = autodiff_detail::to_symbolic_args(inputs);
+    std::vector<SymbolicArg> args = detail::to_symbolic_args(inputs);
     args.emplace_back(direction);
 
-    return Function(autodiff_detail::sensitivity_function_name(fn, "hvp", output_idx, input_idx),
-                    args, std::vector<SymbolicArg>{SymbolicArg(hvp_expr)});
+    return Function(detail::sensitivity_function_name(fn, "hvp", output_idx, input_idx), args,
+                    std::vector<SymbolicArg>{SymbolicArg(hvp_expr)});
 }
 
 /**
@@ -572,15 +567,14 @@ inline Function hessian_vector_product(const Function &fn, int output_idx = 0, i
  */
 inline Function lagrangian_hessian_vector_product(const Function &fn, int objective_output_idx,
                                                   int constraint_output_idx, int input_idx = 0) {
-    autodiff_detail::validate_function_indices(fn, objective_output_idx, input_idx,
-                                               "lagrangian_hessian_vector_product");
-    autodiff_detail::validate_function_indices(fn, constraint_output_idx, input_idx,
-                                               "lagrangian_hessian_vector_product");
-    autodiff_detail::validate_scalar_output(fn, objective_output_idx,
-                                            "lagrangian_hessian_vector_product");
+    detail::validate_function_indices(fn, objective_output_idx, input_idx,
+                                      "lagrangian_hessian_vector_product");
+    detail::validate_function_indices(fn, constraint_output_idx, input_idx,
+                                      "lagrangian_hessian_vector_product");
+    detail::validate_scalar_output(fn, objective_output_idx, "lagrangian_hessian_vector_product");
 
     const auto &cas_fn = fn.casadi_function();
-    std::vector<casadi::MX> inputs = autodiff_detail::symbolic_inputs_like(fn);
+    std::vector<casadi::MX> inputs = detail::symbolic_inputs_like(fn);
     std::vector<casadi::MX> outputs = cas_fn(inputs);
     casadi::MX multipliers =
         casadi::MX::sym("lagrange_multipliers", cas_fn.size1_out(constraint_output_idx),
@@ -592,12 +586,12 @@ inline Function lagrangian_hessian_vector_product(const Function &fn, int object
         outputs.at(objective_output_idx), outputs.at(constraint_output_idx), inputs.at(input_idx),
         multipliers, direction));
 
-    std::vector<SymbolicArg> args = autodiff_detail::to_symbolic_args(inputs);
+    std::vector<SymbolicArg> args = detail::to_symbolic_args(inputs);
     args.emplace_back(multipliers);
     args.emplace_back(direction);
 
-    return Function(autodiff_detail::lagrangian_function_name(fn, "lag_hvp", objective_output_idx,
-                                                              constraint_output_idx, input_idx),
+    return Function(detail::lagrangian_function_name(fn, "lag_hvp", objective_output_idx,
+                                                     constraint_output_idx, input_idx),
                     args, std::vector<SymbolicArg>{SymbolicArg(hvp_expr)});
 }
 

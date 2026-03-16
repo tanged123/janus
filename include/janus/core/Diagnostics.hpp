@@ -119,7 +119,7 @@ struct StructuralDiagnosticsReport {
     }
 };
 
-namespace diagnostics_detail {
+namespace detail {
 
 inline std::vector<int> make_index_vector(int n) {
     std::vector<int> indices(static_cast<std::size_t>(n));
@@ -530,7 +530,7 @@ inline StructuralSensitivityReport analyze_property(const Function &fn, int inpu
     return report;
 }
 
-} // namespace diagnostics_detail
+} // namespace detail
 
 /**
  * @brief Analyze which states are structurally observable from selected outputs.
@@ -543,8 +543,7 @@ inline StructuralSensitivityReport analyze_property(const Function &fn, int inpu
 inline StructuralSensitivityReport
 analyze_structural_observability(const Function &fn, int state_input_idx = 0,
                                  const StructuralSensitivityOptions &opts = {}) {
-    return diagnostics_detail::analyze_property(fn, state_input_idx,
-                                                StructuralProperty::Observability, opts);
+    return detail::analyze_property(fn, state_input_idx, StructuralProperty::Observability, opts);
 }
 
 /**
@@ -557,8 +556,8 @@ analyze_structural_observability(const Function &fn, int state_input_idx = 0,
 inline StructuralSensitivityReport
 analyze_structural_identifiability(const Function &fn, int parameter_input_idx,
                                    const StructuralSensitivityOptions &opts = {}) {
-    return diagnostics_detail::analyze_property(fn, parameter_input_idx,
-                                                StructuralProperty::Identifiability, opts);
+    return detail::analyze_property(fn, parameter_input_idx, StructuralProperty::Identifiability,
+                                    opts);
 }
 
 /**

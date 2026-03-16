@@ -628,9 +628,9 @@ JanusVector<Scalar> best_eigenvector_candidate(const std::array<JanusVector<Scal
         }
         return normalize_vector(*best);
     } else {
-        auto best = janus::logic_detail::select(n02 > n01, cands[1], cands[0]);
+        auto best = janus::detail::select(n02 > n01, cands[1], cands[0]);
         auto best_norm = janus::where(n02 > n01, n02, n01);
-        best = janus::logic_detail::select(n12 > best_norm, cands[2], best);
+        best = janus::detail::select(n12 > best_norm, cands[2], best);
         return normalize_vector(best);
     }
 }
@@ -647,7 +647,7 @@ JanusVector<Scalar> symmetric_eigenvector_2x2(const JanusMatrix<Scalar> &A, cons
         return normalize_vector(janus::dot(first, first) >= janus::dot(second, second) ? first
                                                                                        : second);
     } else {
-        return normalize_vector(janus::logic_detail::select(
+        return normalize_vector(janus::detail::select(
             janus::dot(first, first) >= janus::dot(second, second), first, second));
     }
 }
@@ -770,7 +770,7 @@ EigenDecomposition<Scalar> eig_symmetric_symbolic(const JanusMatrix<Scalar> &A) 
         vectors.col(2) = symmetric_eigenvector_3x3(A, largest);
 
         const JanusMatrix<Scalar> identity = JanusMatrix<Scalar>::Identity(3, 3);
-        result.eigenvectors = janus::logic_detail::select(has_spread, vectors, identity);
+        result.eigenvectors = janus::detail::select(has_spread, vectors, identity);
         return result;
     }
 

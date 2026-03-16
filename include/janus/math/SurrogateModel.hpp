@@ -146,6 +146,8 @@ template <std::floating_point T> auto softplus_scalar(const T &x, double beta) {
 
 inline auto softplus_scalar(const SymbolicScalar &x, double beta) {
     const auto bx = beta * x;
+    // CasADi's logsumexp applies max-shift stabilization internally:
+    // logsumexp(a) = max(a) + log(sum(exp(a - max(a))))
     return SymbolicScalar::logsumexp(SymbolicScalar::vertcat({SymbolicScalar(0.0), bx})) / beta;
 }
 } // namespace detail

@@ -97,7 +97,7 @@ TEST_F(OptiCacheTest, WarmStartConvergence) {
     opti_cold.minimize(janus::pow(1 - x, 2) + 100 * janus::pow(y - janus::pow(x, 2), 2));
     auto sol_cold = opti_cold.solve({.verbose = false});
 
-    int iter_cold = sol_cold.num_iterations();
+    int iter_cold = sol_cold.num_iterations().value_or(-1);
 
     // Save solution
     std::map<std::string, janus::SymbolicScalar> vars;
@@ -119,7 +119,7 @@ TEST_F(OptiCacheTest, WarmStartConvergence) {
     opti_warm.minimize(janus::pow(1 - x2, 2) + 100 * janus::pow(y2 - janus::pow(x2, 2), 2));
     auto sol_warm = opti_warm.solve({.verbose = false});
 
-    int iter_warm = sol_warm.num_iterations();
+    int iter_warm = sol_warm.num_iterations().value_or(-1);
 
     // Verify warm start was faster (should be 0 or very few iterations)
     EXPECT_LT(iter_warm, iter_cold);

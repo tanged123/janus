@@ -45,7 +45,7 @@ You are an advanced AI coding assistant working on **Janus**, a high-performance
 ### 4. Project Structure to Respect
 *   `include/janus/core/`: Concepts and Type traits.
 *   `include/janus/math/`: Math dispatch logic.
-*   `include/janus/linalg/`: Linear algebra extensions.
+*   `include/janus/math/Linalg.hpp`: Linear algebra extensions.
 *   `tests/`: Test suite.
 *   `docs/`: Context and planning documentation (CRITICAL).
 

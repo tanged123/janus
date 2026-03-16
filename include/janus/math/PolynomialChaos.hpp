@@ -77,7 +77,7 @@ struct PolynomialChaosTerm {
     double squared_norm = 1.0;
 };
 
-namespace polynomial_chaos_detail {
+namespace detail {
 
 inline void validate_degree(int degree, const std::string &context) {
     if (degree < 0) {
@@ -374,7 +374,7 @@ inline NumericMatrix regression_operator(const NumericMatrix &design_matrix, dou
     return gram.ldlt().solve(design_matrix.transpose());
 }
 
-} // namespace polynomial_chaos_detail
+} // namespace detail
 
 /**
  * @brief Evaluate a univariate chaos basis polynomial.
@@ -388,23 +388,22 @@ inline NumericMatrix regression_operator(const NumericMatrix &design_matrix, dou
 template <JanusScalar Scalar>
 Scalar pce_polynomial(const PolynomialChaosDimension &dimension, int degree, const Scalar &x,
                       bool normalized = true) {
-    polynomial_chaos_detail::validate_degree(degree, "pce_polynomial");
-    polynomial_chaos_detail::validate_dimension(dimension, "pce_polynomial");
+    detail::validate_degree(degree, "pce_polynomial");
+    detail::validate_dimension(dimension, "pce_polynomial");
 
     Scalar value = Scalar(0.0);
     switch (dimension.family) {
     case PolynomialChaosFamily::Hermite:
-        value = polynomial_chaos_detail::raw_hermite_polynomial(degree, x);
+        value = detail::raw_hermite_polynomial(degree, x);
         break;
     case PolynomialChaosFamily::Legendre:
-        value = polynomial_chaos_detail::raw_legendre_polynomial(degree, x);
+        value = detail::raw_legendre_polynomial(degree, x);
         break;
     case PolynomialChaosFamily::Jacobi:
-        value = polynomial_chaos_detail::raw_jacobi_polynomial(degree, x, dimension.alpha,
-                                                               dimension.beta);
+        value = detail::raw_jacobi_polynomial(degree, x, dimension.alpha, dimension.beta);
         break;
     case PolynomialChaosFamily::Laguerre:
-        value = polynomial_chaos_detail::raw_laguerre_polynomial(degree, x, dimension.alpha);
+        value = detail::raw_laguerre_polynomial(degree, x, dimension.alpha);
         break;
     }
 
@@ -412,7 +411,7 @@ Scalar pce_polynomial(const PolynomialChaosDimension &dimension, int degree, con
         return value;
     }
 
-    const double norm = polynomial_chaos_detail::squared_norm_probability(dimension, degree);
+    const double norm = detail::squared_norm_probability(dimension, degree);
     return value / janus::sqrt(Scalar(norm));
 }
 
@@ -424,7 +423,7 @@ inline double pce_squared_norm(const PolynomialChaosDimension &dimension, int de
     if (normalized) {
         return 1.0;
     }
-    return polynomial_chaos_detail::squared_norm_probability(dimension, degree);
+    return detail::squared_norm_probability(dimension, degree);
 }
 
 /**
@@ -444,12 +443,11 @@ class PolynomialChaosBasis {
             throw InvalidArgument("PolynomialChaosBasis: order must be >= 0");
         }
         for (const auto &dimension : dimensions_) {
-            polynomial_chaos_detail::validate_dimension(dimension, "PolynomialChaosBasis");
+            detail::validate_dimension(dimension, "PolynomialChaosBasis");
         }
 
-        const std::vector<std::vector<int>> indices =
-            polynomial_chaos_detail::generate_multi_indices(static_cast<int>(dimensions_.size()),
-                                                            order_, options_.truncation);
+        const std::vector<std::vector<int>> indices = detail::generate_multi_indices(
+            static_cast<int>(dimensions_.size()), order_, options_.truncation);
 
         terms_.reserve(indices.size());
         squared_norms_.resize(static_cast<Eigen::Index>(indices.size()));
@@ -501,8 +499,7 @@ class PolynomialChaosBasis {
     }
 
     NumericMatrix evaluate(const NumericMatrix &samples) const {
-        polynomial_chaos_detail::validate_samples(samples, dimension(),
-                                                  "PolynomialChaosBasis::evaluate(samples)");
+        detail::validate_samples(samples, dimension(), "PolynomialChaosBasis::evaluate(samples)");
 
         NumericMatrix design(samples.rows(), size());
         for (Eigen::Index row = 0; row < samples.rows(); ++row) {
@@ -525,8 +522,7 @@ JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
                                                 const NumericMatrix &samples,
                                                 const NumericVector &weights,
                                                 const JanusVector<Scalar> &sample_values) {
-    polynomial_chaos_detail::validate_samples(samples, basis.dimension(),
-                                              "pce_projection_coefficients");
+    detail::validate_samples(samples, basis.dimension(), "pce_projection_coefficients");
     if (weights.size() != samples.rows()) {
         throw InvalidArgument("pce_projection_coefficients: weights size must match the number of "
                               "samples");
@@ -553,8 +549,7 @@ JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
                                                 const NumericMatrix &samples,
                                                 const NumericVector &weights,
                                                 const JanusMatrix<Scalar> &sample_values) {
-    polynomial_chaos_detail::validate_samples(samples, basis.dimension(),
-                                              "pce_projection_coefficients");
+    detail::validate_samples(samples, basis.dimension(), "pce_projection_coefficients");
     if (weights.size() != samples.rows()) {
         throw InvalidArgument("pce_projection_coefficients: weights size must match the number of "
                               "samples");
@@ -583,26 +578,22 @@ template <JanusScalar Scalar>
 JanusVector<Scalar>
 pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatrix &samples,
                             const JanusVector<Scalar> &sample_values, double ridge = 1e-12) {
-    polynomial_chaos_detail::validate_samples(samples, basis.dimension(),
-                                              "pce_regression_coefficients");
+    detail::validate_samples(samples, basis.dimension(), "pce_regression_coefficients");
     const NumericMatrix design = basis.evaluate(samples);
     const NumericMatrix op =
-        polynomial_chaos_detail::regression_operator(design, ridge, "pce_regression_coefficients");
-    return polynomial_chaos_detail::apply_operator(op, sample_values,
-                                                   "pce_regression_coefficients");
+        detail::regression_operator(design, ridge, "pce_regression_coefficients");
+    return detail::apply_operator(op, sample_values, "pce_regression_coefficients");
 }
 
 template <JanusScalar Scalar>
 JanusMatrix<Scalar>
 pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatrix &samples,
                             const JanusMatrix<Scalar> &sample_values, double ridge = 1e-12) {
-    polynomial_chaos_detail::validate_samples(samples, basis.dimension(),
-                                              "pce_regression_coefficients");
+    detail::validate_samples(samples, basis.dimension(), "pce_regression_coefficients");
     const NumericMatrix design = basis.evaluate(samples);
     const NumericMatrix op =
-        polynomial_chaos_detail::regression_operator(design, ridge, "pce_regression_coefficients");
-    return polynomial_chaos_detail::apply_operator(op, sample_values,
-                                                   "pce_regression_coefficients");
+        detail::regression_operator(design, ridge, "pce_regression_coefficients");
+    return detail::apply_operator(op, sample_values, "pce_regression_coefficients");
 }
 
 template <JanusScalar Scalar> Scalar pce_mean(const JanusVector<Scalar> &coefficients) {

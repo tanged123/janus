@@ -179,10 +179,10 @@ template <typename Scalar> void test_extended_logic() {
     auto res_all = janus::all(A);
     auto res_any = janus::any(A);
 
-    // Clip
+    // Clamp
     Matrix C(2, 2);
     C << -5.0, 5.0, 0.0, 10.0;
-    auto res_clip = janus::clip(C, 0.0, 2.0); // -> [0, 2; 0, 2]
+    auto res_clip = janus::clamp(C, 0.0, 2.0); // -> [0, 2; 0, 2]
 
     if constexpr (std::is_same_v<Scalar, double>) {
         // Numeric checks

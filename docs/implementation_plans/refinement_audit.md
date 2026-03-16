@@ -108,6 +108,8 @@ Non-functional public method. Users must manually re-evaluate their objective.
 
 Most annotations restate the function signature: `@brief Compute the sine of x` on `sin(x)`. Total: 1453 doxygen annotations across 43 files.
 
+Leave doxygen in as  needed for documentation downstream for users. 
+
 ### M3. Dead/Deprecated Code Still Present
 
 - **DiffOps.hpp**: 16-line deprecated redirect to AutoDiff.hpp + Calculus.hpp. Commented out in JanusMath.hpp but file still exists.
@@ -282,40 +284,3 @@ include/janus/
 - Current `.gitignore` is adequate (already excludes `*.dot`, `*.html`, `*.pdf`, `*.json`, `logs/`, `build/`).
 - `docs/examples/*.html` and `docs/images/*.png` correctly excepted.
 - No changes needed.
-
----
-
-# Phase 3: Refactoring Plan
-
-Work module by module. After each module, verify build + tests.
-
-## Pass 1: Per-file cleanup (content changes)
-
-### math/ module first
-1. Strip redundant doxygen (annotations that restate function signatures)
-2. Unify detail namespaces to plain `detail`
-3. Delete DiffOps.hpp, remove backward-compat aliases
-4. Remove `clip()` alias from Logic.hpp
-5. Consolidate gradient functions in Calculus.hpp
-6. Fix include path in FiniteDifference.hpp (relative -> absolute)
-7. Remove redundant JanusError.hpp include from JanusMath.hpp
-
-### core/ module
-1. Strip redundant doxygen
-2. Unify detail namespaces to plain `detail`
-
-### optimization/ module
-1. Strip redundant doxygen
-2. Unify detail namespace (`opti_detail` -> `detail`)
-3. Fix solve_sweep() to not silently swallow errors
-4. Fix OptiSweep::objective() — either implement or remove
-5. Fix OptiSol silent fallbacks (return optional<int>)
-
-### utils/
-1. No changes (JsonUtils stays internal)
-
-### Root headers
-1. Remove DiffOps.hpp from any residual references
-2. Clean using.hpp if any removed symbols
-
-## Pass 2: Build verification after each module

@@ -23,7 +23,7 @@ void expect_symbolic_table_values_error(const janus::InterpolationError &err) {
 } // namespace
 
 // ============================================================================
-// Interp1D Tests (1D Interpolation Class)
+// Interpolator Tests (1D Interpolation Class)
 // ============================================================================
 
 template <typename Scalar> void test_interp1d() {
@@ -34,7 +34,7 @@ template <typename Scalar> void test_interp1d() {
     janus::NumericVector y(3);
     y << 0.0, 10.0, 0.0;
 
-    janus::Interp1D interp(x, y); // Default: Linear
+    janus::Interpolator interp(x, y); // Default: Linear
 
     Scalar query_mid = 0.5; // Expect 5.0
     auto res_mid = interp(query_mid);
@@ -57,35 +57,35 @@ template <typename Scalar> void test_interp1d() {
     }
 }
 
-TEST(Interp1DTests, Numeric) { test_interp1d<double>(); }
+TEST(InterpolatorTests, Numeric) { test_interp1d<double>(); }
 
-TEST(Interp1DTests, Symbolic) { test_interp1d<janus::SymbolicScalar>(); }
+TEST(InterpolatorTests, Symbolic) { test_interp1d<janus::SymbolicScalar>(); }
 
-TEST(Interp1DTests, CoverageErrorChecks) {
+TEST(InterpolatorTests, CoverageErrorChecks) {
     janus::NumericVector x(3);
     x << 0, 1, 2;
     janus::NumericVector y(2);
     y << 0, 1;
 
     // Mismatched size
-    EXPECT_THROW(janus::Interp1D(x, y), janus::InterpolationError);
+    EXPECT_THROW(janus::Interpolator(x, y), janus::InterpolationError);
 
     // Size < 2
     janus::NumericVector x1(1);
     x1 << 0;
     janus::NumericVector y1(1);
     y1 << 0;
-    EXPECT_THROW(janus::Interp1D(x1, y1), janus::InterpolationError);
+    EXPECT_THROW(janus::Interpolator(x1, y1), janus::InterpolationError);
 
     // Unsorted
     janus::NumericVector xu(3);
     xu << 0, 2, 1;
     janus::NumericVector yu(3);
     yu << 0, 0, 0;
-    EXPECT_THROW(janus::Interp1D(xu, yu), janus::InterpolationError);
+    EXPECT_THROW(janus::Interpolator(xu, yu), janus::InterpolationError);
 
     // Uninitialized use
-    janus::Interp1D empty;
+    janus::Interpolator empty;
     EXPECT_THROW(empty(1.0), janus::InterpolationError);
 
     // Uninitialized matrix use
@@ -94,26 +94,26 @@ TEST(Interp1DTests, CoverageErrorChecks) {
     EXPECT_THROW(empty(q), janus::InterpolationError);
 }
 
-TEST(Interp1DTests, BoundsClamping) {
+TEST(InterpolatorTests, BoundsClamping) {
     janus::NumericVector x(3);
     x << 0, 1, 2;
     janus::NumericVector y(3);
     y << 0, 10, 20;
-    janus::Interp1D interp(x, y);
+    janus::Interpolator interp(x, y);
 
     // Query outside bounds - should clamp
     EXPECT_DOUBLE_EQ(interp(-1.0), 0.0); // Clamps to x=0, y=0
     EXPECT_DOUBLE_EQ(interp(5.0), 20.0); // Clamps to x=2, y=20
 }
 
-TEST(Interp1DTests, HermiteMethod) {
+TEST(InterpolatorTests, HermiteMethod) {
     // Test Hermite (C1) interpolation
     janus::NumericVector x(4);
     x << 0, 1, 2, 3;
     janus::NumericVector y(4);
     y << 0, 1, 4, 9; // y = x^2
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Hermite);
     EXPECT_EQ(interp.method(), janus::InterpolationMethod::Hermite);
 
     // Should produce smooth interpolation
@@ -122,14 +122,14 @@ TEST(Interp1DTests, HermiteMethod) {
     EXPECT_LT(result, 4.0);
 }
 
-TEST(Interp1DTests, BSplineMethod) {
+TEST(InterpolatorTests, BSplineMethod) {
     // Test BSpline (C2) interpolation
     janus::NumericVector x(4);
     x << 0, 1, 2, 3;
     janus::NumericVector y(4);
     y << 1, 1, 1, 1; // Constant function
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::BSpline);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::BSpline);
     EXPECT_EQ(interp.method(), janus::InterpolationMethod::BSpline);
 
     // Constant should interpolate exactly
@@ -138,25 +138,25 @@ TEST(Interp1DTests, BSplineMethod) {
     EXPECT_NEAR(interp(2.5), 1.0, 1e-10);
 }
 
-TEST(Interp1DTests, BSplineRequires4Points) {
+TEST(InterpolatorTests, BSplineRequires4Points) {
     // BSpline should fail with < 4 points
     janus::NumericVector x(3);
     x << 0, 1, 2;
     janus::NumericVector y(3);
     y << 0, 1, 2;
 
-    EXPECT_THROW(janus::Interp1D(x, y, janus::InterpolationMethod::BSpline),
+    EXPECT_THROW(janus::Interpolator(x, y, janus::InterpolationMethod::BSpline),
                  janus::InterpolationError);
 }
 
-TEST(Interp1DTests, NearestMethod) {
+TEST(InterpolatorTests, NearestMethod) {
     // Test Nearest neighbor
     janus::NumericVector x(3);
     x << 0, 1, 2;
     janus::NumericVector y(3);
     y << 0, 10, 20;
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::Nearest);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Nearest);
 
     // Nearest to x=0
     EXPECT_DOUBLE_EQ(interp(0.4), 0.0);
@@ -167,13 +167,13 @@ TEST(Interp1DTests, NearestMethod) {
     EXPECT_DOUBLE_EQ(interp(1.6), 20.0);
 }
 
-TEST(Interp1DTests, HermiteSymbolicNotSupported) {
+TEST(InterpolatorTests, HermiteSymbolicNotSupported) {
     janus::NumericVector x(4);
     x << 0, 1, 2, 3;
     janus::NumericVector y(4);
     y << 0, 1, 4, 9;
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Hermite);
 
     // Symbolic should throw with guidance toward BSpline
     janus::SymbolicScalar query = janus::sym("q");
@@ -185,13 +185,13 @@ TEST(Interp1DTests, HermiteSymbolicNotSupported) {
     }
 }
 
-TEST(Interp1DTests, HermiteSymbolicBatchNotSupported) {
+TEST(InterpolatorTests, HermiteSymbolicBatchNotSupported) {
     janus::NumericVector x(4);
     x << 0, 1, 2, 3;
     janus::NumericVector y(4);
     y << 0, 1, 4, 9;
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::Hermite);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::Hermite);
 
     janus::SymbolicMatrix queries(2, 1);
     queries(0, 0) = janus::sym("q0");
@@ -205,14 +205,14 @@ TEST(Interp1DTests, HermiteSymbolicBatchNotSupported) {
     }
 }
 
-TEST(Interp1DTests, BSplineSymbolic) {
+TEST(InterpolatorTests, BSplineSymbolic) {
     // BSpline should work with symbolic
     janus::NumericVector x(4);
     x << 0, 1, 2, 3;
     janus::NumericVector y(4);
     y << 1, 1, 1, 1;
 
-    janus::Interp1D interp(x, y, janus::InterpolationMethod::BSpline);
+    janus::Interpolator interp(x, y, janus::InterpolationMethod::BSpline);
 
     janus::SymbolicScalar query = casadi::MX(1.5);
     auto result = interp(query);
@@ -220,14 +220,14 @@ TEST(Interp1DTests, BSplineSymbolic) {
     EXPECT_NEAR(eval_scalar(result), 1.0, 1e-9);
 }
 
-TEST(Interp1DTests, VectorizedQuery) {
+TEST(InterpolatorTests, VectorizedQuery) {
     // Test vectorized queries - pass as matrix for batch evaluation
     janus::NumericVector x(3);
     x << 0, 1, 2;
     janus::NumericVector y(3);
     y << 0, 10, 20;
 
-    janus::Interp1D interp(x, y);
+    janus::Interpolator interp(x, y);
 
     // Create as matrix (Nx1) for batch query
     janus::NumericMatrix queries(3, 1);
@@ -419,26 +419,30 @@ TEST(InterpnTests, SymbolicValues2DLinearWeights) {
     EXPECT_NEAR(jacobian_values[3], 0.1875, 1e-9);
 }
 
-TEST(InterpnTests, SymbolicValuesInterpn2dLinear) {
+TEST(InterpnTests, SymbolicValuesInterpnLinear2D) {
     janus::NumericVector x_pts(2);
     x_pts << 0.0, 1.0;
     janus::NumericVector y_pts(2);
     y_pts << 0.0, 1.0;
+    std::vector<janus::NumericVector> points = {x_pts, y_pts};
 
     janus::SymbolicScalar v00 = janus::sym("v00");
     janus::SymbolicScalar v10 = janus::sym("v10");
     janus::SymbolicScalar v01 = janus::sym("v01");
     janus::SymbolicScalar v11 = janus::sym("v11");
-    janus::SymbolicMatrix values(2, 2);
-    values(0, 0) = v00;
-    values(1, 0) = v10;
-    values(0, 1) = v01;
-    values(1, 1) = v11;
+
+    // Flatten in Fortran (column-major) order: (0,0), (1,0), (0,1), (1,1)
+    janus::SymbolicVector values(4);
+    values(0) = v00;
+    values(1) = v10;
+    values(2) = v01;
+    values(3) = v11;
 
     janus::NumericMatrix xi(1, 2);
     xi << 0.25, 0.75;
 
-    auto result = janus::interpn2d(x_pts, y_pts, values, xi, janus::InterpolationMethod::Linear);
+    auto result = janus::interpn<janus::SymbolicScalar>(points, values, xi,
+                                                        janus::InterpolationMethod::Linear);
     casadi::Function eval_fn("eval_parametric_linear_2d", {v00, v10, v01, v11},
                              {janus::to_mx(result)});
     auto outputs = eval_fn(std::vector<casadi::DM>{casadi::DM(0.0), casadi::DM(1.0),
