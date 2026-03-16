@@ -301,8 +301,10 @@ auto sigmoid(const T &x, SigmoidType type = SigmoidType::Tanh, double norm_min =
 
     switch (type) {
     case SigmoidType::Tanh:
-    case SigmoidType::Logistic:
         s = janus::tanh(x);
+        break;
+    case SigmoidType::Logistic:
+        s = 2.0 / (1.0 + janus::exp(-x)) - 1.0;
         break;
     case SigmoidType::Arctan:
         s = (2.0 / M_PI) * janus::atan((M_PI / 2.0) * x);

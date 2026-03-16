@@ -563,7 +563,7 @@ enum class SparseJacobianMode { Forward, Reverse };
 
 namespace detail {
 
-inline std::vector<SymbolicScalar> sparsity_to_mx_vector(const std::vector<SymbolicArg> &args) {
+inline std::vector<SymbolicScalar> to_mx_vector(const std::vector<SymbolicArg> &args) {
     std::vector<SymbolicScalar> ret;
     ret.reserve(args.size());
     for (const auto &arg : args) {
@@ -629,8 +629,8 @@ struct SparseJacobianArtifacts {
 inline SparseJacobianArtifacts
 make_sparse_jacobian_artifacts(const std::vector<SymbolicArg> &expressions,
                                const std::vector<SymbolicArg> &variables, const std::string &name) {
-    SymbolicScalar expr_cat = SymbolicScalar::vertcat(sparsity_to_mx_vector(expressions));
-    SymbolicScalar var_cat = SymbolicScalar::vertcat(sparsity_to_mx_vector(variables));
+    SymbolicScalar expr_cat = SymbolicScalar::vertcat(to_mx_vector(expressions));
+    SymbolicScalar var_cat = SymbolicScalar::vertcat(to_mx_vector(variables));
     SymbolicScalar jac = SymbolicScalar::jacobian(expr_cat, var_cat);
 
     Function values_function = name.empty() ? Function(variables, {stack_nonzeros(jac)})
@@ -674,7 +674,7 @@ struct SparseHessianArtifacts {
 inline SparseHessianArtifacts
 make_sparse_hessian_artifacts(const SymbolicArg &expression,
                               const std::vector<SymbolicArg> &variables, const std::string &name) {
-    SymbolicScalar var_cat = SymbolicScalar::vertcat(sparsity_to_mx_vector(variables));
+    SymbolicScalar var_cat = SymbolicScalar::vertcat(to_mx_vector(variables));
     SymbolicScalar hess = SymbolicScalar::hessian(expression.get(), var_cat);
 
     Function values_function = name.empty() ? Function(variables, {stack_nonzeros(hess)})
@@ -956,7 +956,6 @@ inline SparseHessianEvaluator sparse_hessian(const Function &fn, int output_idx 
  */
 struct NaNSparsityOptions {
     NumericVector reference_point; ///< Point to evaluate at (default: zeros)
-    double perturbation = 1e-7;    ///< Reserved for future finite-difference methods
 };
 
 /**

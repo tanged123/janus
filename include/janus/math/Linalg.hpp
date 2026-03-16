@@ -226,8 +226,6 @@ template <typename MatrixLike> SparseMatrix dense_to_sparse(const MatrixLike &A)
     return sparse;
 }
 
-inline NumericMatrix sparse_to_dense(const SparseMatrix &A) { return NumericMatrix(A); }
-
 template <typename DerivedB>
 auto solve_sparse_direct_numeric(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b,
                                  const LinearSolvePolicy &policy) {
@@ -432,7 +430,7 @@ auto solve(const SparseMatrix &A, const Eigen::MatrixBase<DerivedB> &b,
 
     switch (policy.backend) {
     case LinearSolveBackend::Dense:
-        return detail::solve_dense_numeric(detail::sparse_to_dense(A), b, policy);
+        return detail::solve_dense_numeric(NumericMatrix(A), b, policy);
     case LinearSolveBackend::SparseDirect:
         return detail::solve_sparse_direct_numeric(A, b, policy);
     case LinearSolveBackend::IterativeKrylov:
@@ -962,20 +960,9 @@ inline SparseMatrix sparse_from_triplets(int rows, int cols,
  * @return Sparse matrix
  */
 inline SparseMatrix to_sparse(const NumericMatrix &dense, double tol = 0.0) {
-    std::vector<SparseTriplet> triplets;
-    triplets.reserve(static_cast<size_t>(dense.size()) / 4); // Heuristic
-
-    for (int j = 0; j < dense.cols(); ++j) {
-        for (int i = 0; i < dense.rows(); ++i) {
-            double val = dense(i, j);
-            if (std::abs(val) > tol) {
-                triplets.emplace_back(i, j, val);
-            }
-        }
-    }
-
-    return sparse_from_triplets(static_cast<int>(dense.rows()), static_cast<int>(dense.cols()),
-                                triplets);
+    SparseMatrix sparse = dense.sparseView(1.0, tol);
+    sparse.makeCompressed();
+    return sparse;
 }
 
 /**

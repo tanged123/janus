@@ -216,23 +216,14 @@ inline casadi::DM vector_to_dm(const Eigen::VectorXd &x) {
 }
 
 inline Eigen::VectorXd dm_to_vector(const casadi::DM &x) {
-    Eigen::VectorXd out(x.nnz());
-    std::vector<double> elements = static_cast<std::vector<double>>(x);
-    for (Eigen::Index i = 0; i < out.size(); ++i) {
-        out(i) = elements[static_cast<std::size_t>(i)];
-    }
-    return out;
+    const std::vector<double> elements = static_cast<std::vector<double>>(x);
+    return Eigen::Map<const Eigen::VectorXd>(elements.data(),
+                                             static_cast<Eigen::Index>(elements.size()));
 }
 
 inline Eigen::MatrixXd dm_to_matrix(const casadi::DM &x) {
-    Eigen::MatrixXd out(x.size1(), x.size2());
-    std::vector<double> elements = static_cast<std::vector<double>>(x);
-    for (Eigen::Index j = 0; j < out.cols(); ++j) {
-        for (Eigen::Index i = 0; i < out.rows(); ++i) {
-            out(i, j) = elements[static_cast<std::size_t>(j * out.rows() + i)];
-        }
-    }
-    return out;
+    const std::vector<double> elements = static_cast<std::vector<double>>(x);
+    return Eigen::Map<const Eigen::MatrixXd>(elements.data(), x.size1(), x.size2());
 }
 
 inline std::string implicit_function_name(const casadi::Function &g_casadi) {
@@ -401,7 +392,7 @@ inline StageOutcome solve_trust_region(const casadi::Function &residual_fn,
             const double rho = actual / predicted;
 
             if (actual > 0.0 && rho > 1e-4) {
-                current = candidate;
+                current = std::move(candidate);
                 out.state = current;
                 out.message = "trust-region Newton accepted a step";
 
@@ -468,14 +459,14 @@ inline StageOutcome solve_line_search(const casadi::Function &residual_fn,
 
         double alpha = 1.0;
         bool accepted = false;
+        const double directional_derivative = gradient.dot(step);
         for (int bt = 0; bt < opts.max_backtracking_steps; ++bt) {
             try {
                 NumericState candidate = evaluate_state(residual_fn, jacobian_fn,
                                                         current.x + alpha * step, "rootfinder");
-                const double directional_derivative = gradient.dot(step);
                 if (candidate.merit <= current.merit + opts.line_search_sufficient_decrease *
                                                            alpha * directional_derivative) {
-                    current = candidate;
+                    current = std::move(candidate);
                     out.state = current;
                     out.step_norm = (alpha * step).lpNorm<Eigen::Infinity>();
                     accepted = true;
@@ -584,7 +575,7 @@ inline StageOutcome solve_broyden(const casadi::Function &residual_fn,
             out.state = evaluate_state(residual_fn, jacobian_fn, x, "rootfinder");
             B = out.state.jacobian;
         } else if (denom > std::numeric_limits<double>::epsilon()) {
-            B += ((y - B * s) * s.transpose()) / denom;
+            B.noalias() += ((y - B * s) / denom) * s.transpose();
         } else {
             out.message = "Broyden update encountered a degenerate secant step";
             break;
@@ -638,7 +629,7 @@ inline StageOutcome solve_pseudo_transient(const casadi::Function &residual_fn,
                 NumericState candidate =
                     evaluate_state(residual_fn, jacobian_fn, current.x + step, "rootfinder");
                 if (candidate.merit < current.merit) {
-                    current = candidate;
+                    current = std::move(candidate);
                     out.state = current;
                     dt = std::min(opts.pseudo_transient_dt_max,
                                   dt * opts.pseudo_transient_dt_growth);

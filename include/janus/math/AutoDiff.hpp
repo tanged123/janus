@@ -116,29 +116,8 @@ auto jacobian(const Expr &expression, const Vars &...variables) {
     }
 }
 
-// Helper to separate implementation
+// Reuse shared helpers from Sparsity.hpp detail namespace
 namespace detail {
-inline std::vector<SymbolicScalar> to_mx_vector(const std::vector<SymbolicArg> &args) {
-    std::vector<SymbolicScalar> ret;
-    ret.reserve(args.size());
-    for (const auto &arg : args)
-        ret.push_back(arg.get());
-    return ret;
-}
-} // namespace detail
-
-namespace detail {
-
-inline void validate_function_indices(const Function &fn, int output_idx, int input_idx,
-                                      const std::string &context) {
-    const auto &cas_fn = fn.casadi_function();
-    if (output_idx < 0 || output_idx >= cas_fn.n_out()) {
-        throw InvalidArgument(context + ": output_idx out of range");
-    }
-    if (input_idx < 0 || input_idx >= cas_fn.n_in()) {
-        throw InvalidArgument(context + ": input_idx out of range");
-    }
-}
 
 inline int input_numel(const Function &fn, int input_idx) {
     const auto &cas_fn = fn.casadi_function();

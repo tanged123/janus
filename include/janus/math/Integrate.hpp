@@ -27,6 +27,17 @@
 
 namespace janus {
 
+namespace detail {
+inline NumericVector to_numeric_vector(std::initializer_list<double> init) {
+    NumericVector v(static_cast<Eigen::Index>(init.size()));
+    Eigen::Index idx = 0;
+    for (double val : init) {
+        v(idx++) = val;
+    }
+    return v;
+}
+} // namespace detail
+
 // ============================================================================
 // ODE Result structure
 // ============================================================================
@@ -224,14 +235,17 @@ NumericMatrix finite_difference_jacobian(VectorFunc &&func, const NumericVector 
                                          double epsilon) {
     NumericVector f0 = func(x);
     NumericMatrix J(f0.size(), x.size());
+    NumericVector x_perturbed = x;
 
     for (Eigen::Index j = 0; j < x.size(); ++j) {
-        const double step = epsilon * std::max(1.0, std::abs(x(j)));
-        NumericVector x_plus = x;
-        NumericVector x_minus = x;
-        x_plus(j) += step;
-        x_minus(j) -= step;
-        J.col(j) = ((func(x_plus) - func(x_minus)) / (2.0 * step)).eval();
+        const double xj = x(j);
+        const double step = epsilon * std::max(1.0, std::abs(xj));
+        x_perturbed(j) = xj + step;
+        NumericVector f_plus = func(x_perturbed);
+        x_perturbed(j) = xj - step;
+        NumericVector f_minus = func(x_perturbed);
+        x_perturbed(j) = xj;
+        J.col(j) = ((f_plus - f_minus) / (2.0 * step)).eval();
     }
 
     return J;
@@ -518,12 +532,8 @@ template <typename Func>
 OdeResult<double> solve_ivp(Func &&fun, std::pair<double, double> t_span,
                             std::initializer_list<double> y0_init, int n_eval = 100,
                             double abstol = 1e-8, double reltol = 1e-6) {
-    NumericVector y0(y0_init.size());
-    int idx = 0;
-    for (double val : y0_init) {
-        y0(idx++) = val;
-    }
-    return solve_ivp(std::forward<Func>(fun), t_span, y0, n_eval, abstol, reltol);
+    return solve_ivp(std::forward<Func>(fun), t_span, detail::to_numeric_vector(y0_init), n_eval,
+                     abstol, reltol);
 }
 
 /**
@@ -601,20 +611,9 @@ SecondOrderOdeResult<double>
 solve_second_order_ivp(AccelFunc &&acceleration, std::pair<double, double> t_span,
                        std::initializer_list<double> q0_init, std::initializer_list<double> v0_init,
                        int n_eval = 100, const SecondOrderIvpOptions &opts = {}) {
-    NumericVector q0(q0_init.size());
-    NumericVector v0(v0_init.size());
-
-    int idx = 0;
-    for (double value : q0_init) {
-        q0(idx++) = value;
-    }
-    idx = 0;
-    for (double value : v0_init) {
-        v0(idx++) = value;
-    }
-
-    return solve_second_order_ivp(std::forward<AccelFunc>(acceleration), t_span, q0, v0, n_eval,
-                                  opts);
+    return solve_second_order_ivp(std::forward<AccelFunc>(acceleration), t_span,
+                                  detail::to_numeric_vector(q0_init),
+                                  detail::to_numeric_vector(v0_init), n_eval, opts);
 }
 
 /**
@@ -687,13 +686,8 @@ OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
                                         std::pair<double, double> t_span,
                                         std::initializer_list<double> y0_init, int n_eval = 100,
                                         const MassMatrixIvpOptions &opts = {}) {
-    NumericVector y0(y0_init.size());
-    int idx = 0;
-    for (double value : y0_init) {
-        y0(idx++) = value;
-    }
     return solve_ivp_mass_matrix(std::forward<RhsFunc>(rhs), std::forward<MassFunc>(mass_matrix),
-                                 t_span, y0, n_eval, opts);
+                                 t_span, detail::to_numeric_vector(y0_init), n_eval, opts);
 }
 
 /**

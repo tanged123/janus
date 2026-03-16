@@ -211,8 +211,10 @@ inline NumericVector clenshaw_curtis_probability_weights(const PolynomialChaosDi
 
     for (Eigen::Index k = 0; k < n; ++k) {
         moments(k) = probability_moment(dimension, static_cast<int>(k));
+    }
+    for (Eigen::Index j = 0; j < n; ++j) {
         double x_power = 1.0;
-        for (Eigen::Index j = 0; j < n; ++j) {
+        for (Eigen::Index k = 0; k < n; ++k) {
             vandermonde(k, j) = x_power;
             x_power *= nodes(j);
         }
