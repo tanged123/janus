@@ -1,6 +1,5 @@
 #pragma once
 
-#include "OptiCache.hpp"
 #include "OptiOptions.hpp"
 #include "OptiSol.hpp"
 #include "OptiSweep.hpp"
@@ -948,8 +947,18 @@ class Opti {
      *
      * For advanced usage when CasADi-specific features are needed.
      */
-    casadi::Opti &casadi_opti() { return opti_; }
     const casadi::Opti &casadi_opti() const { return opti_; }
+
+    /**
+     * @brief Set initial guess for a symbolic expression
+     *
+     * Forwards to CasADi's set_initial for element-level initial guesses
+     * (e.g. matrix slices from transcription methods).
+     *
+     * @param x Symbolic expression
+     * @param v Initial value
+     */
+    void set_initial(const casadi::MX &x, const casadi::DM &v) { opti_.set_initial(x, v); }
 
     // =========================================================================
     // Category & Freezing

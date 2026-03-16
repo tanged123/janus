@@ -196,12 +196,12 @@ sol.save("solution.json", vars);
 ```
 
 ### Loading & Warm Starting
-Use `janus::OptiCache::load()` to retrieve previous results. You can use these values to initialize variables in a new optimization run.
+Use `janus::OptiSol::load()` to retrieve previous results. You can use these values to initialize variables in a new optimization run.
 
 ```cpp
 // Load cache
 try {
-    auto cache = janus::OptiCache::load("solution.json");
+    auto cache = janus::OptiSol::load("solution.json");
     
     // Check if variable exists in cache
     double x_init = cache.count("x") ? cache["x"][0] : 0.0;

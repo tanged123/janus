@@ -3,7 +3,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <janus/janus.hpp>
-#include <janus/optimization/OptiCache.hpp>
+#include <janus/optimization/OptiSol.hpp>
 
 class OptiCacheTest : public ::testing::Test {
   protected:
@@ -43,7 +43,7 @@ TEST_F(OptiCacheTest, SaveAndLoad) {
     f.close();
 
     // Load
-    auto data = janus::OptiCache::load(filename);
+    auto data = janus::OptiSol::load(filename);
 
     ASSERT_EQ(data.count("x"), 1);
     ASSERT_EQ(data.count("y"), 1);
@@ -77,7 +77,7 @@ TEST_F(OptiCacheTest, VectorVariable) {
     f.close();
 
     // Load
-    auto data = janus::OptiCache::load(filename);
+    auto data = janus::OptiSol::load(filename);
 
     ASSERT_EQ(data.count("v"), 1);
     const auto &vec = data["v"];
@@ -106,7 +106,7 @@ TEST_F(OptiCacheTest, WarmStartConvergence) {
     sol_cold.save(filename, vars);
 
     // 2. Solve 'warm' problem loading from cache
-    auto data = janus::OptiCache::load(filename);
+    auto data = janus::OptiSol::load(filename);
 
     janus::Opti opti_warm;
     // Initialize with loaded values
