@@ -35,6 +35,12 @@ using janus::LinearSolvePolicy;
 using janus::NumericMatrix;
 using janus::NumericScalar;
 using janus::NumericVector;
+using janus::PolynomialChaosBasis;
+using janus::PolynomialChaosBasisOptions;
+using janus::PolynomialChaosDimension;
+using janus::PolynomialChaosFamily;
+using janus::PolynomialChaosTerm;
+using janus::PolynomialChaosTruncation;
 using janus::SparseDirectLinearSolver;
 using janus::StructuralDiagnosticsOptions;
 using janus::StructuralDiagnosticsReport;
@@ -83,10 +89,20 @@ using janus::where;
 
 // Calculus
 using janus::gradient;
+using janus::hermite_dimension;
 using janus::hessian;
 using janus::hessian_vector_product;
+using janus::jacobi_dimension;
 using janus::jacobian;
 using janus::lagrangian_hessian_vector_product;
+using janus::laguerre_dimension;
+using janus::legendre_dimension;
+using janus::pce_mean;
+using janus::pce_polynomial;
+using janus::pce_projection_coefficients;
+using janus::pce_regression_coefficients;
+using janus::pce_squared_norm;
+using janus::pce_variance;
 
 // Spacing
 using janus::linspace;

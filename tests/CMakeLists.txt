@@ -38,6 +38,7 @@ add_executable(test_math
     math/test_coverage_gaps.cpp
     math/test_rootfinding.cpp
     math/test_orthogonal_polynomials.cpp
+    math/test_polynomial_chaos.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

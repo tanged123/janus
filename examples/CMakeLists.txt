@@ -43,6 +43,9 @@ target_link_libraries(structural_diagnostics_demo PRIVATE janus)
 add_executable(linear_solve_policy_demo math/linear_solve_policy_demo.cpp)
 target_link_libraries(linear_solve_policy_demo PRIVATE janus)
 
+add_executable(polynomial_chaos_demo math/polynomial_chaos_demo.cpp)
+target_link_libraries(polynomial_chaos_demo PRIVATE janus)
+
 # =============================================================================
 # Interpolation Examples
 # =============================================================================

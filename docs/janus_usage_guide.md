@@ -34,6 +34,7 @@
 | `docs/user_guides/numeric_computing.md` | Numeric mode guide |
 | `docs/user_guides/optimization.md` | Opti interface usage |
 | `docs/user_guides/interpolation.md` | Interpolation utilities |
+| `docs/user_guides/polynomial_chaos.md` | Polynomial chaos basis construction, coefficient fitting, symbolic moments |
 | `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
 | `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
@@ -335,6 +336,23 @@ Methods: `"linear"`, `"cubic"`, `"monotonic"`
 
 ---
 
+#### Polynomial Chaos (`PolynomialChaos.hpp`)
+
+| Function | Description |
+|----------|-------------|
+| `pce_polynomial(dim, degree, x, normalized)` | Evaluate a univariate Hermite / Legendre / Jacobi / Laguerre basis term |
+| `pce_squared_norm(dim, degree, normalized)` | Probability-space squared norm for one basis term |
+| `PolynomialChaosBasis(dimensions, order, options)` | Build a multidimensional total-order or tensor-product basis |
+| `basis.evaluate(point)` | Evaluate all basis terms at one stochastic point |
+| `pce_projection_coefficients(...)` | Recover coefficients from weighted collocation samples |
+| `pce_regression_coefficients(...)` | Recover coefficients from sample regression / least squares |
+| `pce_mean(coeffs)` | Mean of a scalar PCE |
+| `pce_variance(basis, coeffs)` | Variance of a scalar PCE |
+
+See `docs/user_guides/polynomial_chaos.md` for sample layout, normalization, and symbolic-moment workflows.
+
+---
+
 #### Spacing (`Spacing.hpp`)
 
 | Function | Description |
@@ -546,6 +564,7 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Symbolic Computing | `docs/user_guides/symbolic_computing.md` | Symbolic mode, graph building, MX operations |
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
 | Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
+| Polynomial Chaos | `docs/user_guides/polynomial_chaos.md` | Askey-scheme bases, projection/regression fitting, symbolic moments |
 | Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
 | Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
