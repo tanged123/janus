@@ -774,6 +774,68 @@ TEST(OptiTest, CategoryTracking) {
 }
 
 // =============================================================================
+// Scaling Tests
+// =============================================================================
+
+TEST(OptiTest, ScalingAnalysisUsesFiniteBoundsForDefaultVariableScale) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0, std::nullopt, -1e6, 1e6);
+    opti.minimize((x - 2.0) * (x - 2.0));
+
+    auto report = opti.analyze_scaling();
+
+    ASSERT_EQ(report.variables.size(), 1);
+    EXPECT_DOUBLE_EQ(report.variables[0].scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.variables[0].suggested_scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.variables[0].normalized_init_abs_max, 0.0);
+}
+
+TEST(OptiTest, ExplicitObjectiveAndConstraintScaling) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to(x == 1e6, 1e6);
+    opti.minimize(janus::pow(x - 1e6, 2), 1e12);
+
+    auto report = opti.analyze_scaling();
+
+    ASSERT_TRUE(report.objective.configured);
+    EXPECT_TRUE(report.objective.user_supplied_scale);
+    EXPECT_DOUBLE_EQ(report.objective.scale, 1e12);
+    EXPECT_DOUBLE_EQ(report.objective.normalized_value, 1.0);
+    ASSERT_EQ(report.constraints.size(), 1);
+    EXPECT_DOUBLE_EQ(report.constraints[0].scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.constraints[0].normalized_magnitude, 1.0);
+    EXPECT_FALSE(report.has_warnings());
+
+    auto sol = opti.solve({.verbose = false});
+    EXPECT_NEAR(sol.value(x), 1e6, 1e-3);
+}
+
+TEST(OptiTest, ScalingAnalysisWarnsForLargeUnscaledObjectiveAndConstraint) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to(x == 1e6);
+    opti.minimize(janus::pow(x - 1e6, 2));
+
+    auto report = opti.analyze_scaling();
+
+    EXPECT_TRUE(report.has_warnings());
+
+    bool saw_constraint_warning = false;
+    bool saw_objective_warning = false;
+    for (const auto &issue : report.issues) {
+        saw_constraint_warning |= issue.kind == janus::ScalingIssueKind::Constraint;
+        saw_objective_warning |= issue.kind == janus::ScalingIssueKind::Objective;
+    }
+
+    EXPECT_TRUE(saw_constraint_warning);
+    EXPECT_TRUE(saw_objective_warning);
+}
+
+// =============================================================================
 // Parametric Sweep Tests
 // =============================================================================
 

@@ -462,17 +462,22 @@ auto p = opti.parameter(5.0);
 
 // Objective
 opti.minimize(cost_function);
+opti.minimize(cost_function, 1e6);   // Explicit objective scaling
 opti.maximize(profit_function);
 
 // Constraints
 opti.subject_to(x >= 0);
+opti.subject_to(g == 0, 1e3);        // Explicit constraint scaling
 opti.subject_to(x * x + y * y <= 1);
 opti.subject_to_bounds(x, lower, upper);  // Box constraints
+
+// Diagnostics
+auto scaling = opti.analyze_scaling();
 
 // Solve
 auto sol = opti.solve();
 double x_val = sol.value(x);
-janus::NumericVector v_val = sol.value_vector(v);
+janus::NumericVector v_val = sol.value(v);
 ```
 
 #### Solver Configuration (`OptiOptions.hpp`)

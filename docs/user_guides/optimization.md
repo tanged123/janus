@@ -138,7 +138,47 @@ For more details on vector operations and trajectory optimization, see the [Brac
 
 ---
 
-## 5. Solution Persistence & Warm Starting
+## 5. Scaling Diagnostics and Nondimensionalization
+
+Poor scaling is a common failure mode for nonlinear programs. `janus::Opti` now exposes three
+practical tools:
+
+- Variable scales can still be supplied explicitly through `variable(..., scale, ...)`.
+- If the initial guess is zero, finite bounds are now used to infer a more sensible default scale.
+- Objectives and constraints can be scaled explicitly, and `analyze_scaling()` reports suspicious magnitudes before solve.
+
+```cpp
+janus::Opti opti;
+
+// Zero initial guess, but large finite bounds -> inferred variable scale is 1e6
+auto x = opti.variable(0.0, std::nullopt, -1e6, 1e6);
+
+// Tell the solver to see this equality as (x - 1e6) / 1e6 == 0
+opti.subject_to(x == 1e6, 1e6);
+
+// Tell the solver to minimize ((x - 1e6)^2) / 1e12
+opti.minimize(janus::pow(x - 1e6, 2), 1e12);
+
+auto report = opti.analyze_scaling();
+if (report.has_warnings()) {
+    for (const auto& issue : report.issues) {
+        std::cout << issue.label << ": " << issue.message << "\n";
+    }
+}
+```
+
+The report summarizes:
+
+- variable block scales and normalized initial guesses
+- constraint row magnitudes versus applied linear scales
+- objective magnitude versus applied objective scale
+- Jacobian sparsity density for the current NLP
+
+This is intended as a pre-solve diagnostic pass, not a full automatic reformulation engine.
+
+---
+
+## 6. Solution Persistence & Warm Starting
 
 Janus allowed you to save optimization results to JSON and use them to warm-start subsequent runs. This is crucial for complex problems where a good initial guess can significantly reduce solve time.
 
@@ -175,7 +215,7 @@ try {
 
 ---
 
-## 6. Parametric Sweeps
+## 7. Parametric Sweeps
 
 Run the same optimization across a range of parameter values with automatic warm-starting:
 
@@ -203,4 +243,3 @@ for (size_t i = 0; i < result.size(); ++i) {
 ```
 
 See the full example: [`examples/optimization/parametric_sweep.cpp`](../../examples/optimization/parametric_sweep.cpp)
-
