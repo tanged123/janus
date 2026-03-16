@@ -58,7 +58,7 @@ int main() {
         std::cout << std::fixed << std::setprecision(6);
         std::cout << "  Optimal x: " << sol.value(x) << " (expected: 1.0)\n";
         std::cout << "  Optimal y: " << sol.value(y) << " (expected: 1.0)\n";
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -84,7 +84,7 @@ int main() {
         std::cout << "  Optimal x: " << sol.value(x) << "\n";
         std::cout << "  Optimal y: " << sol.value(y) << "\n";
         std::cout << "  x + y = " << sol.value(x) + sol.value(y) << " (should be >= 2)\n";
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -116,7 +116,7 @@ int main() {
             std::cout << "    x[" << i << "] = " << std::fixed << std::setprecision(4) << x_opt(i)
                       << " (expected: 1.0)\n";
         }
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -187,7 +187,7 @@ int main() {
         auto sol = opti.solve({.verbose = false});
         std::cout << "    solution x*     : " << sol.value(x) << "\n";
         std::cout << "    solution y*     : " << sol.value(y) << "\n";
-        std::cout << "    iterations      : " << sol.num_iterations() << "\n\n";
+        std::cout << "    iterations      : " << sol.num_iterations().value_or(-1) << "\n\n";
     };
 
     run_scaled_case("Unscaled formulation", false);

@@ -438,8 +438,9 @@ TEST(InterpnTests, SymbolicValuesInterpnLinear2D) {
     values(2) = v01;
     values(3) = v11;
 
-    janus::NumericMatrix xi(1, 2);
-    xi << 0.25, 0.75;
+    janus::JanusMatrix<janus::SymbolicScalar> xi(1, 2);
+    xi(0, 0) = janus::SymbolicScalar(0.25);
+    xi(0, 1) = janus::SymbolicScalar(0.75);
 
     auto result = janus::interpn<janus::SymbolicScalar>(points, values, xi,
                                                         janus::InterpolationMethod::Linear);
