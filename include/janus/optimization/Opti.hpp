@@ -53,12 +53,12 @@ inline double suggest_vector_scale(const NumericVector &init_guess,
     return std::max({init_mag, max_finite_abs(lower_bound, upper_bound), 1.0});
 }
 
-inline std::vector<double> dm_to_vector(const casadi::DM &value) {
+inline std::vector<double> dm_to_std_vector(const casadi::DM &value) {
     return static_cast<std::vector<double>>(value);
 }
 
 inline double dm_to_scalar(const casadi::DM &value) {
-    std::vector<double> elements = dm_to_vector(value);
+    std::vector<double> elements = dm_to_std_vector(value);
     return elements.empty() ? 0.0 : elements.front();
 }
 
@@ -886,12 +886,12 @@ class Opti {
 
         if (opti_.ng() > 0) {
             std::vector<double> g_values =
-                detail::dm_to_vector(opti_.value(opti_.g(), assignments));
+                detail::dm_to_std_vector(opti_.value(opti_.g(), assignments));
             std::vector<double> lbg_values =
-                detail::dm_to_vector(opti_.value(opti_.lbg(), assignments));
+                detail::dm_to_std_vector(opti_.value(opti_.lbg(), assignments));
             std::vector<double> ubg_values =
-                detail::dm_to_vector(opti_.value(opti_.ubg(), assignments));
-            std::vector<double> g_scales = detail::dm_to_vector(opti_.g_linear_scale());
+                detail::dm_to_std_vector(opti_.value(opti_.ubg(), assignments));
+            std::vector<double> g_scales = detail::dm_to_std_vector(opti_.g_linear_scale());
 
             for (int i = 0; i < static_cast<int>(g_values.size()); ++i) {
                 ConstraintScalingInfo info;

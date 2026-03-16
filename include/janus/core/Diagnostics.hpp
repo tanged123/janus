@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <casadi/casadi.hpp>
+#include <numeric>
 #include <optional>
 #include <queue>
 #include <sstream>
@@ -121,14 +122,6 @@ struct StructuralDiagnosticsReport {
 
 namespace detail {
 
-inline std::vector<int> make_index_vector(int n) {
-    std::vector<int> indices(static_cast<std::size_t>(n));
-    for (int i = 0; i < n; ++i) {
-        indices[static_cast<std::size_t>(i)] = i;
-    }
-    return indices;
-}
-
 inline std::vector<int> sort_unique(std::vector<int> values) {
     std::sort(values.begin(), values.end());
     values.erase(std::unique(values.begin(), values.end()), values.end());
@@ -214,7 +207,9 @@ inline std::vector<int> canonical_output_indices(const casadi::Function &cfn,
                                                  const std::vector<int> &requested,
                                                  const std::string &context) {
     if (requested.empty()) {
-        return make_index_vector(cfn.n_out());
+        std::vector<int> all(static_cast<std::size_t>(cfn.n_out()));
+        std::iota(all.begin(), all.end(), 0);
+        return all;
     }
 
     std::vector<int> indices;

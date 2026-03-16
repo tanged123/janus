@@ -2,6 +2,7 @@
 #include "janus/core/Function.hpp"
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusTypes.hpp"
+#include "janus/core/Sparsity.hpp"
 #include <string>
 #include <vector>
 
@@ -165,15 +166,6 @@ inline void validate_same_shape(const casadi::MX &lhs, const casadi::MX &rhs,
 
 inline std::vector<casadi::MX> symbolic_inputs_like(const Function &fn) {
     return fn.casadi_function().mx_in();
-}
-
-inline std::vector<SymbolicArg> to_symbolic_args(const std::vector<casadi::MX> &args) {
-    std::vector<SymbolicArg> ret;
-    ret.reserve(args.size());
-    for (const auto &arg : args) {
-        ret.emplace_back(arg);
-    }
-    return ret;
 }
 
 inline casadi::MX make_zero_seed(int rows, int cols, int directions) {
