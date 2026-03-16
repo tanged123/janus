@@ -62,6 +62,7 @@
               eigen
               casadi
               gtest
+              ccache
               clang-tools
               doxygen
               graphviz

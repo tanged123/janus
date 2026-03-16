@@ -11,15 +11,99 @@ fi
 
 # Handle arguments
 CLEAN=false
+BUILD_TYPE="${BUILD_TYPE:-Debug}"
+
+# Default jobs: half of available cores, capped at 6 (minimum 2)
+# This prevents OOM on 32GB systems with heavy template code (CasADi)
+DEFAULT_JOBS=$(( $(nproc) / 2 ))
+[ "$DEFAULT_JOBS" -lt 2 ] && DEFAULT_JOBS=2
+[ "$DEFAULT_JOBS" -gt 6 ] && DEFAULT_JOBS=6
+JOBS="${JOBS:-$DEFAULT_JOBS}"
+
+# Argument parsing state
+NEXT_IS_JOBS=false
+
+show_help() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Build the Janus project.
+
+Build Type Options:
+  --debug           Build with debug symbols (default)
+  --release         Build with optimizations
+  --relwithdebinfo  Build with optimizations and debug info
+  --clean           Clean build directory before building
+
+Other Options:
+  -j, --jobs N      Number of parallel build jobs (default: half of cores)
+  -h, --help        Show this help message
+
+Environment Variables:
+  BUILD_TYPE        Override build type
+  JOBS              Override parallel job count
+
+Examples:
+  ./scripts/build.sh                    # Debug build
+  ./scripts/build.sh --release          # Release build
+  ./scripts/build.sh --clean            # Clean debug build
+  ./scripts/build.sh -j 4 --release     # Release build with 4 jobs
+EOF
+    exit 0
+}
 
 for arg in "$@"; do
+    # If previous arg was -j/--jobs, this arg should be the job count
+    if [ "$NEXT_IS_JOBS" = true ]; then
+        if [[ "$arg" =~ ^[0-9]+$ ]]; then
+            JOBS="$arg"
+            NEXT_IS_JOBS=false
+            continue
+        else
+            echo "Error: --jobs/-j requires a numeric argument, got: '$arg'" >&2
+            exit 1
+        fi
+    fi
+
     case $arg in
+        -h|--help)
+            show_help
+            ;;
         --clean)
-        CLEAN=true
-        shift
-        ;;
+            CLEAN=true
+            ;;
+        --debug)
+            BUILD_TYPE="Debug"
+            ;;
+        --release)
+            BUILD_TYPE="Release"
+            ;;
+        --relwithdebinfo)
+            BUILD_TYPE="RelWithDebInfo"
+            ;;
+        --jobs=*|-j=*)
+            JOBS="${arg#*=}"
+            ;;
+        --jobs|-j)
+            NEXT_IS_JOBS=true
+            ;;
+        *)
+            echo "Warning: Unknown argument ignored: $arg" >&2
+            ;;
     esac
 done
+
+# Check if -j/--jobs was the last argument without a value
+if [ "$NEXT_IS_JOBS" = true ]; then
+    echo "Error: --jobs/-j requires a numeric argument" >&2
+    exit 1
+fi
+
+# Validate JOBS is numeric
+if ! [[ "$JOBS" =~ ^[0-9]+$ ]]; then
+    echo "Error: Invalid job count: '$JOBS' (must be numeric)" >&2
+    exit 1
+fi
 
 if [ "$CLEAN" = true ]; then
     echo "Clean build requested."
@@ -27,8 +111,25 @@ if [ "$CLEAN" = true ]; then
     "$SCRIPT_DIR/clean.sh"
 fi
 
-# Create build directory if it doesn't exist or reconfigure
-cmake -B build -G Ninja
+echo "Building with CMAKE_BUILD_TYPE=$BUILD_TYPE (jobs: $JOBS)"
 
-# Build the project
-ninja -C build
+# Show ccache stats before build
+if command -v ccache &> /dev/null; then
+    echo ""
+    echo "=== ccache stats (before build) ==="
+    ccache -s | grep -E "(Hits|Misses|Hit rate|Cache size)" || ccache -s | head -10
+fi
+
+# Create build directory if it doesn't exist or reconfigure
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+
+# Build the project with limited parallelism to prevent OOM
+ninja -C build -j "$JOBS"
+
+# Show ccache stats after build
+if command -v ccache &> /dev/null; then
+    echo ""
+    echo "=== ccache stats (after build) ==="
+    ccache -s | grep -E "(Hits|Misses|Hit rate|Cache size)" || ccache -s | head -10
+fi

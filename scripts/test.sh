@@ -15,8 +15,14 @@ if [ ! -d "build" ]; then
     ./scripts/build.sh
 fi
 
+# Default jobs: half of available cores, capped at 6 (minimum 2)
+DEFAULT_JOBS=$(( $(nproc) / 2 ))
+[ "$DEFAULT_JOBS" -lt 2 ] && DEFAULT_JOBS=2
+[ "$DEFAULT_JOBS" -gt 6 ] && DEFAULT_JOBS=6
+JOBS="${JOBS:-$DEFAULT_JOBS}"
+
 # Rebuild to ensure latest changes
-ninja -C build
+ninja -C build -j "$JOBS"
 
 # Run tests
 mkdir -p logs
