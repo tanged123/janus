@@ -835,6 +835,50 @@ TEST(OptiTest, ScalingAnalysisWarnsForLargeUnscaledObjectiveAndConstraint) {
     EXPECT_TRUE(saw_objective_warning);
 }
 
+TEST(OptiTest, ScaleValidationErrors) {
+    EXPECT_THROW(janus::detail::validate_positive_scale(0.0, "scale"), janus::InvalidArgument);
+    EXPECT_THROW(
+        janus::detail::validate_positive_scale(std::numeric_limits<double>::quiet_NaN(), "scale"),
+        janus::InvalidArgument);
+    EXPECT_DOUBLE_EQ(janus::detail::max_finite_abs(-3.0, std::numeric_limits<double>::infinity()),
+                     3.0);
+    EXPECT_DOUBLE_EQ(janus::detail::constraint_violation(5.0, 0.0, true, 4.0, true), 1.0);
+
+    janus::Opti opti;
+    EXPECT_THROW(opti.variable(0.0, std::optional<double>(0.0)), janus::InvalidArgument);
+    EXPECT_THROW(opti.variable(3, 0.0, std::optional<double>(0.0)), janus::InvalidArgument);
+
+    janus::NumericVector init(2);
+    init << 1.0, 2.0;
+    EXPECT_THROW(opti.variable(init, std::optional<double>(0.0)), janus::InvalidArgument);
+
+    auto x = opti.variable(0.0);
+    EXPECT_THROW(opti.minimize(x * x, 0.0), janus::InvalidArgument);
+    EXPECT_THROW(opti.maximize(x, std::numeric_limits<double>::quiet_NaN()),
+                 janus::InvalidArgument);
+}
+
+TEST(OptiTest, ScalingAnalysisWarnsForTinyVariableAndScaleSpan) {
+    janus::Opti opti;
+
+    auto x = opti.variable(1e-9, std::optional<double>(1e4));
+    auto y = opti.variable(1.0, std::optional<double>(1e-3));
+    opti.minimize((x - 1.0) * (x - 1.0) + (y - 1.0) * (y - 1.0));
+
+    auto report = opti.analyze_scaling();
+
+    bool saw_variable_warning = false;
+    bool saw_summary_warning = false;
+    for (const auto &issue : report.issues) {
+        saw_variable_warning |= issue.kind == janus::ScalingIssueKind::Variable;
+        saw_summary_warning |= issue.kind == janus::ScalingIssueKind::Summary;
+    }
+
+    EXPECT_TRUE(saw_variable_warning);
+    EXPECT_TRUE(saw_summary_warning);
+    EXPECT_GT(report.summary.variable_scale_ratio, 1e6);
+}
+
 // =============================================================================
 // Parametric Sweep Tests
 // =============================================================================

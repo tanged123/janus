@@ -247,6 +247,45 @@ TEST(RootFindingTest, ImplicitFunctionCustomSlots) {
     EXPECT_NEAR(jac_vals[1], 0.2, 1e-6);
 }
 
+TEST(RootFindingTest, ImplicitFunctionDifferentInputOutputIndices) {
+    // The unknown lives in input slot 1 but the residual lives in output slot 0.
+    // G(a, x, b) -> (x^2 + a*x - b, a - b)
+    //   implicit_input_index  = 1  (x is the unknown)
+    //   implicit_output_index = 0  (first output is the residual)
+    auto a = sym("a");
+    auto x = sym("x");
+    auto b = sym("b");
+    auto residual = x * x + a * x - b;
+    auto aux = a - b;
+    Function g("g_diff_indices", {a, x, b}, {residual, aux});
+
+    Eigen::VectorXd x_guess(1);
+    x_guess << 1.0;
+
+    ImplicitFunctionOptions implicit_opts;
+    implicit_opts.implicit_input_index = 1;
+    implicit_opts.implicit_output_index = 0;
+    auto implicit_fn = create_implicit_function(g, x_guess, {}, implicit_opts);
+
+    // At (a, b) = (3, 4), the positive root is x = 1.
+    auto res = implicit_fn.eval(3.0, 4.0);
+    EXPECT_NEAR(res(0), 1.0, 1e-6);
+
+    // Verify derivatives: dx/da = -x/(2x+a) = -0.2, dx/db = 1/(2x+a) = 0.2
+    auto a_sym = sym("a_sym_diff");
+    auto b_sym = sym("b_sym_diff");
+    auto x_sym = implicit_fn(a_sym, b_sym)[0];
+    auto ab_sym = casadi::MX::vertcat({a_sym, b_sym});
+    auto jac = casadi::MX::jacobian(janus::to_mx(x_sym), ab_sym);
+    casadi::Function j_fn("j_fn_diff_idx", {a_sym, b_sym}, {jac});
+    auto j_val = j_fn(std::vector<casadi::DM>{casadi::DM(3.0), casadi::DM(4.0)});
+    std::vector<double> jac_vals = std::vector<double>(j_val[0]);
+
+    ASSERT_EQ(jac_vals.size(), 2u);
+    EXPECT_NEAR(jac_vals[0], -0.2, 1e-6);
+    EXPECT_NEAR(jac_vals[1], 0.2, 1e-6);
+}
+
 TEST(RootFindingTest, NewtonSolverClass) {
     auto x = sym("x");
     auto f_expr = x * x - 9.0; // Roots at +/- 3
