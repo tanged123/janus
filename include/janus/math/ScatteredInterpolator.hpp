@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file ScatteredInterpolator.hpp
+ * @brief RBF-based interpolation for unstructured scattered data
+ * @see Interpolate.hpp
+ */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
@@ -253,7 +258,9 @@ class ScatteredInterpolator {
 
     /**
      * @brief Evaluate at N-D point
-     * @tparam Scalar Scalar type (double or SymbolicScalar)
+     * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+     * @param query Query point vector
+     * @return Interpolated value
      */
     template <JanusScalar Scalar> Scalar operator()(const JanusVector<Scalar> &query) const {
         if (!m_valid) {
@@ -264,6 +271,9 @@ class ScatteredInterpolator {
 
     /**
      * @brief Evaluate at scalar (1D only)
+     * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+     * @param query Scalar query value
+     * @return Interpolated value
      */
     template <JanusScalar Scalar> Scalar operator()(const Scalar &query) const {
         if (!m_valid) {
@@ -281,16 +291,19 @@ class ScatteredInterpolator {
 
     /**
      * @brief Get number of input dimensions
+     * @return Number of dimensions
      */
     int dims() const { return m_dims; }
 
     /**
      * @brief Check if interpolator is valid (initialized)
+     * @return True if initialized
      */
     bool valid() const { return m_valid; }
 
     /**
      * @brief Get underlying gridded interpolator (for inspection)
+     * @return Reference to gridded interpolator
      */
     const Interpolator &gridded() const { return m_gridded; }
 

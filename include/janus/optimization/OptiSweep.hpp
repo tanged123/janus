@@ -1,3 +1,6 @@
+/// @file OptiSweep.hpp
+/// @brief Parametric sweep results for optimization problems
+
 #pragma once
 
 #include "OptiSol.hpp"
@@ -6,20 +9,21 @@
 
 namespace janus {
 
-/**
- * @brief Result of a parametric sweep
- *
- * Stores solutions obtained by solving an optimization problem
- * across a range of parameter values.
- *
- * @code
- * auto result = opti.solve_sweep(param, {0.1, 0.2, 0.3, 0.4, 0.5});
- * for (int i = 0; i < result.size(); ++i) {
- *     std::cout << "param=" << result.param_values[i]
- *               << " obj=" << result.objective(i) << "\n";
- * }
- * @endcode
- */
+/// @brief Result of a parametric sweep
+///
+/// Stores solutions obtained by solving an optimization problem
+/// across a range of parameter values.
+///
+/// @code
+/// auto result = opti.solve_sweep(param, {0.1, 0.2, 0.3, 0.4, 0.5});
+/// for (int i = 0; i < result.size(); ++i) {
+///     std::cout << "param=" << result.param_values[i]
+///               << " obj=" << result.objective(i) << "\n";
+/// }
+/// @endcode
+///
+/// @see Opti::solve_sweep for creating a SweepResult
+/// @see OptiSol for individual solution access
 struct SweepResult {
     /// Parameter values that were swept
     std::vector<double> param_values;
@@ -39,11 +43,14 @@ struct SweepResult {
     /// Error messages for failed points (empty string if converged)
     std::vector<std::string> errors;
 
-    /// Number of sweep points
+    /// @brief Number of sweep points
+    /// @return number of parameter values in the sweep
     size_t size() const { return param_values.size(); }
 
-    /// Get objective value at sweep index.
-    /// Requires the objective expression that was passed to minimize/maximize.
+    /// @brief Get objective value at sweep index
+    /// @param i sweep index
+    /// @param objective_expr objective expression passed to minimize/maximize
+    /// @return optimized objective value at sweep point i
     double objective(size_t i, const SymbolicScalar &objective_expr) const {
         if (i >= solutions.size()) {
             throw InvalidArgument("SweepResult::objective: index out of range");
@@ -51,7 +58,9 @@ struct SweepResult {
         return solutions[i].value(objective_expr);
     }
 
-    /// Extract values of a variable across all sweep points
+    /// @brief Extract scalar variable values across all sweep points
+    /// @param var symbolic scalar to evaluate
+    /// @return vector of values, one per converged sweep point
     NumericVector values(const SymbolicScalar &var) const {
         NumericVector result(static_cast<int>(solutions.size()));
         for (size_t i = 0; i < solutions.size(); ++i) {
@@ -60,7 +69,9 @@ struct SweepResult {
         return result;
     }
 
-    /// Extract values of a vector variable across all sweep points
+    /// @brief Extract vector variable values across all sweep points
+    /// @param var symbolic vector to evaluate
+    /// @return matrix with columns corresponding to sweep points
     NumericMatrix values(const SymbolicVector &var) const {
         if (solutions.empty()) {
             return NumericMatrix(0, 0);

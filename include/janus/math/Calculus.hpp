@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Calculus.hpp
+ * @brief Numerical differentiation and integration (gradient, trapz, cumtrapz, diff)
+ * @see FiniteDifference.hpp, IntegrateDiscrete.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"

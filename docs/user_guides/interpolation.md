@@ -1,10 +1,6 @@
-# N-Dimensional Interpolation User Guide
+# N-Dimensional Interpolation
 
-This guide covers Janus's N-dimensional interpolation capabilities, one of the core features for working with gridded data in both numeric and symbolic modes.
-
-## Overview
-
-The `interpn` function provides N-dimensional interpolation on regular grids, supporting dimensions from 1D up to 7D and beyond. It's designed to work seamlessly with Janus's dual-backend architecture, allowing the same code to run in both fast numeric mode and symbolic trace mode for optimization.
+The `interpn` function provides N-dimensional interpolation on regular grids, supporting dimensions from 1D up to 7D and beyond. It works seamlessly with Janus's dual-backend architecture, allowing the same code to run in both fast numeric mode and symbolic trace mode for optimization. For unstructured point clouds, `ScatteredInterpolator` fits RBF models and resamples onto grids for symbolic-compatible queries.
 
 ## Quick Start
 
@@ -29,58 +25,10 @@ xi << 0.5, 0.5,   // Point 1
 
 // Interpolate
 auto result = janus::interpn<double>(points, values, xi);
-// result(0) ≈ 1.0, result(1) ≈ 2.5
+// result(0) ~ 1.0, result(1) ~ 2.5
 ```
 
----
-
-## Interpolation Methods
-
-Janus supports four interpolation methods with different smoothness properties:
-
-| Method | Enum Value | Continuity | Symbolic | Description |
-|--------|------------|------------|----------|-------------|
-| **Linear** | `InterpolationMethod::Linear` | C0 | ✅ Yes | Piecewise linear. Fast, simple, but has gradient discontinuities at grid points. |
-| **Hermite** | `InterpolationMethod::Hermite` | C1 | ❌ Numeric only | Catmull-Rom cubic spline. Smooth gradients, good for animation and trajectories. |
-| **BSpline** | `InterpolationMethod::BSpline` | C2 | ✅ Yes | Cubic B-spline. Smoothest option, ideal for optimization. Requires ≥4 points per dimension. |
-| **Nearest** | `InterpolationMethod::Nearest` | None | ❌ Numeric only | Nearest neighbor. Fast lookup, non-differentiable. |
-
-### Choosing a Method
-
-```
-Use Case                              Recommended Method
-─────────────────────────────────────────────────────────
-Fast lookup, low accuracy             Nearest
-General purpose, good balance         Linear
-Smooth trajectories, C1 gradients     Hermite
-Optimization problems, C2 smooth      BSpline
-Symbolic differentiation              Linear or BSpline
-```
-
-### Smoothness Comparison
-
-```
-                Grid Point
-                    │
-                    ▼
-    ┌───────────────●───────────────┐
-    │               │               │
-C0  │    ╱──────────●──────────╲    │  Linear: Gradient jumps at knots
-    │   ╱           │           ╲   │
-    ├───────────────●───────────────┤
-    │            ╱──●──╲            │
-C1  │          ╱    │    ╲          │  Hermite: Smooth gradient, curvature jump
-    │         ╱     │     ╲         │
-    ├───────────────●───────────────┤
-    │           ╭───●───╮           │
-C2  │          ╭    │    ╮          │  BSpline: Smooth gradient AND curvature
-    │         ╭     │     ╮         │
-    └───────────────────────────────┘
-```
-
----
-
-## API Reference
+## Core API
 
 ### `interpn<Scalar>()`
 
@@ -94,8 +42,6 @@ interpn(const std::vector<Eigen::VectorXd>& points,
         std::optional<Scalar> fill_value = std::nullopt);
 ```
 
-#### Parameters
-
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `points` | `std::vector<Eigen::VectorXd>` | Grid coordinates for each dimension. Each vector must be sorted. |
@@ -104,15 +50,20 @@ interpn(const std::vector<Eigen::VectorXd>& points,
 | `method` | `InterpolationMethod` | Interpolation algorithm (default: `Linear`). |
 | `fill_value` | `std::optional<Scalar>` | Value for out-of-bounds queries. If `nullopt`, clamps to boundary. |
 
-#### Returns
+Returns `Eigen::Matrix<Scalar, Dynamic, 1>` -- vector of interpolated values at each query point.
 
-`Eigen::Matrix<Scalar, Dynamic, 1>` - Vector of interpolated values at each query point.
+### Interpolation Methods
+
+| Method | Enum Value | Continuity | Symbolic | Description |
+|--------|------------|------------|----------|-------------|
+| **Linear** | `InterpolationMethod::Linear` | C0 | Yes | Piecewise linear. Fast, simple, but has gradient discontinuities at grid points. |
+| **Hermite** | `InterpolationMethod::Hermite` | C1 | Numeric only | Catmull-Rom cubic spline. Smooth gradients, good for animation and trajectories. |
+| **BSpline** | `InterpolationMethod::BSpline` | C2 | Yes | Cubic B-spline. Smoothest option, ideal for optimization. Requires >= 4 points per dimension. |
+| **Nearest** | `InterpolationMethod::Nearest` | None | Numeric only | Nearest neighbor. Fast lookup, non-differentiable. |
 
 ### Symbolic Table Values
 
-`interpn()` also accepts a `janus::SymbolicVector` of table values. This keeps
-the lookup table coefficients inside the symbolic graph so they can be optimized
-directly:
+`interpn()` also accepts a `janus::SymbolicVector` of table values, keeping the lookup table coefficients inside the symbolic graph so they can be optimized directly:
 
 ```cpp
 auto [table_values, table_values_mx] = janus::sym_vec_pair("table", 4);
@@ -125,13 +76,9 @@ auto result = janus::interpn(points, table_values, xi,
 ```
 
 This parameterized-table path currently supports `Linear` and `BSpline`.
-`Hermite` and `Nearest` remain numeric-only for table values. The cached
-`janus::Interpolator` class still stores numeric tables; use the free
-`interpn()` overloads when the table itself must stay symbolic.
+`Hermite` and `Nearest` remain numeric-only for table values.
 
-#### Type Aliases (Recommended)
-
-Use Janus types for better readability:
+### Type Aliases (Recommended)
 
 ```cpp
 // Numeric
@@ -145,25 +92,54 @@ janus::SymbolicMatrix // = Eigen::Matrix<casadi::MX, Dynamic, Dynamic>
 janus::SymbolicScalar // = casadi::MX
 ```
 
----
+## Usage Patterns
 
-## Data Layout: Fortran Order
+### Choosing a Method
+
+```
+Use Case                              Recommended Method
+---------------------------------------------------------
+Fast lookup, low accuracy             Nearest
+General purpose, good balance         Linear
+Smooth trajectories, C1 gradients     Hermite
+Optimization problems, C2 smooth      BSpline
+Symbolic differentiation              Linear or BSpline
+```
+
+### Smoothness Comparison
+
+```
+                Grid Point
+                    |
+                    v
+    +---------------*---------------+
+    |               |               |
+C0  |    /----------*----------\    |  Linear: Gradient jumps at knots
+    |   /           |           \   |
+    +---------------*---------------+
+    |            /--*--\            |
+C1  |          /    |    \          |  Hermite: Smooth gradient, curvature jump
+    |         /     |     \         |
+    +---------------*---------------+
+    |           ,---*---,           |
+C2  |          ,    |    ,          |  BSpline: Smooth gradient AND curvature
+    |         ,     |     ,         |
+    +-------------------------------+
+```
+
+### Data Layout: Fortran Order
 
 Grid values must be flattened in **Fortran order** (column-major), where the first dimension varies fastest.
 
-### 2D Example
-
-For a 2×3 grid with coordinates `x = [0, 1]` and `y = [0, 1, 2]`:
+For a 2x3 grid with coordinates `x = [0, 1]` and `y = [0, 1, 2]`:
 
 ```
 Grid Layout (visual):          Flattening Order:
     y=0   y=1   y=2
 x=0  a     b     c            [a, d, b, e, c, f]
-x=1  d     e     f             ↑  ↑
-                               └──┴── x varies fastest
+x=1  d     e     f             ^  ^
+                               +--+-- x varies fastest
 ```
-
-### Code Example
 
 ```cpp
 // 2D grid: x = [0, 1], y = [0, 1, 2]
@@ -182,23 +158,16 @@ values << 0,   // (0,0) = 0+0
           3;   // (1,2) = 1+2
 ```
 
----
-
-## Boundary Handling
-
-### Default: Clamping
+### Boundary Handling
 
 When `fill_value` is not provided, out-of-bounds queries are **clamped** to the grid boundary:
 
 ```cpp
-// Query outside grid bounds
 xi << -1.0, 0.5;  // x = -1 is outside [0, 1]
 
 auto result = janus::interpn<double>(points, values, xi);
 // Effectively queries at (0.0, 0.5) - clamped to boundary
 ```
-
-### Fill Value
 
 Use `fill_value` to return a specific value for out-of-bounds queries:
 
@@ -211,28 +180,22 @@ auto result = janus::interpn<double>(
 // Returns -999.0 for any query outside grid bounds
 ```
 
-### Linear Extrapolation (1D Only)
+### Linear Extrapolation
 
 For optimization problems, clamping produces **zero gradients** outside bounds, which can stall solvers. The `ExtrapolationConfig` class provides linear extrapolation with optional safety bounds:
 
 ```cpp
-#include <janus/math/Interpolate.hpp>
-
 janus::NumericVector x(4), y(4);
 x << 0, 1, 2, 3;
-y << 0, 10, 40, 90;  // y = 10*x^2 sampled
+y << 0, 10, 40, 90;
 
-// Linear extrapolation with output bounds [0, 200]
 janus::Interpolator interp(x, y,
     janus::InterpolationMethod::BSpline,
     janus::ExtrapolationConfig::linear(0.0, 200.0));
 
-// Query outside bounds
 double val = interp(4.0);  // Extrapolates linearly from boundary slope
                             // then clamps result to [0, 200]
 ```
-
-#### ExtrapolationConfig Factory Methods
 
 | Factory Method | Behavior |
 |----------------|----------|
@@ -240,217 +203,138 @@ double val = interp(4.0);  // Extrapolates linearly from boundary slope
 | `ExtrapolationConfig::linear()` | Linear extrapolation, unbounded |
 | `ExtrapolationConfig::linear(lower, upper)` | Linear extrapolation with output bounds |
 
-#### How Linear Extrapolation Works
-
-```
-                Left extrapolation          Right extrapolation
-                     │                           │
-      ╲              │              ╱            │              ╱
-       ╲             │  ●──────────●            │  ●──────────●
-        ╲            │ ╱            ╲           │ ╱            ╲
-─────────●──────────●──────────────●───────────●──────────────●─────────
-       x_min                     x_max
-         │                         │
-         └─ slope = (y[1]-y[0])    └─ slope = (y[n-1]-y[n-2])
-               ───────────             ───────────────────
-              (x[1]-x[0])              (x[n-1]-x[n-2])
-```
-
-#### Symbolic Support
-
 Linear extrapolation works in symbolic mode with full AD support:
 
 ```cpp
 auto x_sym = janus::sym("x");
 auto y_sym = interp(x_sym);
 
-// Compute gradient (non-zero even outside bounds!)
 auto dy_dx = janus::jacobian(y_sym, x_sym);
 ```
 
-#### N-D Extrapolation
-
-Linear extrapolation is fully supported in N dimensions. For each dimension that falls outside bounds, the extrapolation adds a correction term:
+N-D extrapolation is fully supported. For each dimension that falls outside bounds, the extrapolation adds a correction term:
 
 ```
-result = interp(clamped_query) + Σ slope_d × (query_d - boundary_d)
+result = interp(clamped_query) + sum( slope_d * (query_d - boundary_d) )
 ```
-
-where the sum is over all out-of-bounds dimensions. The partial derivatives `∂f/∂x_d` are computed at construction time using finite differences at the grid boundaries.
 
 ```cpp
-// 2D example with linear extrapolation
 janus::Interpolator interp2d(points, values,
     janus::InterpolationMethod::Linear,
     janus::ExtrapolationConfig::linear(-10.0, 100.0));
 
-// Query outside bounds in both dimensions
 janus::NumericVector query(2);
-query << 3.0, 3.0;  // Both x and y outside [0, 2]
-double result = interp2d(query);  // Extrapolates using both ∂f/∂x and ∂f/∂y
+query << 3.0, 3.0;
+double result = interp2d(query);
 ```
 
----
+### Loading Data from File
 
-## Scattered Data Interpolation
+```cpp
+Eigen::MatrixXd data = load_csv("aero_coeffs.csv");
+
+janus::NumericVector mach = data.col(0).head(n_mach);
+janus::NumericVector alpha = data.col(1).head(n_alpha);
+janus::NumericVector CL = data.col(2);
+
+std::vector<janus::NumericVector> points = {mach, alpha};
+
+auto cl = janus::interpn<double>(points, CL, query_pts);
+```
+
+### Surrogate Model in Optimization
+
+```cpp
+template <typename Scalar>
+Scalar drag_model(const janus::JanusVector<Scalar>& state) {
+    janus::JanusMatrix<Scalar> query(1, 2);
+    query(0, 0) = state(0);  // Mach
+    query(0, 1) = state(1);  // Angle of attack
+
+    auto cd = janus::interpn<Scalar>(
+        aero_grid, cd_values, query,
+        janus::InterpolationMethod::BSpline
+    );
+    return cd(0);
+}
+```
+
+### Symbolic Mode
+
+For optimization problems, use symbolic interpolation to embed lookups in your objective:
+
+```cpp
+janus::SymbolicMatrix xi(1, 2);
+xi(0, 0) = janus::sym("x");
+xi(0, 1) = janus::sym("y");
+
+auto z_sym = janus::interpn<janus::SymbolicScalar>(
+    points, values, xi,
+    janus::InterpolationMethod::BSpline
+);
+
+auto f = janus::Function("lookup", {xi(0,0), xi(0,1)}, {z_sym(0)});
+```
+
+| Method | Symbolic Mode | Reason |
+|--------|---------------|--------|
+| Linear | Yes | Uses CasADi `interpolant` |
+| Hermite | No | Requires interval selection at runtime; throws and recommends BSpline |
+| BSpline | Yes | Uses CasADi `interpolant` |
+| Nearest | No | Requires rounding (non-smooth) |
+
+### Scattered Data Interpolation
 
 For unstructured point cloud data (non-gridded), use `ScatteredInterpolator`. It fits Radial Basis Functions (RBF) to scattered points, then resamples onto a grid for fast symbolic-compatible queries.
-
-### Quick Start
 
 ```cpp
 #include <janus/math/ScatteredInterpolator.hpp>
 
-// 2D scattered data (e.g., wind tunnel test points)
 janus::NumericMatrix points(20, 2);  // 20 test points, 2D input
-janus::NumericVector values(20);      // Measured values
+janus::NumericVector values(20);
 // ... fill in data ...
 
 janus::ScatteredInterpolator interp(points, values);
 
-// Query at arbitrary point
 janus::NumericVector query(2);
 query << 0.6, 5.0;
 double result = interp(query);
 ```
-
-### Gridded vs Scattered Comparison
 
 | Feature | Gridded (`Interpolator`) | Scattered (`ScatteredInterpolator`) |
 |---------|--------------------------|-------------------------------------|
 | Data Structure | Regular axis-aligned grid | Arbitrary point cloud |
 | Performance | Very fast (tensorially separable) | Slower (RBF solve at construction) |
 | Use Case | Uniformly sampled data | Wind tunnel points, CFD meshes |
-| Symbolic Mode | ✅ Native | ✅ Via gridded resampling |
+| Symbolic Mode | Native | Via gridded resampling |
 
-### RBF Kernels
+RBF Kernels:
 
 | Kernel | Enum Value | Description |
 |--------|------------|-------------|
-| **Thin Plate Spline** | `RBFKernel::ThinPlateSpline` | r² log(r) - smooth, good default |
-| **Multiquadric** | `RBFKernel::Multiquadric` | sqrt(1 + (εr)²) - adjustable shape |
-| **Gaussian** | `RBFKernel::Gaussian` | exp(-(εr)²) - localized influence |
+| **Thin Plate Spline** | `RBFKernel::ThinPlateSpline` | r^2 log(r) - smooth, good default |
+| **Multiquadric** | `RBFKernel::Multiquadric` | sqrt(1 + (er)^2) - adjustable shape |
+| **Gaussian** | `RBFKernel::Gaussian` | exp(-(er)^2) - localized influence |
 | **Linear** | `RBFKernel::Linear` | r - simple, stable for few points |
-| **Cubic** | `RBFKernel::Cubic` | r³ - smooth |
+| **Cubic** | `RBFKernel::Cubic` | r^3 - smooth |
 
-### API Reference
-
-```cpp
-// N-D scattered data
-ScatteredInterpolator(
-    const NumericMatrix& points,     // Shape (n_points, n_dims)
-    const NumericVector& values,     // Length n_points
-    int grid_resolution = 20,        // Points per dimension for resampling
-    RBFKernel kernel = RBFKernel::ThinPlateSpline,
-    double epsilon = 1.0,            // Shape parameter for MQ/Gaussian
-    InterpolationMethod method = InterpolationMethod::Linear
-);
-
-// 1D convenience
-ScatteredInterpolator(
-    const NumericVector& x,
-    const NumericVector& y,
-    int grid_resolution = 50,
-    RBFKernel kernel = RBFKernel::ThinPlateSpline
-);
-```
-
-### Reconstruction Error
-
-Check fit quality with `reconstruction_error()`:
+Check fit quality and use in symbolic mode:
 
 ```cpp
-janus::ScatteredInterpolator interp(points, values);
 std::cout << "RMS error: " << interp.reconstruction_error() << "\n";
-```
 
-### Symbolic Mode
-
-Scattered interpolation works in symbolic mode (via the underlying gridded interpolant):
-
-```cpp
 auto sym_x = janus::sym("x");
-auto result = interp(sym_x);  // SymbolicScalar
-
-// Compute gradient
+auto result = interp(sym_x);
 auto grad = janus::jacobian(result, sym_x);
 ```
 
-### Best Practices
+## Advanced Usage
 
-1. **Grid Resolution**: Higher resolution → better accuracy, more memory. Start with 20-30.
-2. **Kernel Choice**: ThinPlateSpline is a good default. Use Linear for very few points.
-3. **Check Error**: Always check `reconstruction_error()` to validate fit quality.
-4. **Extrapolation**: Queries outside convex hull are clamped to boundary.
-
----
-
-## Implementation Details
-
-### CasADi Backend
-
-Both numeric and symbolic interpolation use **CasADi** as the underlying engine:
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   janus::interpn                     │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│  Scalar = double        Scalar = casadi::MX          │
-│  ────────────────       ─────────────────────        │
-│        │                       │                     │
-│        ▼                       ▼                     │
-│  ┌───────────────────────────────────────────┐      │
-│  │         casadi::interpolant()              │      │
-│  │  Creates CasADi Function for grid lookup   │      │
-│  └───────────────────────────────────────────┘      │
-│        │                       │                     │
-│        ▼                       ▼                     │
-│  casadi::DM call         casadi::MX call             │
-│  (numeric result)        (symbolic expression)       │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
-
-#### Why CasADi?
-
-1. **Single Implementation**: Same code path for numeric and symbolic
-2. **Automatic Differentiation**: Symbolic mode generates AD-compatible graphs
-3. **Optimization Ready**: Interpolated values can be optimization variables
-4. **Performance**: CasADi's C++ core is highly optimized
-
-### Hermite (C1) Implementation
-
-The Hermite method uses a **custom Catmull-Rom implementation** because CasADi doesn't provide a native C1 interpolant:
-
-```cpp
-// Catmull-Rom slope estimation at grid point i:
-// m[i] = (y[i+1] - y[i-1]) / (x[i+1] - x[i-1])
-
-// Cubic Hermite basis functions:
-// h00(t) = 2t³ - 3t² + 1
-// h10(t) = t³ - 2t² + t
-// h01(t) = -2t³ + 3t²
-// h11(t) = t³ - t²
-
-// Interpolated value:
-// p(t) = h00*y0 + h10*m0*h + h01*y1 + h11*m1*h
-```
-
-This provides C1 continuity (continuous first derivative) at all grid points.
-It is intentionally **numeric-only** in Janus: symbolic Hermite queries throw an
-`InterpolationError` because interval selection requires runtime comparisons that
-cannot be traced cleanly into a symbolic graph. For symbolic optimization workflows,
-use `InterpolationMethod::BSpline`.
-
----
-
-## High-Dimensional Interpolation
+### High-Dimensional Interpolation
 
 Janus supports interpolation in arbitrary dimensions using **tensor product** extension:
 
 ```cpp
-// 5D interpolation example
 janus::NumericVector pts(3);
 pts << 0.0, 1.0, 2.0;
 
@@ -466,90 +350,62 @@ xi << 0.5, 0.5, 0.5, 0.5, 0.5;
 auto result = janus::interpn<double>(points, values, xi);
 ```
 
-### Performance Considerations
-
 | Dimensions | Grid Size | Points | Memory |
 |------------|-----------|--------|--------|
-| 2D | 10×10 | 100 | ~1 KB |
-| 3D | 10×10×10 | 1,000 | ~8 KB |
-| 4D | 10×10×10×10 | 10,000 | ~80 KB |
-| 5D | 10×10×10×10×10 | 100,000 | ~800 KB |
+| 2D | 10x10 | 100 | ~1 KB |
+| 3D | 10x10x10 | 1,000 | ~8 KB |
+| 4D | 10x10x10x10 | 10,000 | ~80 KB |
+| 5D | 10x10x10x10x10 | 100,000 | ~800 KB |
 
 > **Note**: High-dimensional grids grow exponentially. Consider sparse grids or surrogate models for >5D.
 
----
+### Implementation Details
 
-## Symbolic Mode
+Both numeric and symbolic interpolation use **CasADi** as the underlying engine:
 
-For optimization problems, use symbolic interpolation to embed lookups in your objective:
-
-```cpp
-// Create symbolic query variables
-janus::SymbolicMatrix xi(1, 2);
-xi(0, 0) = janus::sym("x");
-xi(0, 1) = janus::sym("y");
-
-// Symbolic interpolation
-auto z_sym = janus::interpn<janus::SymbolicScalar>(
-    points, values, xi,
-    janus::InterpolationMethod::BSpline  // C2 smooth for optimization
-);
-
-// Use in optimization objective
-auto f = janus::Function("lookup", {xi(0,0), xi(0,1)}, {z_sym(0)});
+```
++-----------------------------------------------------+
+|                   janus::interpn                     |
++-----------------------------------------------------+
+|                                                      |
+|  Scalar = double        Scalar = casadi::MX          |
+|  ----------------       ---------------------        |
+|        |                       |                     |
+|        v                       v                     |
+|  +-------------------------------------------+      |
+|  |         casadi::interpolant()              |      |
+|  |  Creates CasADi Function for grid lookup   |      |
+|  +-------------------------------------------+      |
+|        |                       |                     |
+|        v                       v                     |
+|  casadi::DM call         casadi::MX call             |
+|  (numeric result)        (symbolic expression)       |
+|                                                      |
++-----------------------------------------------------+
 ```
 
-### Method Compatibility
-
-| Method | Symbolic Mode | Reason |
-|--------|---------------|--------|
-| Linear | ✅ | Uses CasADi `interpolant` |
-| Hermite | ❌ | Requires interval selection at runtime; Janus throws and recommends BSpline |
-| BSpline | ✅ | Uses CasADi `interpolant` |
-| Nearest | ❌ | Requires rounding (non-smooth) |
-
----
-
-## Common Patterns
-
-### Loading Data from File
+The Hermite method uses a **custom Catmull-Rom implementation** because CasADi doesn't provide a native C1 interpolant:
 
 ```cpp
-// Example: Load aerodynamic coefficients from CSV
-Eigen::MatrixXd data = load_csv("aero_coeffs.csv");
+// Catmull-Rom slope estimation at grid point i:
+// m[i] = (y[i+1] - y[i-1]) / (x[i+1] - x[i-1])
 
-// Extract grid axes
-janus::NumericVector mach = data.col(0).head(n_mach);
-janus::NumericVector alpha = data.col(1).head(n_alpha);
-janus::NumericVector CL = data.col(2);
+// Cubic Hermite basis functions:
+// h00(t) = 2t^3 - 3t^2 + 1
+// h10(t) = t^3 - 2t^2 + t
+// h01(t) = -2t^3 + 3t^2
+// h11(t) = t^3 - t^2
 
-std::vector<janus::NumericVector> points = {mach, alpha};
-
-// Query lift coefficient at any (Mach, alpha)
-auto cl = janus::interpn<double>(points, CL, query_pts);
+// Interpolated value:
+// p(t) = h00*y0 + h10*m0*h + h01*y1 + h11*m1*h
 ```
 
-### Surrogate Model in Optimization
+This is intentionally **numeric-only** in Janus: symbolic Hermite queries throw an
+`InterpolationError` because interval selection requires runtime comparisons that
+cannot be traced cleanly into a symbolic graph. For symbolic optimization workflows,
+use `InterpolationMethod::BSpline`.
 
-```cpp
-template <typename Scalar>
-Scalar drag_model(const janus::JanusVector<Scalar>& state) {
-    // Use BSpline for C2 smooth optimization
-    janus::JanusMatrix<Scalar> query(1, 2);
-    query(0, 0) = state(0);  // Mach
-    query(0, 1) = state(1);  // Angle of attack
-    
-    auto cd = janus::interpn<Scalar>(
-        aero_grid, cd_values, query,
-        janus::InterpolationMethod::BSpline
-    );
-    return cd(0);
-}
-```
-
----
-
-## Error Handling
+## Diagnostics & Troubleshooting
 
 The interpolation functions throw `janus::InterpolationError` for invalid inputs:
 
@@ -561,20 +417,27 @@ try {
 }
 ```
 
-### Common Errors
-
 | Error | Cause | Solution |
 |-------|-------|----------|
 | "points cannot be empty" | Empty grid | Provide at least 2 points per dimension |
 | "points must be sorted" | Unsorted grid axis | Sort grid coordinates ascending |
 | "values_flat size mismatch" | Wrong value count | Ensure `prod(dims)` values in Fortran order |
 | "Hermite/Catmull-Rom is numeric-only" | Using Hermite with MX | Use Linear or BSpline for symbolic |
-| "BSpline: Need more data points" | Grid < 4 points | Use ≥4 points per dimension for BSpline |
+| "BSpline: Need more data points" | Grid < 4 points | Use >= 4 points per dimension for BSpline |
 
----
+Scattered interpolation best practices:
+
+1. **Grid Resolution**: Higher resolution leads to better accuracy but more memory. Start with 20-30.
+2. **Kernel Choice**: ThinPlateSpline is a good default. Use Linear for very few points.
+3. **Check Error**: Always check `reconstruction_error()` to validate fit quality.
+4. **Extrapolation**: Queries outside convex hull are clamped to boundary.
 
 ## See Also
 
 - [Symbolic Computing Guide](symbolic_computing.md) - Working with CasADi symbolic types
 - [Numeric Computing Guide](numeric_computing.md) - Janus type system overview
-- `include/janus/math/Interpolate.hpp` - Full API implementation
+- [Optimization Guide](optimization.md) - Using interpolation as surrogate models
+- [`include/janus/math/Interpolate.hpp`](../../include/janus/math/Interpolate.hpp) - Full API implementation
+- [`include/janus/math/ScatteredInterpolator.hpp`](../../include/janus/math/ScatteredInterpolator.hpp) - Scattered interpolation API
+- [`examples/interpolation/nd_interpolation_demo.cpp`](../../examples/interpolation/nd_interpolation_demo.cpp) - N-D interpolation example
+- [`examples/interpolation/scattered_interpolation_demo.cpp`](../../examples/interpolation/scattered_interpolation_demo.cpp) - Scattered data example

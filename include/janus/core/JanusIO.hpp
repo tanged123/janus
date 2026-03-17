@@ -31,7 +31,10 @@ namespace janus {
 class Function;
 
 /**
- * @brief Print a Matrix (Numeric or Symbolic) to stdout with a label
+ * @brief Print a matrix to stdout with a label
+ * @tparam Derived Eigen expression type
+ * @param label Descriptive label printed before the matrix
+ * @param mat Matrix to display
  */
 template <typename Derived>
 void print(const std::string &label, const Eigen::MatrixBase<Derived> &mat) {
@@ -40,6 +43,10 @@ void print(const std::string &label, const Eigen::MatrixBase<Derived> &mat) {
 
 /**
  * @brief Deprecated alias for print
+ * @tparam Derived Eigen expression type
+ * @param label Descriptive label
+ * @param mat Matrix to display
+ * @see print
  */
 template <typename Derived>
 void disp(const std::string &label, const Eigen::MatrixBase<Derived> &mat) {
@@ -47,10 +54,10 @@ void disp(const std::string &label, const Eigen::MatrixBase<Derived> &mat) {
 }
 
 /**
- * @brief Evaluation helper for symbolic matrices
- * Evaluates a symbolic matrix to a numeric Eigen matrix.
- * Assumes the matrix contains no free variables (i.e. is constant).
- * Throws if evaluation fails.
+ * @brief Evaluate a symbolic matrix to a numeric Eigen matrix
+ * @tparam Derived Eigen expression type
+ * @param mat Symbolic or numeric matrix (must contain no free variables)
+ * @return NumericMatrix with evaluated values
  */
 template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
     using Scalar = typename Derived::Scalar;
@@ -84,7 +91,9 @@ template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
     }
 }
 
-// Explicit overload for SymbolicScalar scalar
+/// @brief Evaluate a symbolic scalar to a double
+/// @param val Symbolic scalar (must contain no free variables)
+/// @return Numeric value
 inline double eval(const SymbolicScalar &val) {
     try {
         casadi::Function f("f", {}, {val});
@@ -96,7 +105,10 @@ inline double eval(const SymbolicScalar &val) {
     }
 }
 
-// Overload for numeric types (passthrough)
+/// @brief Passthrough eval for numeric types
+/// @tparam T Arithmetic type
+/// @param val Numeric value
+/// @return Same value unchanged
 template <typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0> T eval(const T &val) {
     return val;
 }
@@ -364,7 +376,9 @@ inline bool visualize_graph(const SymbolicScalar &expr, const std::string &outpu
 
 namespace detail {
 
-/// Escape a string for embedding in a JavaScript string literal
+/// @brief Escape a string for embedding in a JavaScript string literal
+/// @param content Raw string
+/// @return Escaped string
 inline std::string escape_for_js(const std::string &content) {
     std::string escaped;
     for (char c : content) {
@@ -382,7 +396,9 @@ inline std::string escape_for_js(const std::string &content) {
     return escaped;
 }
 
-/// Escape a string for embedding in JSON
+/// @brief Escape a string for embedding in JSON
+/// @param s Raw string
+/// @return Escaped string
 inline std::string escape_for_json(const std::string &s) {
     std::string result;
     for (char c : s) {
@@ -402,10 +418,13 @@ inline std::string escape_for_json(const std::string &s) {
     return result;
 }
 
-/// Write a complete interactive graph HTML page.
-/// Takes pre-computed DOT, node data, and edges as JSON strings.
-/// The extra_header_js parameter is inserted after the data declarations
-/// (used by SX graphs to populate the stats div).
+/// @brief Write a complete interactive graph HTML page
+/// @param out Output stream
+/// @param title Page title
+/// @param escaped_dot DOT source (JS-escaped)
+/// @param node_data_json Node metadata as JSON
+/// @param edges_json Edge list as JSON
+/// @param extra_header_js Optional JS inserted after data declarations
 inline void write_graph_html(std::ostream &out, const std::string &title,
                              const std::string &escaped_dot, const std::string &node_data_json,
                              const std::string &edges_json,
@@ -1242,7 +1261,11 @@ inline void export_sx_graph_html(const casadi::SX &expr, const std::string &file
 /**
  * @brief Export format for deep graph visualization
  */
-enum class DeepGraphFormat { DOT, HTML, PDF };
+enum class DeepGraphFormat {
+    DOT,  ///< Graphviz DOT text format
+    HTML, ///< Self-contained interactive HTML
+    PDF   ///< Rendered PDF via Graphviz
+};
 
 /**
  * @brief Export a CasADi Function to deep graph format showing all operations

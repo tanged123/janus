@@ -1,3 +1,8 @@
+/**
+ * @file TranscriptionBase.hpp
+ * @brief Shared CRTP base for trajectory transcription methods
+ */
+
 #pragma once
 
 #include "Opti.hpp"
@@ -11,12 +16,27 @@
 namespace janus {
 
 /**
- * @brief Shared CRTP base for transcription methods.
+ * @brief Shared CRTP base for transcription methods
+ *
+ * @tparam Derived CRTP derived class (e.g. DirectCollocation, Pseudospectral)
+ *
+ * @see DirectCollocation for direct collocation transcription
+ * @see Pseudospectral for pseudospectral transcription
+ * @see MultipleShooting for multiple shooting transcription
+ * @see BirkhoffPseudospectral for Birkhoff pseudospectral transcription
  */
 template <typename Derived> class TranscriptionBase {
   public:
+    /**
+     * @brief Construct with a reference to the optimization environment
+     * @param opti Opti instance to add variables and constraints to
+     */
     explicit TranscriptionBase(Opti &opti) : opti_(opti) {}
 
+    /**
+     * @brief Pin all initial states to specified values
+     * @param x0 state vector at the initial time
+     */
     void set_initial_state(const NumericVector &x0) {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_initial_state()");
@@ -29,6 +49,11 @@ template <typename Derived> class TranscriptionBase {
         }
     }
 
+    /**
+     * @brief Pin a single initial state component
+     * @param idx state index
+     * @param value fixed value for that state
+     */
     void set_initial_state(int idx, double value) {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_initial_state()");
@@ -39,6 +64,10 @@ template <typename Derived> class TranscriptionBase {
         opti_.subject_to(states_(0, idx) == value);
     }
 
+    /**
+     * @brief Pin all final states to specified values
+     * @param xf state vector at the final time
+     */
     void set_final_state(const NumericVector &xf) {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_final_state()");
@@ -51,6 +80,11 @@ template <typename Derived> class TranscriptionBase {
         }
     }
 
+    /**
+     * @brief Pin a single final state component
+     * @param idx state index
+     * @param value fixed value for that state
+     */
     void set_final_state(int idx, double value) {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_final_state()");
@@ -61,6 +95,11 @@ template <typename Derived> class TranscriptionBase {
         opti_.subject_to(states_(n_nodes_ - 1, idx) == value);
     }
 
+    /**
+     * @brief Register the dynamics function xdot = f(x, u, t)
+     * @tparam Func callable with signature SymbolicVector(const SymbolicVector&, const SymbolicVector&, const SymbolicScalar&)
+     * @param dynamics dynamics function
+     */
     template <typename Func> void set_dynamics(Func &&dynamics) {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_dynamics()");
@@ -78,13 +117,26 @@ template <typename Derived> class TranscriptionBase {
         dynamics_set_ = true;
     }
 
+    /** @brief Get the state decision variable matrix
+     *  @return matrix of size (n_nodes x n_states) */
     const SymbolicMatrix &states() const { return states_; }
+    /** @brief Get the control decision variable matrix
+     *  @return matrix of size (n_nodes x n_controls) or (n_intervals x n_controls) */
     const SymbolicMatrix &controls() const { return controls_; }
+    /** @brief Get the normalized time grid
+     *  @return vector of node times in [0, 1] */
     const NumericVector &time_grid() const { return tau_; }
+    /** @brief Get the number of discretization nodes
+     *  @return node count */
     int n_nodes() const { return n_nodes_; }
+    /** @brief Get the number of state variables per node
+     *  @return state dimension */
     int n_states() const { return n_states_; }
+    /** @brief Get the number of control variables per node
+     *  @return control dimension */
     int n_controls() const { return n_controls_; }
 
+    /** @brief Add dynamics constraints to the optimization problem */
     void add_dynamics_constraints() {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before add_dynamics_constraints()");
@@ -92,7 +144,9 @@ template <typename Derived> class TranscriptionBase {
         static_cast<Derived *>(this)->add_dynamics_constraints_impl();
     }
 
+    /** @brief Alias for add_dynamics_constraints() */
     void add_defect_constraints() { add_dynamics_constraints(); }
+    /** @brief Alias for add_dynamics_constraints() */
     void add_continuity_constraints() { add_dynamics_constraints(); }
 
   protected:

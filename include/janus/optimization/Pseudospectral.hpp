@@ -13,22 +13,44 @@
 
 namespace janus {
 
+/** @brief Available pseudospectral node distributions */
 enum class PseudospectralScheme {
     LGL, ///< Legendre-Gauss-Lobatto
     CGL  ///< Chebyshev-Gauss-Lobatto
 };
 
+/** @brief Options for Pseudospectral setup */
 struct PseudospectralOptions {
     PseudospectralScheme scheme = PseudospectralScheme::LGL;
     int n_nodes = 21; ///< Number of collocation nodes (including endpoints)
 };
 
+/**
+ * @brief Pseudospectral (Gauss-Lobatto) transcription
+ *
+ * @see TranscriptionBase for shared interface
+ * @see PseudospectralOptions for configuration
+ * @see BirkhoffPseudospectral for Birkhoff variant
+ */
 class Pseudospectral : public TranscriptionBase<Pseudospectral> {
     friend class TranscriptionBase<Pseudospectral>;
 
   public:
+    /**
+     * @brief Construct with a reference to the optimization environment
+     * @param opti Opti instance
+     */
     explicit Pseudospectral(Opti &opti) : TranscriptionBase<Pseudospectral>(opti) {}
 
+    /**
+     * @brief Set up the pseudospectral problem with fixed final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf final time
+     * @param opts pseudospectral options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, double tf,
           const PseudospectralOptions &opts = {}) {
@@ -80,6 +102,15 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
         return {states_, controls_, tau_};
     }
 
+    /**
+     * @brief Set up the pseudospectral problem with variable final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf symbolic final time (decision variable)
+     * @param opts pseudospectral options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, const SymbolicScalar &tf,
           const PseudospectralOptions &opts = {}) {
@@ -89,9 +120,18 @@ class Pseudospectral : public TranscriptionBase<Pseudospectral> {
         return result;
     }
 
+    /** @brief Get the spectral differentiation matrix
+     *  @return n_nodes x n_nodes differentiation matrix */
     const NumericMatrix &diff_matrix() const { return D_; }
+    /** @brief Get the quadrature weights
+     *  @return vector of quadrature weights on [-1, 1] */
     const NumericVector &quadrature_weights() const { return weights_; }
 
+    /**
+     * @brief Compute quadrature of an integrand over the time domain
+     * @param integrand symbolic vector of values at each node
+     * @return symbolic scalar approximation of the definite integral
+     */
     SymbolicScalar quadrature(const SymbolicVector &integrand) const {
         if (!setup_complete_) {
             throw RuntimeError("Pseudospectral: call setup() before quadrature()");

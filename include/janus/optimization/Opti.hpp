@@ -1,3 +1,8 @@
+/**
+ * @file Opti.hpp
+ * @brief High-level nonlinear programming interface
+ */
+
 #pragma once
 
 #include "OptiOptions.hpp"
@@ -153,6 +158,11 @@ struct VariableOptions {
  *   opti.minimize(obj);
  *   auto sol = opti.solve();  // All x[i] ~= 1.0
  * @endcode
+ *
+ * @see OptiSol for extracting results
+ * @see OptiOptions for solver configuration
+ * @see SweepResult for parametric sweep results
+ * @see ScalingReport for scaling diagnostics
  */
 class Opti {
   public:
@@ -390,6 +400,9 @@ class Opti {
      *
      * The provided scale is forwarded to CasADi so the solver sees
      * `constraint / linear_scale`.
+     *
+     * @param constraint symbolic inequality/equality expression
+     * @param linear_scale positive scale factor
      */
     void subject_to(const SymbolicScalar &constraint, double linear_scale) {
         opti_.subject_to(constraint, casadi::DM(detail::validate_positive_scale(
@@ -409,6 +422,8 @@ class Opti {
 
     /**
      * @brief Add multiple constraints with one shared linear scale
+     * @param constraints vector of constraint expressions
+     * @param linear_scale positive scale factor applied to all
      */
     void subject_to(const std::vector<SymbolicScalar> &constraints, double linear_scale) {
         double s = detail::validate_positive_scale(linear_scale, "Opti::subject_to");
@@ -437,6 +452,8 @@ class Opti {
 
     /**
      * @brief Add an initializer-list of constraints with one shared linear scale
+     * @param constraints initializer list of constraint expressions
+     * @param linear_scale positive scale factor applied to all
      */
     void subject_to(std::initializer_list<SymbolicScalar> constraints, double linear_scale) {
         double s = detail::validate_positive_scale(linear_scale, "Opti::subject_to");
@@ -541,6 +558,9 @@ class Opti {
      * @brief Set objective to minimize with explicit objective scaling
      *
      * The solver sees `objective / objective_scale`.
+     *
+     * @param objective symbolic expression to minimize
+     * @param objective_scale positive scale factor
      */
     void minimize(const SymbolicScalar &objective, double objective_scale) {
         set_objective(objective, detail::validate_positive_scale(objective_scale, "Opti::minimize"),
@@ -558,6 +578,9 @@ class Opti {
      * @brief Set objective to maximize with explicit objective scaling
      *
      * The solver sees `-objective / objective_scale`.
+     *
+     * @param objective symbolic expression to maximize
+     * @param objective_scale positive scale factor
      */
     void maximize(const SymbolicScalar &objective, double objective_scale) {
         set_objective(objective, detail::validate_positive_scale(objective_scale, "Opti::maximize"),
@@ -793,7 +816,10 @@ class Opti {
     // =========================================================================
 
     /**
-     * @brief Diagnose variable, objective, and constraint scaling at the current initial point.
+     * @brief Diagnose variable, objective, and constraint scaling at the current initial point
+     * @param opts thresholds controlling warning/critical classification
+     * @return scaling report with per-variable and per-constraint metadata
+     * @see ScalingReport for the returned structure
      */
     ScalingReport analyze_scaling(const ScalingAnalysisOptions &opts = {}) const {
         ScalingReport report;
@@ -946,6 +972,8 @@ class Opti {
      * @brief Access the underlying CasADi Opti object
      *
      * For advanced usage when CasADi-specific features are needed.
+     *
+     * @return reference to the CasADi Opti object
      */
     const casadi::Opti &casadi_opti() const { return opti_; }
 

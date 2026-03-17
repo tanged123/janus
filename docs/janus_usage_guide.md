@@ -1,49 +1,18 @@
-# Janus Usage Guide
+# Janus v2.0.0 Usage Guide
 
-> **Purpose**: This document provides comprehensive guidance for AI agents working with the Janus library. It documents all available modules, best practices, and conventions to prevent duplication of work.
+> **Purpose**: Map of the Janus library for AI agents and developers. Each section gives a brief overview and links to the detailed user guide. For the full API, see the [Doxygen docs](https://tanged123.github.io/janus/index.html).
 
 ---
 
 ## Table of Contents
 
-1. [Documentation Resources](#documentation-resources)
-2. [Best Practices](#best-practices)
-3. [Type System](#type-system)
-4. [Module Reference](#module-reference)
-   - [Core Layer](#core-layer-januscore)
-   - [Math Layer](#math-layer-janusmath)
-   - [Optimization Layer](#optimization-layer-janusoptimization)
-5. [Existing User Guides](#existing-user-guides)
-
----
-
-## Documentation Resources
-
-### Official Documentation
-
-- **Doxygen API Docs**: [https://tanged123.github.io/janus/index.html](https://tanged123.github.io/janus/index.html)
-- **Design Overview**: `docs/design_overview.md`
-- **User Guides**: `docs/user_guides/` (comprehensive guides)
-
-### Key Documentation Files
-
-| File | Description |
-|------|-------------|
-| `docs/design_overview.md` | High-level architecture and design philosophy |
-| `docs/user_guides/symbolic_computing.md` | Symbolic mode guide |
-| `docs/user_guides/numeric_computing.md` | Numeric mode guide |
-| `docs/user_guides/optimization.md` | Opti interface usage |
-| `docs/user_guides/interpolation.md` | Interpolation utilities |
-| `docs/user_guides/polynomial_chaos.md` | Polynomial chaos basis construction, coefficient fitting, symbolic moments |
-| `docs/user_guides/stochastic_quadrature.md` | Probability-measure quadrature rules, tensor grids, and Smolyak sparse grids |
-| `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
-| `docs/user_guides/graph_visualization.md` | Computational graph visualization |
-| `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
-| `docs/user_guides/structural_diagnostics.md` | Structural observability and identifiability preflight checks |
-| `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, and tearing recommendations |
-| `docs/user_guides/collocation.md` | Direct collocation for trajectory optimization |
-| `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
-| `docs/user_guides/transcription_methods.md` | Overview of trajectory optimization methods |
+1. [Best Practices](#best-practices)
+2. [Type System](#type-system)
+3. [Module Reference](#module-reference)
+   - [Core Layer](#core-layer)
+   - [Math Layer](#math-layer)
+   - [Optimization Layer](#optimization-layer)
+4. [User Guide Index](#user-guide-index)
 
 ---
 
@@ -54,64 +23,61 @@
 All physics/math functions **must** be templated on `Scalar`:
 
 ```cpp
-// ✅ CORRECT
+// Correct
 template <typename Scalar>
 Scalar my_function(const Scalar& x) { ... }
 
-// ❌ WRONG - Breaks symbolic mode
+// Wrong -- breaks symbolic mode
 double my_function(double x) { ... }
 ```
 
-### 2. Math Dispatch - Use `janus::` Namespace
+### 2. Math Dispatch -- Use `janus::` Namespace
 
 **Always** use Janus math functions instead of `std::`:
 
 ```cpp
-// ✅ CORRECT
-janus::sin(x), janus::pow(x, 2), janus::sqrt(x), janus::exp(x)
-
-// ❌ WRONG - Uses std, breaks symbolic tracing
-std::sin(x), std::pow(x, 2), std::sqrt(x), std::exp(x)
+janus::sin(x);  janus::pow(x, 2);  janus::sqrt(x);  janus::exp(x);
+// Never: std::sin(x), std::pow(x, 2), etc.
 ```
 
-### 3. Branching - Use `janus::where()`, Never `if/else`
+### 3. Branching -- Use `janus::where()`, Never `if/else`
 
 ```cpp
-// ✅ CORRECT
 Scalar result = janus::where(x > 0, x, -x);
 
-// ❌ WRONG - MX can't evaluate to bool
-if (x > 0) { result = x; } else { result = -x; }
-```
-
-For multi-way branching, use `janus::select()`:
-```cpp
+// Multi-way branching
 Scalar cd = janus::select(
     {mach < 0.3, mach < 0.8, mach < 1.2},
     {Scalar(0.02), Scalar(0.025), Scalar(0.05)},
     Scalar(0.03));  // default
 ```
 
-### 4. Loops - Structural Bounds Only
+### 4. Loops -- Structural Bounds Only
 
 ```cpp
-// ✅ CORRECT - Structural bound (known at trace time)
+// Correct -- structural bound (known at trace time)
 for (int i = 0; i < N; ++i) { ... }
 
-// ❌ WRONG - Dynamic bound (breaks symbolic mode)
+// Wrong -- dynamic bound breaks symbolic mode
 while (error > tolerance) { ... }
 ```
 
-### 5. Type Aliases - Use Janus Native Types
+### 5. Type Aliases -- Use Janus Native Types
 
 ```cpp
 #include <janus/core/JanusTypes.hpp>
 
-// Prefer these over raw Eigen types
 janus::Vec3<Scalar>   // 3D vector
 janus::Mat3<Scalar>   // 3x3 matrix
 janus::VecX<Scalar>   // Dynamic vector
 janus::MatX<Scalar>   // Dynamic matrix
+```
+
+### 6. Include Convention
+
+```cpp
+#include <janus/janus.hpp>    // Everything (recommended for applications)
+#include <janus/using.hpp>    // Convenience header -- brings common symbols into scope
 ```
 
 ---
@@ -151,343 +117,203 @@ janus::SparseTriplet    // Eigen::Triplet<double>
 ### Symbolic Variable Creation
 
 ```cpp
-// Scalar
-auto x = janus::sym("x");
-
-// Matrix/Vector (returns MX)
-auto M = janus::sym("M", rows, cols);
-
-// Vector as SymbolicVector (Eigen container)
-auto v = janus::sym_vector("v", size);
-auto v = janus::sym_vec("v", size);  // Alias
-
-// Get both SymbolicVector and underlying MX
-auto [vec, mx] = janus::sym_vec_pair("state", 3);
+auto x = janus::sym("x");                          // Scalar
+auto M = janus::sym("M", rows, cols);              // Matrix (MX)
+auto v = janus::sym_vector("v", size);             // SymbolicVector (Eigen)
+auto [vec, mx] = janus::sym_vec_pair("state", 3);  // Both representations
 ```
 
 ### Conversion Utilities
 
 ```cpp
-janus::to_mx(eigen_matrix)     // Eigen → CasADi MX
-janus::to_eigen(casadi_mx)     // CasADi MX → Eigen
-janus::as_mx(symbolic_vector)  // SymbolicVector → single MX
-janus::as_vector(casadi_mx)    // MX → SymbolicVector
+janus::to_mx(eigen_matrix)     // Eigen -> CasADi MX
+janus::to_eigen(casadi_mx)     // CasADi MX -> Eigen
+janus::as_mx(symbolic_vector)  // SymbolicVector -> single MX
+janus::as_vector(casadi_mx)    // MX -> SymbolicVector
 ```
 
 ---
 
 ## Module Reference
 
-### Core Layer (`janus/core/`)
+### Core Layer
 
-| File | Description | Key Functions |
-|------|-------------|---------------|
-| `JanusTypes.hpp` | Type system and aliases | `sym()`, `sym_vec()`, `to_mx()`, `to_eigen()` |
-| `JanusConcepts.hpp` | C++20 concepts for type constraints | `ScalarType`, `NumericScalar`, `SymbolicScalar` |
-| `JanusError.hpp` | Custom exception types | `InvalidArgument`, `IntegrationError`, `InterpolationError` |
-| `JanusIO.hpp` | I/O and graph visualization | `eval()`, `print()`, `to_dot()`, `graphviz()` |
-| `Function.hpp` | CasADi function wrapper | `Function` class for compiled symbolic functions |
-| `Sparsity.hpp` | Sparsity analysis and sparse derivative kernels | `SparsityPattern`, `GraphColoring`, `sparse_jacobian()`, `sparse_hessian()`, `nan_propagation_sparsity()` |
-| `Diagnostics.hpp` | Structural observability and identifiability checks | `analyze_structural_observability()`, `analyze_structural_identifiability()`, `analyze_structural_diagnostics()` |
-| `StructuralTransforms.hpp` | Structural reduction and decomposition passes | `alias_eliminate()`, `block_triangularize()`, `structural_analyze()` |
+| File | Description |
+|------|-------------|
+| `JanusTypes.hpp` | Type system, aliases, `janus::sym()`, `janus::to_mx()`, `janus::to_eigen()` |
+| `JanusConcepts.hpp` | C++20 concepts: `ScalarType`, `NumericScalar`, `SymbolicScalar` |
+| `JanusError.hpp` | Exception hierarchy: `JanusError`, `InvalidArgument`, `RuntimeError`, `IntegrationError`, `InterpolationError` |
+| `JanusIO.hpp` | `janus::eval()`, `janus::print()`, `janus::to_dot()`, `janus::graphviz()` |
+| `Function.hpp` | `janus::Function` -- compiled symbolic function wrapper |
+| `Sparsity.hpp` | Sparsity patterns, graph coloring, `janus::sparse_jacobian()`, `janus::sparse_hessian()` |
+| `Diagnostics.hpp` | Structural observability/identifiability: `janus::analyze_structural_observability()`, `janus::analyze_structural_identifiability()` |
+| `StructuralTransforms.hpp` | `janus::alias_eliminate()`, `janus::block_triangularize()`, `janus::structural_analyze()` |
 
-#### Key APIs in Core
+See `docs/user_guides/sparsity.md`, `docs/user_guides/structural_diagnostics.md`, `docs/user_guides/structural_transforms.md`.
+
+---
+
+### Math Layer
+
+#### Arithmetic & Trigonometry
+
+Standard math dispatch (`janus::sin`, `janus::pow`, `janus::exp`, etc.) with scalar and matrix overloads. See `docs/user_guides/math_functions.md` for the full function table.
+
+#### Logic & Branching
+
+`janus::where()`, `janus::select()`, `janus::min()`, `janus::max()`, `janus::clamp()`, element-wise comparisons, smooth blending (`janus::sigmoid_blend`, `janus::blend`). See `docs/user_guides/math_functions.md`.
+
+#### Calculus & Autodiff
+
+Gradient, Jacobian, Hessian, Hessian-vector products, Lagrangian second-order adjoints, sensitivity regime selection. See `docs/user_guides/symbolic_computing.md`.
 
 ```cpp
-// Evaluation
-double result = janus::eval(symbolic_expr, {{"x", 5.0}});
-janus::NumericMatrix result = janus::eval(symbolic_matrix, args);
+auto J = janus::jacobian(f, x);
+auto H = janus::hessian(f, x);
+auto Hv = janus::hessian_vector_product(f, x, direction);
+```
 
-// Printing
-janus::print(symbolic_expr);            // Pretty print
-janus::print_expression(symbolic_expr); // Show graph structure
+#### Linear Algebra
 
-// Graph visualization
-std::string dot = janus::to_dot(expr, "my_graph");
-janus::graphviz(expr, "output.pdf");
+`janus::solve(A, b)` with optional `LinearSolvePolicy` for backend selection:
 
-// Function compilation
-janus::Function f("f", {x}, {result});
-auto output = f({5.0});
+```cpp
+janus::LinearSolvePolicy policy;
+policy.backend = janus::LinearSolveBackend::SparseDirect;
+policy.sparse_direct_solver = janus::SparseDirectLinearSolver::SparseLU;
+auto x = janus::solve(A, b, policy);
+```
 
-// Sparse derivative kernels
+Available backends: `Dense` (ColPivHouseholderQR, PartialPivLU, FullPivLU, LLT, LDLT), `SparseDirect` (SparseLU, SparseQR, SimplicialLLT, SimplicialLDLT), `IterativeKrylov` (BiCGSTAB, GMRES with preconditioner hooks). Also includes `janus::dot`, `janus::cross`, `janus::norm`, `janus::inv`, `janus::det`, `janus::eye`, `janus::zeros`, `janus::ones`, `janus::block_diag`, and more.
+
+See `docs/user_guides/math_functions.md`.
+
+#### Interpolation
+
+1D and N-dimensional interpolation with `"linear"`, `"cubic"`, and `"monotonic"` methods. See `docs/user_guides/interpolation.md`.
+
+```cpp
+auto y = janus::interp1(x, xp, fp);
+auto y = janus::interp_nd(point, table);
+```
+
+#### Polynomial Chaos Expansions (PCE)
+
+Askey-scheme orthogonal polynomial bases (Hermite, Legendre, Jacobi, Laguerre), total-order and tensor-product truncation, coefficient fitting via projection or regression, symbolic mean/variance extraction.
+
+```cpp
+janus::PolynomialChaosBasis basis(dimensions, order, options);
+auto coeffs = janus::pce_projection_coefficients(basis, grid, values);
+auto mu = janus::pce_mean(coeffs);
+auto var = janus::pce_variance(basis, coeffs);
+```
+
+See `docs/user_guides/polynomial_chaos.md`.
+
+#### Stochastic Quadrature
+
+Probability-measure quadrature rules, tensor-product grids, and Smolyak sparse grids for high-dimensional integration and PCE projection.
+
+```cpp
+auto rule = janus::stochastic_quadrature_rule(dim, order, family);
+auto grid = janus::tensor_product_quadrature(rules);
+auto sparse = janus::smolyak_sparse_grid(dimensions, level, options);
+```
+
+See `docs/user_guides/stochastic_quadrature.md`.
+
+#### Root Finding
+
+Nonlinear solve for `F(x) = 0` with a numeric globalization stack (trust-region Newton, line-search Newton, Broyden, pseudo-transient continuation) and differentiable implicit function wrappers for embedding solves inside symbolic graphs.
+
+```cpp
+auto result = janus::rootfinder(function, x0, opts);
+
+// Differentiable implicit solve for use inside optimization
+auto implicit_fn = janus::create_implicit_function(function, x_guess, opts, implicit_opts);
+```
+
+See `docs/user_guides/root_finding.md`.
+
+#### ODE Integration
+
+IVP solvers with multiple steppers (`RK4`, `CVODES`, `BDF1`, `RosenbrockEuler`), definite integration via Gauss-Kronrod quadrature. See `docs/user_guides/integration.md`.
+
+```cpp
+auto result = janus::solve_ivp(dynamics, x0, t_span);
+double I = janus::quad(f, a, b);
+```
+
+#### Second-Order Integrators
+
+Dedicated solvers for systems of the form `q'' = a(t, q)`:
+
+```cpp
+auto result = janus::solve_second_order_ivp(accel, q0, v0, t_span);
+// Single steps:
+janus::stormer_verlet_step(accel, q, v, t, dt);  // Symplectic
+janus::rkn4_step(accel, q, v, t, dt);            // 4th-order RKN
+```
+
+#### Mass-Matrix Integrators
+
+Native support for stiff systems `M(t,y) y' = f(t,y)`:
+
+```cpp
+auto result = janus::solve_ivp_mass_matrix(rhs, M, x0, t_span);         // Numeric
+auto result = janus::solve_ivp_mass_matrix_expr(rhs, M, t, y, x0, t_span); // Symbolic (IDAS)
+```
+
+#### Sparsity Pipelines
+
+NaN-propagation sparsity detection, graph coloring, and compiled sparse derivative kernels that avoid materializing dense Jacobian/Hessian matrices.
+
+```cpp
 auto J = janus::sparse_jacobian(result, x);
 auto H = janus::sparse_hessian(objective, vars);
-auto nz = J.values(x_val);
+auto nz = J.values(x_val);  // Evaluate only nonzero entries
+```
 
-// Structural observability / identifiability checks
+See `docs/user_guides/sparsity.md`.
+
+#### Structural Diagnostics
+
+Preflight checks for structural observability and identifiability before committing to an optimization solve.
+
+```cpp
 auto obs = janus::analyze_structural_observability(measurement_fn, 0);
-auto id = janus::analyze_structural_identifiability(measurement_fn, 1);
+auto id  = janus::analyze_structural_identifiability(measurement_fn, 1);
+auto all = janus::analyze_structural_diagnostics(system_fn, options);
+```
 
-// Structural reduction and decomposition
-auto alias = janus::alias_eliminate(residual_fn);
-auto blt = janus::block_triangularize(residual_fn);
+See `docs/user_guides/structural_diagnostics.md`.
+
+#### Structural Transforms
+
+Alias elimination, BLT (block lower-triangular) decomposition, and tearing recommendations for large-scale equation systems.
+
+```cpp
+auto alias   = janus::alias_eliminate(residual_fn);
+auto blt     = janus::block_triangularize(residual_fn);
 auto analysis = janus::structural_analyze(residual_fn);
 ```
 
----
+See `docs/user_guides/structural_transforms.md`.
 
-### Math Layer (`janus/math/`)
+#### Other Math Modules
 
-#### Arithmetic (`Arithmetic.hpp`)
-
-Basic math operations with dual-backend support:
-
-| Function | Description |
-|----------|-------------|
-| `abs(x)` | Absolute value |
-| `sqrt(x)` | Square root |
-| `pow(base, exp)` | Power function |
-| `exp(x)` | Exponential e^x |
-| `log(x)` | Natural logarithm |
-| `log10(x)` | Base-10 logarithm |
-| `sinh(x)`, `cosh(x)`, `tanh(x)` | Hyperbolic functions |
-| `floor(x)`, `ceil(x)` | Rounding |
-| `remainder(x, y)` | Modulo operation |
-| `sign(x)` | Sign function |
-| `copysign(mag, sgn)` | Copy sign |
-
-All functions have scalar and matrix overloads.
+- **Spacing**: `janus::linspace`, `janus::cosspace`, `janus::sinspace`, `janus::logspace`, `janus::geomspace`
+- **Discrete integration**: rectangular, trapezoidal, Simpson, cubic, squared-curvature methods
+- **Finite differences**: `janus::finite_difference_coefficients()`
+- **Rotations**: `janus::rotation_x/y/z()`, `janus::rotation_2d()`
+- **Quaternions**: `janus::Quaternion<Scalar>` with full algebra, conversions, `janus::slerp()`
+- **Surrogate models**: `janus::softmax`, `janus::softmin`, `janus::softabs`, `janus::sigmoid`, `janus::tanh_blend`
 
 ---
 
-#### Trigonometry (`Trig.hpp`)
+### Optimization Layer
 
-| Function | Description |
-|----------|-------------|
-| `sin(x)`, `cos(x)`, `tan(x)` | Basic trig |
-| `asin(x)`, `acos(x)`, `atan(x)` | Inverse trig |
-| `atan2(y, x)` | Two-argument arctangent |
-
----
-
-#### Logic (`Logic.hpp`)
-
-Symbolic-compatible branching and comparisons:
-
-| Function | Description |
-|----------|-------------|
-| `where(cond, if_true, if_false)` | Ternary selection |
-| `select(conditions, values, default)` | Multi-way selection |
-| `min(a, b)`, `max(a, b)` | Min/max |
-| `clamp(val, low, high)` | Clamping |
-| `lt(a, b)`, `gt(a, b)`, `le(a, b)`, `ge(a, b)`, `eq(a, b)`, `neq(a, b)` | Element-wise comparisons |
-| `sigmoid_blend(x, val_low, val_high, sharpness)` | Smooth blending |
-| `blend(x, val_low, val_high, center, sharpness)` | Centered blending |
-
----
-
-#### Calculus (`Calculus.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `gradient(f, x)` | Gradient of scalar function |
-| `jacobian(f, x)` | Jacobian matrix |
-| `hessian(f, x)` | Hessian matrix |
-| `trapz(y, x)` | Trapezoidal integration |
-| `diff(y, x)` | Numerical differentiation |
-| `cumsum(y)` | Cumulative sum |
-
----
-
-#### Autodiff (`AutoDiff.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `jacobian({outputs}, {inputs})` | Multi-input/output Jacobian |
-| `hessian(output, inputs)` | Hessian matrix |
-| `hessian_vector_product(output, inputs, direction)` | Matrix-free Hessian action `H * v` |
-| `lagrangian_hessian_vector_product(...)` | Matrix-free second-order adjoint `∇²L(x, λ) v` |
-| `select_sensitivity_regime(...)` | Choose forward, adjoint, or checkpointed adjoint |
-| `sensitivity_jacobian(function, output_idx, input_idx, ...)` | Build a Jacobian function through the selected regime |
-
----
-
-#### Linear Algebra (`Linalg.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `dot(a, b)` | Dot product |
-| `cross(a, b)` | Cross product (3D) |
-| `solve(A, b)` | Default linear solve backend |
-| `solve(A, b, policy)` | Policy-selected dense, sparse-direct, or iterative linear solve |
-| `norm(v)` | Euclidean norm |
-| `normalize(v)` | Unit vector |
-| `trace(M)` | Matrix trace |
-| `det(M)` | Determinant |
-| `inv(M)` | Matrix inverse |
-| `reshape(M, rows, cols)` | Reshape matrix |
-| `eye<Scalar>(n)` | Identity matrix |
-| `zeros<Scalar>(rows, cols)` | Zero matrix |
-| `ones<Scalar>(rows, cols)` | Ones matrix |
-| `block_diag(blocks)` | Block diagonal matrix |
-
----
-
-#### Interpolation (`Interpolate.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `interp1(x, xp, fp)` | 1D linear interpolation |
-| `interp1(x, table, method)` | 1D with method selection |
-| `interp_nd(point, table)` | N-dimensional interpolation |
-| `InterpolatedModel::fit(x, y)` | Fit interpolation model |
-
-Methods: `"linear"`, `"cubic"`, `"monotonic"`
-
----
-
-#### Polynomial Chaos (`PolynomialChaos.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `pce_polynomial(dim, degree, x, normalized)` | Evaluate a univariate Hermite / Legendre / Jacobi / Laguerre basis term |
-| `pce_squared_norm(dim, degree, normalized)` | Probability-space squared norm for one basis term |
-| `PolynomialChaosBasis(dimensions, order, options)` | Build a multidimensional total-order or tensor-product basis |
-| `basis.evaluate(point)` | Evaluate all basis terms at one stochastic point |
-| `pce_projection_coefficients(...)` | Recover coefficients from weighted collocation samples |
-| `pce_regression_coefficients(...)` | Recover coefficients from sample regression / least squares |
-| `pce_mean(coeffs)` | Mean of a scalar PCE |
-| `pce_variance(basis, coeffs)` | Variance of a scalar PCE |
-
-See `docs/user_guides/polynomial_chaos.md` for sample layout, normalization, and symbolic-moment workflows.
-
----
-
-#### Stochastic Quadrature (`Quadrature.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `stochastic_quadrature_rule(dim, order, rule)` | One-dimensional probability-measure quadrature rule |
-| `stochastic_quadrature_level(dim, level, rule)` | Refinement-level rule, including nested Clenshaw-Curtis |
-| `tensor_product_quadrature(rules)` | Tensor-product grid with Janus sample layout |
-| `smolyak_sparse_grid(dimensions, level, options)` | Sparse-grid collocation for higher-dimensional problems |
-| `pce_projection_coefficients(basis, rule, values)` | Direct projection from a univariate quadrature rule |
-| `pce_projection_coefficients(basis, grid, values)` | Direct projection from a tensor or Smolyak grid |
-
-See `docs/user_guides/stochastic_quadrature.md` for rule families, nesting behavior, and sparse-grid usage.
-
----
-
-#### Spacing (`Spacing.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `linspace(start, end, n)` | Linear spacing |
-| `cosspace(start, end, n)` | Cosine spacing (clusters at ends) |
-| `sinspace(start, end, n)` | Sine spacing |
-| `logspace(start, end, n)` | Logarithmic spacing |
-| `geomspace(start, end, n)` | Geometric spacing |
-
----
-
-#### Integration (`Integrate.hpp`)
-
-ODE integration:
-
-| Function | Description |
-|----------|-------------|
-| `quad(f, a, b)` | Definite integral (Gauss-Kronrod) |
-| `solve_ivp(dynamics, x0, t_span)` | ODE IVP solver |
-| `solve_second_order_ivp(accel, q0, v0, t_span)` | Second-order trajectory solver (`q'' = a(t, q)`) |
-| `solve_ivp_mass_matrix(rhs, M, x0, t_span)` | Native stiff solver for `M(t, y) y' = f(t, y)` |
-| `solve_ivp_mass_matrix_expr(rhs, M, t, y, x0, t_span)` | Symbolic IDAS mass-matrix / DAE solve |
-| `stormer_verlet_step(accel, q, v, t, dt)` | Symplectic single-step integrator |
-| `rkn4_step(accel, q, v, t, dt)` | 4th-order Runge-Kutta-Nystrom step |
-
-Integration methods: `RK4`, `StormerVerlet`, `RKN4`, `RosenbrockEuler`, `BDF1`, `CVODES`, `IDAS`
-
----
-
-#### Discrete Integration (`IntegrateDiscrete.hpp`)
-
-Symbolic-friendly discrete integration:
-
-| Function | Description |
-|----------|-------------|
-| `integrate_discrete(y, x, method)` | Discrete integration |
-
-Methods: `"rectangular"`, `"trapezoidal"`, `"simpson"`, `"cubic"`, `"squared_curvature"`
-
----
-
-#### Finite Difference (`FiniteDifference.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `finite_difference_coefficients(derivative_order, x, x0)` | FD coefficients |
-
----
-
-#### Rotations (`Rotations.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `rotation_2d(angle)` | 2D rotation matrix |
-| `rotation_x(angle)` | Rotation about X axis |
-| `rotation_y(angle)` | Rotation about Y axis |
-| `rotation_z(angle)` | Rotation about Z axis |
-
----
-
-#### Quaternion (`Quaternion.hpp`)
-
-Full quaternion algebra class:
-
-| Method | Description |
-|--------|-------------|
-| `Quaternion(w, x, y, z)` | Constructor |
-| `Quaternion::from_axis_angle(axis, angle)` | From axis-angle |
-| `Quaternion::from_dcm(dcm)` | From rotation matrix |
-| `q.inverse()`, `q.conjugate()` | Inverse/conjugate |
-| `q.normalize()` | Normalize |
-| `q.rotate(v)` | Rotate vector |
-| `q.to_dcm()` | Convert to DCM |
-| `q.to_euler_zyx()` | Convert to Euler angles |
-| `slerp(q1, q2, t)` | Spherical interpolation |
-
----
-
-#### Root Finding (`RootFinding.hpp`)
-
-| Function | Description |
-|----------|-------------|
-| `rootfinder(function, x0, opts)` | Solve `F(x)=0` for a dense column-vector state |
-| `NewtonSolver` | Reusable nonlinear solve wrapper with compiled residual/Jacobian kernels |
-| `create_implicit_function(function, x_guess, opts, implicit_opts)` | Differentiable implicit solve wrapper using CasADi rootfinder sensitivities |
-
-Numeric root finding uses a globalization stack with `RootSolveStrategy::Auto` by default:
-
-- Trust-region Newton (Levenberg-Marquardt)
-- Line-search Newton
-- Quasi-Newton Broyden updates
-- Pseudo-transient continuation
-
-`rootfinder<SymbolicScalar>()` and `create_implicit_function()` remain CasADi-rootfinder-backed so the solve stays differentiable inside symbolic graphs.
-
-See `docs/user_guides/root_finding.md` for strategy guidance, diagnostics, and a walkthrough of `examples/interpolation/rootfinding_demo.cpp`.
-
----
-
-#### Surrogate Models (`SurrogateModel.hpp`)
-
-Smooth approximations:
-
-| Function | Description |
-|----------|-------------|
-| `softmax(x, sharpness)` | Smooth maximum |
-| `softmin(x, sharpness)` | Smooth minimum |
-| `softabs(x, sharpness)` | Smooth absolute value |
-| `sigmoid(x)` | Logistic sigmoid |
-| `tanh_blend(x, low, high, center, width)` | Tanh blending |
-
----
-
-### Optimization Layer (`janus/optimization/`)
-
-#### Opti (`Opti.hpp`)
-
-Main optimization interface:
+#### Opti Interface (`Opti.hpp`)
 
 ```cpp
 janus::Opti opti;
@@ -510,37 +336,48 @@ opti.subject_to(x >= 0);
 opti.subject_to(g == 0, 1e3);        // Explicit constraint scaling
 opti.subject_to(x * x + y * y <= 1);
 opti.subject_to_bounds(x, lower, upper);  // Box constraints
-
-// Diagnostics
-auto scaling = opti.analyze_scaling();
-
-// Solve
-auto sol = opti.solve();
-double x_val = sol.value(x);
-janus::NumericVector v_val = sol.value(v);
 ```
 
-#### Solver Configuration (`OptiOptions.hpp`)
+See `docs/user_guides/optimization.md`.
+
+#### Solving and Options (`OptiOptions.hpp`)
+
+Options are passed to `solve()` via `OptiOptions`:
 
 ```cpp
-opti.set_max_iterations(1000);
-opti.set_tolerance(1e-8);
-opti.set_option("print_level", 0);  // IPOPT options
-opti.set_solver(janus::Solver::IPOPT);
+auto sol = opti.solve();                                           // Defaults
+auto sol = opti.solve({.max_iter = 500, .verbose = false});        // Designated initializers
+auto sol = opti.solve(janus::OptiOptions{}.set_tol(1e-10));       // Builder pattern
 
-// Check solver availability
-if (janus::solver_available(janus::Solver::SNOPT)) { ... }
+// Solver selection
+auto sol = opti.solve({.solver = janus::Solver::Ipopt});           // Default
+auto sol = opti.solve({.solver = janus::Solver::Snopt});           // Requires SNOPT license
+
+if (janus::solver_available(janus::Solver::Snopt)) { ... }
 ```
 
-#### Solution (`OptiSol.hpp`)
+#### Solution Extraction (`OptiSol.hpp`)
 
 ```cpp
 auto sol = opti.solve();
 
-sol.value(x);           // Get scalar value
-sol.value_vector(v);    // Get vector value
-sol.objective_value();  // Optimal objective
-sol.stats();            // Solver statistics
+double x_opt = sol.value(x);                  // Scalar
+janus::NumericVector v_opt = sol.value(v);    // Vector
+janus::NumericMatrix M_opt = sol.value(M);    // Matrix
+auto stats = sol.stats();                     // Solver statistics
+
+// Save / load
+sol.save("result.json", {{"x", x}, {"y", y}});
+auto data = janus::OptiSol::load("result.json");
+```
+
+#### Scaling Diagnostics
+
+Preflight analysis of variable, constraint, and objective scaling before solving:
+
+```cpp
+auto report = opti.analyze_scaling();
+// Report contains ScalingIssue entries with severity, suggested scales, etc.
 ```
 
 #### Parametric Sweep (`OptiSweep.hpp`)
@@ -552,7 +389,13 @@ auto results = sweep.run(parameter, values);
 
 #### Trajectory Optimization
 
-**Collocation** (`Collocation.hpp`):
+Four transcription methods are available, all sharing a common `TranscriptionBase` interface. See `docs/user_guides/transcription_methods.md` for comparison.
+
+- **Direct collocation** -- `docs/user_guides/collocation.md`
+- **Multiple shooting** -- `docs/user_guides/multiple_shooting.md`
+- **Pseudospectral** (LG/LGR) -- `docs/user_guides/pseudospectral.md`
+- **Birkhoff pseudospectral** (LGL/CGL) -- `docs/user_guides/birkhoff_pseudospectral.md`
+
 ```cpp
 janus::DirectCollocation problem(N_segments, dynamics, t0, tf);
 problem.set_state_bounds(lower, upper);
@@ -561,44 +404,30 @@ problem.set_boundary_conditions(x0, xf);
 auto [sol, t, x, u] = problem.solve();
 ```
 
-**Multiple Shooting** (`MultiShooting.hpp`):
-```cpp
-janus::MultipleShooting problem(N_segments, dynamics, t0, tf);
-problem.set_initial_guess(t_init, x_init, u_init);
-auto [sol, t, x, u] = problem.solve();
-```
-
 ---
 
-## Existing User Guides
+## User Guide Index
 
-Before implementing new functionality, check these existing guides to avoid duplication:
-
-| Guide | File | Topics Covered |
-|-------|------|----------------|
-| Numeric Computing | `docs/user_guides/numeric_computing.md` | Numeric mode, evaluation, standard execution |
-| Symbolic Computing | `docs/user_guides/symbolic_computing.md` | Symbolic mode, graph building, MX operations |
-| Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
-| Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
-| Polynomial Chaos | `docs/user_guides/polynomial_chaos.md` | Askey-scheme bases, projection/regression fitting, symbolic moments |
-| Stochastic Quadrature | `docs/user_guides/stochastic_quadrature.md` | Probability-measure nodes, tensor grids, Smolyak sparse grids |
-| Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
-| Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
-| Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
-| Structural Diagnostics | `docs/user_guides/structural_diagnostics.md` | Observability, identifiability, structural rank deficiencies |
-| Structural Transforms | `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, tearing recommendations |
-| Collocation | `docs/user_guides/collocation.md` | Direct collocation transcription |
-| Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
-| Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of trajectory methods |
-| Math Functions | `docs/user_guides/math_functions.md` | Overview of janus:: math functions |
-
----
-
-## Pattern Documentation
-
-- `docs/patterns/branching_logic.md` - Advanced `where()` and `select()` patterns
-- `docs/patterns/loop_patterns.md` - Structural loops, while→for conversion
-- (Additional patterns in `docs/patterns/`)
+| Guide | File | Topics |
+|-------|------|--------|
+| Numeric Computing | `docs/user_guides/numeric_computing.md` | Numeric mode, evaluation |
+| Symbolic Computing | `docs/user_guides/symbolic_computing.md` | Symbolic mode, graph building |
+| Math Functions | `docs/user_guides/math_functions.md` | Full janus:: math dispatch table |
+| Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interpolation |
+| Integration | `docs/user_guides/integration.md` | ODE solvers, quadrature |
+| Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, implicit functions |
+| Polynomial Chaos | `docs/user_guides/polynomial_chaos.md` | PCE bases, fitting, moments |
+| Stochastic Quadrature | `docs/user_guides/stochastic_quadrature.md` | Quadrature rules, sparse grids |
+| Sparsity | `docs/user_guides/sparsity.md` | Sparsity, coloring, sparse derivatives |
+| Structural Diagnostics | `docs/user_guides/structural_diagnostics.md` | Observability, identifiability |
+| Structural Transforms | `docs/user_guides/structural_transforms.md` | Alias elimination, BLT, tearing |
+| Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz |
+| Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints |
+| Collocation | `docs/user_guides/collocation.md` | Direct collocation |
+| Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting |
+| Pseudospectral | `docs/user_guides/pseudospectral.md` | LG/LGR pseudospectral |
+| Birkhoff Pseudospectral | `docs/user_guides/birkhoff_pseudospectral.md` | LGL/CGL Birkhoff |
+| Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of methods |
 
 ---
 
@@ -606,19 +435,23 @@ Before implementing new functionality, check these existing guides to avoid dupl
 
 ### DO NOT Reimplement
 
-The following functionality already exists in Janus:
+The following functionality already exists in Janus -- check the relevant user guide before building anything new:
 
-- ✅ All basic math (`sin`, `cos`, `pow`, `exp`, `log`, `sqrt`, etc.)
-- ✅ Linear algebra (`dot`, `cross`, `norm`, `inv`, `det`)
-- ✅ Quaternion algebra and rotations
-- ✅ Interpolation (1D, ND, multiple methods)
-- ✅ ODE integration (`solve_ivp`, `quad`)
-- ✅ Discrete integration (trapz, Simpson, etc.)
-- ✅ Branching logic (`where`, `select`, `clamp`, `min`, `max`)
-- ✅ Sparsity analysis
-- ✅ Function compilation
-- ✅ Optimization (`Opti`, IPOPT)
-- ✅ Trajectory optimization (collocation, multiple shooting)
+- All basic math (`sin`, `cos`, `pow`, `exp`, `log`, `sqrt`, etc.)
+- Linear algebra (`dot`, `cross`, `norm`, `inv`, `det`, `solve` with policies)
+- Quaternion algebra and rotations
+- Interpolation (1D, ND, multiple methods)
+- Root finding (globalization stack, implicit function wrappers)
+- ODE integration (`solve_ivp`, `quad`, second-order, mass-matrix)
+- Polynomial chaos and stochastic quadrature
+- Sparsity analysis and sparse derivative kernels
+- Structural diagnostics and transforms
+- Discrete integration (trapz, Simpson, etc.)
+- Branching logic (`where`, `select`, `clamp`, `min`, `max`)
+- Function compilation
+- Optimization (`Opti`, IPOPT, SNOPT)
+- Trajectory optimization (collocation, multiple shooting, pseudospectral, Birkhoff)
+- Scaling diagnostics
 
 ### When Building on Janus
 

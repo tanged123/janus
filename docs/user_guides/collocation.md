@@ -1,115 +1,105 @@
-# Direct Collocation in Janus
+# Direct Collocation
 
-Direct collocation transforms continuous-time optimal control problems into large sparse nonlinear programs (NLPs). This guide explains the technique and how to use the `DirectCollocation` class.
+Direct collocation transforms continuous-time optimal control problems into large sparse NLPs by discretizing time into nodes and enforcing dynamics at each segment using defect constraints. Janus provides the `janus::DirectCollocation` class in `<janus/optimization/Collocation.hpp>`. It supports trapezoidal (2nd order) and Hermite-Simpson (4th order) schemes and works in **symbolic mode** via the `janus::Opti` interface.
 
-## What is Direct Collocation?
+## Quick Start
 
-In trajectory optimization, you want to find state trajectories $x(t)$ and control inputs $u(t)$ that minimize some objective while satisfying dynamics constraints:
+```cpp
+#include <janus/janus.hpp>
 
-$$\dot{x} = f(x, u, t)$$
+janus::Opti opti;
+janus::DirectCollocation dc(opti);
 
-Direct collocation **discretizes** time into nodes and enforces dynamics at each segment using **defect constraints**.
+auto [x, u, tau] = dc.setup(
+    2, 1, 0.0, 2.0,
+    {.scheme = janus::CollocationScheme::HermiteSimpson, .n_nodes = 31}
+);
 
-### Collocation Schemes
+dc.set_dynamics([](const auto& x, const auto& u, const auto& t) {
+    janus::SymbolicVector dxdt(2);
+    dxdt(0) = x(1);
+    dxdt(1) = u(0);
+    return dxdt;
+});
+
+dc.add_defect_constraints();
+dc.set_initial_state(janus::NumericVector{{0.0, 0.0}});
+dc.set_final_state(janus::NumericVector{{1.0, 0.0}});
+
+opti.minimize(/* objective */);
+auto sol = opti.solve();
+```
+
+## Core API
+
+| Method | Description |
+|--------|-------------|
+| `DirectCollocation(opti)` | Construct with a `janus::Opti` instance |
+| `setup(n_states, n_controls, t0, tf, opts)` | Create decision variables and time grid |
+| `set_dynamics(ode)` | Set the ODE function: `(x, u, t) -> dxdt` |
+| `add_defect_constraints()` | Apply collocation defect constraints |
+| `add_dynamics_constraints()` | Unified alias for `add_defect_constraints()` |
+| `set_initial_state(x0)` | Set initial boundary condition (full vector or per-index) |
+| `set_final_state(xf)` | Set final boundary condition (full vector or per-index) |
+| `n_nodes()` | Number of collocation nodes |
+| `time_grid()` | Normalized time grid `[0, 1]` |
+
+**Collocation schemes:**
 
 | Scheme | Order | Description |
 |--------|-------|-------------|
-| Trapezoidal | 2nd | Uses average of endpoint derivatives |
-| Hermite-Simpson | 4th | Uses cubic interpolation with midpoint |
+| `CollocationScheme::Trapezoidal` | 2nd | Uses average of endpoint derivatives |
+| `CollocationScheme::HermiteSimpson` | 4th | Uses cubic interpolation with midpoint |
 
-**Trapezoidal** (simpler):
+**Trapezoidal:**
 ```
 x[k+1] - x[k] = 0.5 * h * (f[k] + f[k+1])
 ```
 
-**Hermite-Simpson** (more accurate):
+**Hermite-Simpson:**
 ```
 x_mid = 0.5*(x[k] + x[k+1]) + h/8*(f[k] - f[k+1])
 x[k+1] - x[k] = h/6 * (f[k] + 4*f_mid + f[k+1])
 ```
 
----
+## Usage Patterns
 
-## The DirectCollocation Class
-
-Located in `<janus/optimization/Collocation.hpp>`.
-
-### Basic Usage
-
-```cpp
-#include <janus/janus.hpp>
-
-// 1. Create Opti and DirectCollocation
-janus::Opti opti;
-janus::DirectCollocation dc(opti);
-
-// 2. Setup decision variables
-auto [x, u, tau] = dc.setup(
-    n_states,    // Number of state variables
-    n_controls,  // Number of control variables
-    t0, tf,      // Time bounds
-    {.scheme = CollocationScheme::HermiteSimpson, .n_nodes = 31}
-);
-
-// 3. Set dynamics (ODE function)
-dc.set_dynamics([](const auto& x, const auto& u, const auto& t) {
-    SymbolicVector dxdt(2);
-    dxdt(0) = x(1);      // dx/dt = velocity
-    dxdt(1) = u(0);      // dv/dt = control
-    return dxdt;
-});
-
-// 4. Apply collocation constraints
-dc.add_defect_constraints();
-
-// 5. Set boundary conditions
-dc.set_initial_state(x0);
-dc.set_final_state(xf);
-
-// 6. Set objective and solve
-opti.minimize(objective);
-auto sol = opti.solve();
-```
-
----
-
-## Example: Brachistochrone
+### Brachistochrone Example
 
 The brachistochrone problem finds the fastest path for a bead sliding under gravity.
 
-**Dynamics**:
+**Dynamics:**
 ```cpp
-SymbolicVector brachistochrone_dynamics(
-    const SymbolicVector &state,    // [x, y, v]
-    const SymbolicVector &control,  // [theta]
-    const SymbolicScalar &t) 
+janus::SymbolicVector brachistochrone_dynamics(
+    const janus::SymbolicVector &state,    // [x, y, v]
+    const janus::SymbolicVector &control,  // [theta]
+    const janus::SymbolicScalar &t)
 {
-    SymbolicScalar v = state(2);
-    SymbolicScalar theta = control(0);
+    janus::SymbolicScalar v = state(2);
+    janus::SymbolicScalar theta = control(0);
 
-    SymbolicVector dxdt(3);
-    dxdt(0) = v * janus::sin(theta);   // x' = v*sin(θ)
-    dxdt(1) = -v * janus::cos(theta);  // y' = -v*cos(θ)
-    dxdt(2) = 9.81 * janus::cos(theta); // v' = g*cos(θ)
+    janus::SymbolicVector dxdt(3);
+    dxdt(0) = v * janus::sin(theta);    // x' = v*sin(theta)
+    dxdt(1) = -v * janus::cos(theta);   // y' = -v*cos(theta)
+    dxdt(2) = 9.81 * janus::cos(theta); // v' = g*cos(theta)
     return dxdt;
 }
 ```
 
-**Setup**:
+**Setup:**
 ```cpp
-Opti opti;
-DirectCollocation dc(opti);
+janus::Opti opti;
+janus::DirectCollocation dc(opti);
 
-// Final time is a decision variable
 auto T = opti.variable(2.0, std::nullopt, 0.1, 10.0);
 
-auto [x, u, tau] = dc.setup(3, 1, 0.0, T, 
-    {.scheme = CollocationScheme::HermiteSimpson, .n_nodes = 31});
+auto [x, u, tau] = dc.setup(3, 1, 0.0, T,
+    {.scheme = janus::CollocationScheme::HermiteSimpson, .n_nodes = 31});
 
 dc.set_dynamics(brachistochrone_dynamics);
 dc.add_defect_constraints();
 
-dc.set_initial_state(NumericVector{{0.0, 10.0, 0.001}});
+dc.set_initial_state(janus::NumericVector{{0.0, 10.0, 0.001}});
 dc.set_final_state(0, 10.0);  // Final x
 dc.set_final_state(1, 5.0);   // Final y
 
@@ -117,48 +107,28 @@ opti.minimize(T);  // Minimize time
 auto sol = opti.solve();
 ```
 
-**Result**: T* = 1.8016s (matches Dymos reference: 1.8019s, error < 0.02%)
+**Result:** T* = 1.8016s (matches Dymos reference: 1.8019s, error < 0.02%)
 
-## Unified Comparison Example
+### Free vs Fixed Final Time
 
-The optimization demos are now unified into one comparison file:
-
-- `examples/optimization/transcription_comparison_demo.cpp`
-
-It solves the same brachistochrone setup with:
-- Direct Collocation
-- Multiple Shooting
-- Pseudospectral
-- Birkhoff Pseudospectral
-
-and prints:
-- Single-grid performance stats (solve time, iterations, NLP size, error)
-- A multi-grid convergence table for each transcription type
-
----
-
-## Free vs Fixed Final Time
-
-**Fixed time**: Pass `double` for `tf`
+**Fixed time:** Pass `double` for `tf`
 ```cpp
 dc.setup(n_states, n_controls, 0.0, 2.0, opts);
 ```
 
-**Free time**: Pass `SymbolicScalar` for `tf`
+**Free time:** Pass `SymbolicScalar` for `tf`
 ```cpp
 auto T = opti.variable(2.0);  // Decision variable
 dc.setup(n_states, n_controls, 0.0, T, opts);
 opti.minimize(T);  // Minimize time
 ```
 
----
-
-## Comparison: Manual vs DirectCollocation
+### Manual vs DirectCollocation Comparison
 
 **Manual collocation** (50+ lines):
 ```cpp
 for (int i = 0; i < N - 1; ++i) {
-    SymbolicVector state_i(3), state_ip1(3);
+    janus::SymbolicVector state_i(3), state_ip1(3);
     state_i << x(i), y(i), v(i);
     state_ip1 << x(i+1), y(i+1), v(i+1);
     auto f_i = ode(state_i, theta(i));
@@ -176,14 +146,25 @@ dc.set_initial_state(x0);
 dc.set_final_state(xf);
 ```
 
----
+### Unified Comparison Example
 
-## When to Use
+The file `examples/optimization/transcription_comparison_demo.cpp` solves the same brachistochrone with Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral, printing single-grid performance stats and a multi-grid convergence table.
+
+### When to Use
 
 | Problem | Use Collocation? |
 |---------|-----------------|
-| Trajectory optimization | ✓ Yes |
-| Minimum-time problems | ✓ Yes (free tf) |
-| Path constraints | ✓ Yes |
-| Stiff systems | ✓ Yes (implicit) |
+| Trajectory optimization | Yes |
+| Minimum-time problems | Yes (free tf) |
+| Path constraints | Yes |
+| Stiff systems | Yes (implicit) |
 | Bang-bang control | Consider multiple shooting |
+
+## See Also
+
+- [Transcription Methods Guide](transcription_methods.md) -- Comparison of all four transcription methods
+- [Multiple Shooting Guide](multiple_shooting.md) -- Alternative transcription via numerical integration
+- [Pseudospectral Guide](pseudospectral.md) -- Global polynomial transcription
+- [Birkhoff Pseudospectral Guide](birkhoff_pseudospectral.md) -- Birkhoff-form transcription
+- [transcription_comparison_demo.cpp](../../examples/optimization/transcription_comparison_demo.cpp) -- Unified comparison example
+- [Collocation.hpp](../../include/janus/optimization/Collocation.hpp) -- API reference

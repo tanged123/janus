@@ -1,180 +1,182 @@
-# Janus 👥
+# Janus
 
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://tanged123.github.io/janus/) [![Janus CI](https://github.com/tanged123/janus/actions/workflows/ci.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/ci.yml) [![Clang-Format Check](https://github.com/tanged123/janus/actions/workflows/format.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/format.yml) [![codecov](https://codecov.io/github/tanged123/janus/graph/badge.svg?token=0DSF7KK8W7)](https://codecov.io/github/tanged123/janus)
 
-**Janus** is a high-performance C++ numerical framework named after the Roman god of duality. True to its name, it allows a single physics model to face two directions: **Numeric Mode** for fast execution and **Symbolic Mode** for graph generation and optimization.
+Janus is a C++20 header-only numerical framework that implements a dual-mode code-transformations paradigm inspired by [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox). You write physics models once using generic templates; the same code compiles to optimized native arithmetic (Eigen) for simulation **and** builds a symbolic computational graph (CasADi) for automatic differentiation and gradient-based optimization. No code duplication, no runtime dispatch overhead.
 
-Built on C++20, Eigen, and CasADi, Janus implements the Code Transformations paradigm, enabling engineers to write physics models once and execute them in two distinct modes:
-
-1. **Fast Numeric Mode**: For real-time simulation and control (standard C++/Eigen).
-2. **Symbolic Trace Mode**: For gradient-based optimization and graph visualization (CasADi).
-
-> For a deep dive into the architecture, see [Design Overview](docs/design_overview.md).
-
-## Features
-
-- 🎭 **Dual-Mode Physics**: Write once, run as Numeric (Fast C++) or Symbolic (CasADi Graph).
-- 🔢 **Unified Math**: Std/CasADi agnostic math functions (`janus::sin`, `janus::pow`, `janus::where`).
-- ⚡ **Linear Algebra**: Eigen-based matrix operations compatible with symbolic types.
-- 📉 **Optimization**: High-level `Opti` interface for NLP solvers (IPOPT/SNOPT/QPOASES) with Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral transcriptions.
-- 🔁 **Differentiation**: Automatic differentiation (Forward/Reverse) via CasADi.
-- ⏱️ **Integration**: ODE solvers (`solve_ivp`), Runge-Kutta methods, discrete integration.
-- 📈 **Interpolation**: 1D, 2D, Sparse, and N-D table lookups with B-spline support.
-- 📐 **Geometry**: Quaternions, Rotation Matrices, Euler Angles.
-- 🔍 **Root Finding**: Newton-Raphson and bracketing solvers.
-- 🧠 **Surrogates**: Differentiable approximations (sigmoid, softmax) for discontinuous functions.
-- 💾 **IO**: Graph visualization and serialization.
-
-## Quick Start
+## Building & Development
 
 ### Prerequisites
 
-- **Nix**: This project uses Nix Flakes to provide a reproducible development environment.
+**Recommended:** [Nix](https://nixos.org/) with flakes enabled -- the `flake.nix` pins every dependency.
 
-### Dev Shell
+**Manual:** CMake 3.20+, a C++20 compiler (Clang recommended), Eigen 3.4+, CasADi, GoogleTest, Ninja.
 
-Enter the development environment:
+### Dev environment
 
 ```bash
+# Enter the Nix dev shell (sets up compiler, Eigen, CasADi, gtest, ccache, doxygen, lcov, etc.)
+nix develop
+
+# Or use the convenience wrapper
 ./scripts/dev.sh
 ```
 
-### Build & Test
-
-We provide shorthand scripts to streamline the workflow:
-
-1. **Build**: Configures and compiles the project.
-
-    ```bash
-    ./scripts/build.sh
-    ```
-
-2. **Test**: Rebuilds (if necessary) and runs the test suite.
-
-    ```bash
-    ./scripts/test.sh
-    ```
-
-3. **Clean**: Cleans out the build folder.
-
-    ```bash
-    ./scripts/clean.sh
-    ```
-
-4. **CI / Clean Verification**: Runs the full build and test pipeline inside the reproducible Nix environment (what CI does).
-
-    ```bash
-    ./scripts/ci.sh
-    ```
-
-5. **Examples**: Runs all example simulations.
-
-    ```bash
-    ./scripts/run_examples.sh
-    ```
-
-6. **Full Verification**: Runs everything (Build + Test + Examples). This is the recommended pre-push check.
-
-    ```bash
-    ./scripts/verify.sh
-    ```
-
-    Logs are saved to `logs/ci.log`, `logs/tests.log`, `logs/examples.log`, and `logs/verify.log`.
-
-### Formatting
-
-We use **treefmt** (via `nix fmt`) to enforce code style for C++, CMake, and Nix files.
-
-**Manual formatting:**
+### Build, test, run
 
 ```bash
-nix fmt
+./scripts/build.sh              # CMake + Ninja debug build
+./scripts/build.sh --release    # Release build
+./scripts/test.sh               # Build (if needed) + ctest
+./scripts/coverage.sh           # Build with coverage, run tests, generate lcov report
+./scripts/run_examples.sh       # Build and run all 30 example programs
+./scripts/verify.sh             # Full pre-push check: build + test + examples
 ```
 
-**Auto-format on commit (recommended):**
+Formatting is enforced via `treefmt` (clang-format, cmake-format, nixfmt):
 
 ```bash
-./scripts/install-hooks.sh
+nix fmt                         # Format everything
+./scripts/install-hooks.sh      # Install pre-commit formatting hook
 ```
 
-This installs a pre-commit hook that automatically formats your code before each commit, so you never forget!
+## Project Structure
 
-## Usage Example
+```
+janus/
+  include/janus/
+    core/                  # Type system, concepts, diagnostics, sparsity, structural analysis, IO
+    math/                  # Trig, calculus, autodiff, interpolation, integration, root finding,
+                           #   quadrature, PCE, linalg, quaternions, rotations, surrogates
+    optimization/          # Opti interface, scaling, collocation, multiple shooting,
+                           #   pseudospectral, Birkhoff pseudospectral
+    janus.hpp              # Umbrella header
+  examples/
+    intro/                 # Getting started (numeric, energy, sparsity, printing)
+    math/                  # Branching, graphs, loops, sensitivity, PCE, structural analysis
+    interpolation/         # N-D tables, scattered interpolation, root finding, file-based tables
+    simulation/            # ODE integration, drag, brachistochrone, hybrid, attitudes
+    optimization/          # Rosenbrock, drag, beam, brachistochrone, sweeps, transcription comparison
+    integration_demo.cpp   # RK4, RK45, Stormer-Verlet, mass-matrix integrators
+  tests/                   # GoogleTest suites mirroring include/ layout (core/, math/, optimization/)
+  docs/
+    user_guides/           # 18 topic guides (see Documentation below)
+    patterns/              # Reusable patterns (branching, loops, hybrid optimization)
+    design_overview.md     # Architecture deep-dive
+  scripts/                 # Build, test, CI, coverage, formatting, doc generation
+  flake.nix                # Nix dev environment and package definition
+```
 
-Write physics models once using `janus` math functions, and execute them in both numeric and symbolic modes.
+## Architecture Overview
+
+Janus is built on a **template-first traceability** paradigm. User models are templated on a generic scalar type; the framework provides two backends that satisfy the same concept constraints. The **numeric backend** maps to `double` and `Eigen::MatrixXd` -- the compiler generates assembly identical to hand-written C++. The **symbolic backend** maps to `casadi::MX` and `Eigen::Matrix<casadi::MX>` -- the same code constructs a static computational graph suitable for automatic differentiation, sparsity detection, and NLP solvers.
+
+A **dispatch layer** in the `janus::` namespace shadows `std::` math functions and uses C++20 concepts to route calls (`janus::sin`, `janus::pow`, etc.) to the correct backend at compile time. The framework draws a strict line between **structural logic** (integers, booleans, loop bounds -- these shape the graph) and **value logic** (floating-point quantities that flow through the graph). Standard `if/else` cannot branch on symbolic values; `janus::where(condition, true_val, false_val)` compiles to a ternary in numeric mode and a `casadi::if_else` switch node in symbolic mode.
+
+For the full design rationale, see [docs/design_overview.md](docs/design_overview.md).
+
+## Documentation
+
+### Organization
+
+- **`docs/user_guides/`** -- 18 standalone guides, each covering one subsystem end-to-end.
+- **`docs/patterns/`** -- Reusable coding patterns (branching, loops, hybrid optimization).
+- **`docs/design_overview.md`** -- Architecture principles and type system.
+- **Doxygen API docs** -- Generated from source comments.
+
+### Generating docs
+
+```bash
+./scripts/generate_docs.sh      # Or: doxygen Doxyfile
+```
+
+Hosted on [GitHub Pages](https://tanged123.github.io/janus/).
+
+### User guides
+
+| Guide | Description |
+|---|---|
+| [numeric_computing](docs/user_guides/numeric_computing.md) | Numeric backend basics -- templates, Eigen, optimized machine code |
+| [symbolic_computing](docs/user_guides/symbolic_computing.md) | Symbolic backend -- CasADi graph construction, derivatives, code generation |
+| [math_functions](docs/user_guides/math_functions.md) | Dispatch layer and ADL for dual-mode math (`janus::sin`, `janus::pow`, etc.) |
+| [interpolation](docs/user_guides/interpolation.md) | N-dimensional gridded interpolation in numeric and symbolic modes |
+| [integration](docs/user_guides/integration.md) | ODE solvers -- RK4, RK45, Stormer-Verlet, mass-matrix, second-order systems |
+| [root_finding](docs/user_guides/root_finding.md) | Newton-Raphson and bracketing solvers with globalization |
+| [optimization](docs/user_guides/optimization.md) | `janus::Opti` interface for constrained NLP (IPOPT/SNOPT/QPOASES) |
+| [collocation](docs/user_guides/collocation.md) | Direct collocation transcription for optimal control |
+| [multiple_shooting](docs/user_guides/multiple_shooting.md) | Multiple shooting transcription via CasADi integrators (CVODES/IDAS) |
+| [pseudospectral](docs/user_guides/pseudospectral.md) | Global polynomial pseudospectral transcription |
+| [birkhoff_pseudospectral](docs/user_guides/birkhoff_pseudospectral.md) | Birkhoff-form pseudospectral with derivative collocation |
+| [transcription_methods](docs/user_guides/transcription_methods.md) | Comparison and selection guide for all transcription methods |
+| [graph_visualization](docs/user_guides/graph_visualization.md) | Visualizing computational graphs for debugging |
+| [polynomial_chaos](docs/user_guides/polynomial_chaos.md) | Polynomial chaos expansion for uncertainty quantification |
+| [stochastic_quadrature](docs/user_guides/stochastic_quadrature.md) | Probability-measure quadrature rules for PCE workflows |
+| [sparsity](docs/user_guides/sparsity.md) | Jacobian/Hessian sparsity detection and exploitation |
+| [structural_transforms](docs/user_guides/structural_transforms.md) | Alias elimination and BLT decomposition for residual systems |
+| [structural_diagnostics](docs/user_guides/structural_diagnostics.md) | Structural observability analysis for state estimation |
+
+## Key Features
+
+**Core** -- Dual-mode type system, C++20 concept constraints, compile-time dispatch, runtime diagnostics, graph serialization and visualization.
+
+**Math** -- Automatic differentiation (forward/reverse via CasADi), N-D interpolation (gridded, scattered, B-spline), root finding (Newton-Raphson, bracketing with globalization), discrete and continuous calculus, stochastic quadrature, polynomial chaos expansion, linear algebra (templated Eigen ops), quaternions and rotations, surrogate models (sigmoid, softmax smoothing).
+
+**Integration** -- `solve_ivp` with RK4, RK45 (adaptive), Stormer-Verlet (symplectic), mass-matrix DAE integration, second-order ODE support, discrete integration utilities.
+
+**Optimization** -- `janus::Opti` high-level NLP interface (IPOPT, SNOPT, QPOASES), variable/constraint scaling, direct collocation, multiple shooting, pseudospectral, Birkhoff pseudospectral transcriptions, parametric sweeps.
+
+**Structural Analysis** -- Jacobian/Hessian sparsity detection, alias elimination, BLT (block lower triangular) decomposition, structural observability checking.
+
+## Examples
+
+The `examples/` directory contains 30 runnable demos organized by topic:
+
+- **intro/** (4) -- Numeric basics, energy model, sparsity intro, printing
+- **math/** (10) -- Branching logic, graph visualization, loops, sensitivity, PCE, linear solve policies, structural analysis
+- **interpolation/** (4) -- N-D tables, scattered data, root finding, file-based table loading
+- **simulation/** (5) -- Drag model, brachistochrone, hybrid systems, aircraft attitudes, smooth trajectories
+- **optimization/** (6) -- Rosenbrock, drag optimization, beam deflection, brachistochrone, parametric sweeps, transcription comparison
+- **integration** (1) -- RK4, RK45, Stormer-Verlet, mass-matrix integrators
+
+Build and run all examples:
+
+```bash
+./scripts/run_examples.sh
+```
+
+## Quick Look
+
+Write a model once, evaluate it numerically and symbolically:
 
 ```cpp
 #include <janus/janus.hpp>
-#include <iostream>
 
-// 1. Define Physics (Write Once)
-// Use C++20 'auto' to support both double and Symbolic types automatically.
-// This single function drives both simulation and optimization!
-auto compute_drag(auto rho, auto v, auto S, auto Cd) {
+// Generic model -- works with double or CasADi symbolic types
+auto drag(auto rho, auto v, auto S, auto Cd) {
     return 0.5 * rho * janus::pow(v, 2) * S * Cd;
 }
 
 int main() {
-    // 2. Numeric Mode (Fast Simulation)
-    // Compiles to standard optimized C++ machine code
-    double D = compute_drag(1.225, 50.0, 10.0, 0.02); 
-    std::cout << "Drag: " << D << " N" << std::endl;
+    // Numeric mode -- compiles to native arithmetic
+    double D = drag(1.225, 50.0, 10.0, 0.02);
 
-    // 3. Symbolic Mode (Optimization)
-    // Same function builds a computational graph for the solver
+    // Symbolic mode -- same function builds a CasADi graph
     janus::Opti opti;
-    auto v = opti.variable(50.0);       // Decision Variable
-    
-    // Mix doubles and symbols seamlessly (no casting required!)
-    auto D_sym = compute_drag(1.225, v, 10.0, 0.02); 
-    
-    opti.minimize(D_sym);               // Minimize Drag
-    opti.subject_to_bounds(v, 10, 100); // Speed limit constraint
-    
-    auto sol = opti.solve();            // Solve with IPOPT
-    std::cout << "Optimal V: " << sol.value(v) << " m/s" << std::endl;
+    auto v = opti.variable(50.0);
+    auto D_sym = drag(1.225, v, 10.0, 0.02);
+
+    opti.minimize(D_sym);
+    opti.subject_to_bounds(v, 10, 100);
+    auto sol = opti.solve();  // IPOPT under the hood
 }
 ```
 
-For more details:
+## Contributing
 
-- **Numeric Simulation**: [Numeric Computing Guide](docs/user_guides/numeric_computing.md) and `examples/intro/numeric_intro.cpp`.
-- **Symbolic Generation**: [Symbolic Computing Guide](docs/user_guides/symbolic_computing.md) and `examples/simulation/drag_coefficient.cpp`.
-- **Optimization**: [Optimization Guide](docs/user_guides/optimization.md) and `examples/optimization/drag_optimization.cpp`.
+**Language and style:** C++20, header-only, heavily templated. Formatting is enforced by `nix fmt` (clang-format). Run `./scripts/install-hooks.sh` to auto-format on commit.
 
-## Project Structure
+**Adding tests:** Test files live in `tests/` and mirror the `include/janus/` directory layout (`tests/core/`, `tests/math/`, `tests/optimization/`). Use GoogleTest. Run `./scripts/test.sh` to verify.
 
-```plaintext
-janus/
-├── docs/                    # Documentation
-├── examples/                # Example implementations
-│   ├── intro/               # Basic Janus usage examples
-│   ├── interpolation/       # Interpolation and table lookup demos
-│   ├── math/                # Math/symbolic graph demos
-│   ├── optimization/        # Optimization/transcription demos
-│   └── simulation/          # ODE and physics simulation demos
-├── include/
-│   └── janus/
-│       ├── core/                # Core symbolic/numeric interfaces and IO
-│       ├── math/                # Math, interpolation, integration, autodiff helpers
-│       ├── optimization/        # Opti + transcription methods
-│       ├── utils/               # Utility helpers (e.g., JSON)
-│       ├── janus.hpp            # Main umbrella include
-│       └── using.hpp            # Convenience aliases/imports
-├── scripts/                 # Build, test, CI, and verification scripts
-├── tests/                   # GoogleTest suites (core/math/optimization)
-├── CMakeLists.txt
-└── flake.nix                # Nix environment definition
-```
+**Adding examples:** Drop a `.cpp` file in the appropriate `examples/` subdirectory and add it to `examples/CMakeLists.txt`. Run `./scripts/run_examples.sh` to verify.
 
-## Inspiration & Credits
-
-Janus is heavily inspired by **AeroSandbox**, Peter Sharpe's Python-based design optimization framework. Janus serves as a C++ implementation and extension of the "Code Transformations" paradigm pioneered by Sharpe.
-
-- **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
-- **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
-
-Janus is built upon the shoulders of giants:
-
-- **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
-- **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
+**PR workflow:** Fork, branch, make changes, ensure `./scripts/verify.sh` passes (build + test + examples), open a PR against `main`.

@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file FiniteDifference.hpp
+ * @brief Finite difference weights, derivative approximations, and integration defects
+ * @see Calculus.hpp, AutoDiff.hpp
+ */
 
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -25,6 +30,8 @@ enum class IntegrationMethod {
 
 /**
  * @brief Parse integration method from string
+ * @param method Method name string
+ * @return Corresponding IntegrationMethod enum value
  */
 inline IntegrationMethod parse_integration_method(const std::string &method) {
     if (method == "trapezoidal" || method == "trapezoid" || method == "midpoint") {
@@ -48,7 +55,7 @@ inline IntegrationMethod parse_integration_method(const std::string &method) {
  * For approximating df/dx at point i: df/dx ≈ (f[i+1] - f[i]) / h
  * Returns [weight_i, weight_i+1] = [-1/h, 1/h]
  *
- * @tparam Scalar Numeric type
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param h Step size
  * @return Pair of weights [w_i, w_{i+1}]
  */
@@ -62,7 +69,7 @@ template <typename Scalar> std::pair<Scalar, Scalar> forward_euler_weights(Scala
  * For approximating df/dx at point i+1: df/dx ≈ (f[i+1] - f[i]) / h
  * Same formula as forward, but used at i+1 instead of i
  *
- * @tparam Scalar Numeric type
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param h Step size
  * @return Pair of weights [w_i, w_{i+1}]
  */
@@ -76,7 +83,7 @@ template <typename Scalar> std::pair<Scalar, Scalar> backward_euler_weights(Scal
  * For approximating df/dx at point i: df/dx ≈ (f[i+1] - f[i-1]) / (2h)
  * Returns [weight_{i-1}, weight_{i+1}] = [-1/(2h), 1/(2h)]
  *
- * @tparam Scalar Numeric type
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param h Step size
  * @return Pair of weights [w_{i-1}, w_{i+1}]
  */
@@ -90,7 +97,7 @@ template <typename Scalar> std::pair<Scalar, Scalar> central_difference_weights(
  * For integrating: integral(f, x[i], x[i+1]) ≈ 0.5 * (f[i] + f[i+1]) * h
  * Returns [weight_i, weight_{i+1}] for the two points
  *
- * @tparam Scalar Numeric type
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param h Step size
  * @return Pair of weights [w_i, w_{i+1}]
  */
@@ -107,7 +114,7 @@ template <typename Scalar> std::pair<Scalar, Scalar> trapezoidal_weights(Scalar 
  *
  * Returns vector of size N-1 where out[i] ≈ df/dx at point i
  *
- * @tparam Scalar Numeric type (double or SymbolicScalar)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param f Function values (size N)
  * @param x Grid points (size N)
  * @return JanusVector<Scalar> derivative approximation (size N-1)
@@ -134,7 +141,7 @@ JanusVector<Scalar> forward_difference(const JanusVector<Scalar> &f, const Janus
  *
  * Returns vector of size N-1 where out[i] ≈ df/dx at point i+1
  *
- * @tparam Scalar Numeric type (double or SymbolicScalar)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param f Function values (size N)
  * @param x Grid points (size N)
  * @return JanusVector<Scalar> derivative approximation (size N-1)
@@ -150,7 +157,7 @@ JanusVector<Scalar> backward_difference(const JanusVector<Scalar> &f,
  *
  * Returns vector of size N-2 where out[i] ≈ df/dx at point i+1
  *
- * @tparam Scalar Numeric type (double or SymbolicScalar)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param f Function values (size N)
  * @param x Grid points (size N)
  * @return JanusVector<Scalar> derivative approximation (size N-2)
@@ -180,7 +187,7 @@ JanusVector<Scalar> central_difference(const JanusVector<Scalar> &f, const Janus
  *
  * These defects are used as equality constraints in trajectory optimization.
  *
- * @tparam Scalar Numeric type (double or SymbolicScalar)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param x Variable values (size N)
  * @param xdot Derivative values (size N)
  * @param t Time grid (size N)
@@ -230,7 +237,7 @@ JanusVector<Scalar> integration_defects(const JanusVector<Scalar> &x,
  *
  * Based on Fornberg 1988: "Generation of Finite Difference Formulas on Arbitrarily Spaced Grids"
  *
- * @tparam Scalar Numeric type (double or SymbolicScalar)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  * @param x Grid points (JanusVector<Scalar>)
  * @param x0 Evaluation point
  * @param derivative_degree Order of derivative to approximate

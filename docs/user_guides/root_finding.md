@@ -1,33 +1,36 @@
-# Root Finding Guide
+# Root Finding
 
-This guide covers Janus's nonlinear root-finding utilities in `RootFinding.hpp`. The API now has two distinct roles:
+Janus provides nonlinear root-finding utilities in `RootFinding.hpp` for solving `F(x) = 0` systems. The API serves two distinct roles: numeric nonlinear solves with a globalization stack for difficult residual systems, and symbolic implicit solves that stay differentiable inside CasADi graphs. Both modes work with dense column-vector inputs and outputs of matching dimensions.
 
-- Numeric nonlinear solves with a globalization stack for difficult residual systems
-- Symbolic implicit solves that stay differentiable inside CasADi graphs
-
-## Overview
-
-Janus expects a root-finding problem to look like:
+## Quick Start
 
 ```cpp
-F(x) = 0
+#include <janus/janus.hpp>
+
+// Define a residual symbolically
+auto x = janus::sym("x");
+janus::Function F("f", {x}, {x * x - 2.0});
+
+// Solve F(x) = 0 starting from x0 = 1
+Eigen::VectorXd x0(1);
+x0 << 1.0;
+
+auto result = janus::rootfinder<double>(F, x0);
+std::cout << "Root: " << result.x.transpose() << std::endl;  // ~1.4142
 ```
 
-with:
+## Core API
 
-- one dense column-vector input `x`
-- one dense column-vector output `F(x)`
-- matching input and output dimensions
+*   **`janus::rootfinder<double>(F, x0, opts)`**: Numeric root-finding with automatic globalization fallback.
+*   **`janus::NewtonSolver(F, opts)`**: Persistent solver for repeated solves of the same residual system.
+*   **`janus::create_implicit_function(G, x_guess, opts)`**: Create a differentiable implicit function `x(p)` from `G(x, p) = 0`.
+*   **`janus::rootfinder<janus::SymbolicScalar>()`**: CasADi-backed symbolic solve node.
+*   **`janus::RootFinderOptions`**: Configuration for tolerance, max iterations, strategy, and pseudo-transient parameters.
+*   **`janus::RootResult<double>`**: Result struct with `x`, `converged`, `method`, `iterations`, `residual_norm`, `step_norm`, and `message`.
 
-The main entry points are:
+## Usage Patterns
 
-```cpp
-janus::RootResult<double> result = janus::rootfinder<double>(F, x0, opts);
-janus::NewtonSolver solver(F, opts);
-janus::Function implicit = janus::create_implicit_function(G, x_guess, opts);
-```
-
-## Numeric Solves
+### Numeric Solves
 
 `rootfinder<double>()` and `NewtonSolver::solve()` use Janus's own globalization stack. The default is `RootSolveStrategy::Auto`, which tries:
 
@@ -79,7 +82,7 @@ Useful fields:
 - `step_norm`: last accepted step infinity norm
 - `message`: short status string
 
-### Example: Automatic Fallback
+### Automatic Fallback
 
 This example starts from a singular Jacobian, so `Auto` falls through to pseudo-transient continuation:
 
@@ -97,7 +100,7 @@ opts.pseudo_transient_dt0 = 0.1;
 auto result = janus::rootfinder<double>(F, x0, opts);
 ```
 
-### Example: Persistent Solver Reuse
+### Persistent Solver Reuse
 
 When you will solve the same residual system multiple times, use `NewtonSolver` so the residual and Jacobian kernels are compiled once:
 
@@ -111,17 +114,12 @@ auto res1 = solver.solve(x0_a);
 auto res2 = solver.solve(x0_b);
 ```
 
-## Differentiable Implicit Solves
+### Differentiable Implicit Solves
 
 `create_implicit_function()` is the right tool when the solve itself must remain inside a symbolic graph:
 
 ```cpp
-G(x, p) = 0  ->  x(p)
-```
-
-Janus keeps this path on CasADi's differentiable `newton` rootfinder so exact implicit sensitivities are preserved.
-
-```cpp
+// G(x, p) = 0  ->  x(p)
 auto x = janus::sym("x");
 auto p = janus::sym("p");
 janus::Function G("G", {x, p}, {x * x - p});
@@ -132,6 +130,8 @@ guess << 1.0;
 auto x_of_p = janus::create_implicit_function(G, guess);
 auto dxdp = janus::jacobian(x_of_p(p)[0](0), p);
 ```
+
+Janus keeps this path on CasADi's differentiable `newton` rootfinder so exact implicit sensitivities are preserved.
 
 ### Non-Default Implicit Slots
 
@@ -145,14 +145,13 @@ implicit_opts.implicit_output_index = 1;
 auto implicit = janus::create_implicit_function(G, guess, {}, implicit_opts);
 ```
 
-## Symbolic `rootfinder`
+### Symbolic `rootfinder`
 
 `rootfinder<janus::SymbolicScalar>()` also remains CasADi-rootfinder-backed. Use it when you want a symbolic solve node directly, but for optimization workflows the higher-level `create_implicit_function()` wrapper is usually cleaner.
 
-## Example Program
+## See Also
 
-See `examples/interpolation/rootfinding_demo.cpp` for a runnable example that demonstrates:
-
-- automatic fallback to pseudo-transient continuation
-- explicit line-search strategy selection with a persistent solver
-- differentiable implicit solve creation and symbolic differentiation
+- [Symbolic Computing Guide](symbolic_computing.md) - Working with symbolic expressions and differentiation
+- [Optimization Guide](optimization.md) - Nonlinear optimization with `janus::Opti`
+- [`examples/interpolation/rootfinding_demo.cpp`](../../examples/interpolation/rootfinding_demo.cpp) - Runnable root-finding example
+- [`include/janus/math/RootFinding.hpp`](../../include/janus/math/RootFinding.hpp) - Full API implementation

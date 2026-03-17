@@ -21,6 +21,8 @@ enum class CollocationScheme {
 
 /**
  * @brief Options for DirectCollocation setup
+ *
+ * @see DirectCollocation for usage
  */
 struct CollocationOptions {
     CollocationScheme scheme = CollocationScheme::Trapezoidal;
@@ -29,13 +31,29 @@ struct CollocationOptions {
 
 /**
  * @brief Direct collocation transcription
+ *
+ * @see TranscriptionBase for shared interface
+ * @see CollocationOptions for configuration
  */
 class DirectCollocation : public TranscriptionBase<DirectCollocation> {
     friend class TranscriptionBase<DirectCollocation>;
 
   public:
+    /**
+     * @brief Construct with a reference to the optimization environment
+     * @param opti Opti instance
+     */
     explicit DirectCollocation(Opti &opti) : TranscriptionBase<DirectCollocation>(opti) {}
 
+    /**
+     * @brief Set up the collocation problem with fixed final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf final time
+     * @param opts collocation options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, double tf, const CollocationOptions &opts = {}) {
         n_states_ = n_states;
@@ -67,6 +85,15 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
         return {states_, controls_, tau_};
     }
 
+    /**
+     * @brief Set up the collocation problem with variable final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf symbolic final time (decision variable)
+     * @param opts collocation options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, const SymbolicScalar &tf,
           const CollocationOptions &opts = {}) {
@@ -77,11 +104,14 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
     }
 
     /**
-     * @brief Composite quadrature for an integrand sampled at collocation nodes.
+     * @brief Composite quadrature for an integrand sampled at collocation nodes
      *
      * Trapezoidal scheme uses composite trapezoidal weights.
      * Hermite-Simpson uses composite Simpson when possible (even number of
      * intervals), otherwise falls back to trapezoidal.
+     *
+     * @param integrand symbolic vector of integrand values at each node
+     * @return symbolic scalar approximation of the definite integral
      */
     SymbolicScalar quadrature(const SymbolicVector &integrand) const {
         if (!setup_complete_) {
@@ -112,6 +142,8 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
         return h * sum;
     }
 
+    /** @brief Get the number of collocation intervals
+     *  @return n_nodes - 1 */
     int n_intervals() const { return n_nodes_ - 1; }
 
   private:

@@ -1,123 +1,103 @@
-# Janus Optimization Guide
+# Optimization
 
-This guide walks you through using the Janus Optimization Framework (`janus::Opti`), demonstrating how to solve constrained nonlinear optimization problems (NLP) while reusing your simulation code.
+Janus provides a high-level C++ interface to constrained nonlinear optimization through `janus::Opti`, wrapping CasADi/IPOPT. It allows you to define optimization variables, write objectives and constraints using standard C++ syntax, and reuse your physicist-written simulation models directly in the optimization loop. This works in symbolic mode, with seamless interop with numeric constants.
 
-## 1. Introduction to `janus::Opti`
+## Quick Start
 
-`janus::Opti` is a high-level C++ interface to cell-bounded optimization solvers (currently wrapping CasADi/IPOPT). It allows you to:
-- Define optimization variables (scalars or vectors).
-- Write objectives and constraints using standard C++ syntax.
-- Reuse your physicist-written simulation models directly in the optimization loop.
-
----
-
-## 2. Example 1: The Rosenbrock Benchmark
-
-The Rosenbrock function (or "banana function") is a classic test for optimization algorithms.
-Code reference: [`examples/optimization/rosenbrock.cpp`](../../examples/optimization/rosenbrock.cpp)
-
-### Step 1: Initialize the Solver
 ```cpp
 #include <janus/janus.hpp>
 
 janus::Opti opti;
-```
 
-### Step 2: Define Variables
-Use `.variable()` to create decision variables. You can provide an initial guess.
-```cpp
-auto x = opti.variable(0.0); // Initial guess x=0
-auto y = opti.variable(0.0); // Initial guess y=0
-```
+auto x = opti.variable(0.0);
+auto y = opti.variable(0.0);
 
-### Step 3: Define the Objective
-The goal is to minimize the function $f(x, y) = (1-x)^2 + 100(y-x^2)^2$.
-```cpp
+// Minimize the Rosenbrock function
 auto f = janus::pow(1 - x, 2) + 100 * janus::pow(y - janus::pow(x, 2), 2);
 opti.minimize(f);
-```
 
-### Step 4: Add Constraints
-You can add equality (`==`) or inequality (`<=`, `>=`) constraints.
-```cpp
-// Example: constrain the solution to a specific region
-opti.subject_to(janus::pow(x, 2) + janus::pow(y, 2) <= 2.0); // Unit circle
-```
-
-### Step 5: Solve and Retrieve Results
-Call `.solve()` to execute IPOPT. You can pass options like `max_iter` or `verbose`.
-```cpp
 auto sol = opti.solve({.max_iter = 500, .verbose = false});
+std::cout << "x=" << sol.value(x) << ", y=" << sol.value(y) << std::endl;
+```
 
+## Core API
+
+*   **`janus::Opti`**: The optimization problem builder.
+*   **`opti.variable(initial_guess)`**: Create a scalar decision variable.
+*   **`opti.variable(n, initial_guess)`**: Create a vector decision variable of length `n`.
+*   **`opti.parameter(value)`**: Create a parameter that can be changed between solves.
+*   **`opti.minimize(expr)`**: Set the objective function to minimize.
+*   **`opti.subject_to(constraint)`**: Add an equality (`==`) or inequality (`<=`, `>=`) constraint.
+*   **`opti.subject_to_bounds(var, lb, ub)`**: Set variable bounds (more efficient than general constraints).
+*   **`opti.subject_to_lower(var, lb)`** / **`opti.subject_to_upper(var, ub)`**: One-sided bounds.
+*   **`opti.solve(options)`**: Execute IPOPT and return a solution object.
+*   **`sol.value(var)`**: Retrieve the optimal value of a variable from the solution.
+
+## Usage Patterns
+
+### The Rosenbrock Benchmark
+
+The Rosenbrock function (or "banana function") is a classic test for optimization algorithms.
+Code reference: [`examples/optimization/rosenbrock.cpp`](../../examples/optimization/rosenbrock.cpp)
+
+```cpp
+janus::Opti opti;
+
+auto x = opti.variable(0.0);
+auto y = opti.variable(0.0);
+
+auto f = janus::pow(1 - x, 2) + 100 * janus::pow(y - janus::pow(x, 2), 2);
+opti.minimize(f);
+
+// Add constraints
+opti.subject_to(janus::pow(x, 2) + janus::pow(y, 2) <= 2.0);
+
+auto sol = opti.solve({.max_iter = 500, .verbose = false});
 double x_star = sol.value(x);
 double y_star = sol.value(y);
-
 std::cout << "Optimal Solution: x=" << x_star << ", y=" << y_star << std::endl;
 ```
 
----
-
-## 3. Example 2: "Write Once, Use Everywhere" (C++20 Style)
+### "Write Once, Use Everywhere" (C++20 Style)
 
 The true power of Janus is reusing your existing physics code. With C++20 **Abbreviated Function Templates** (`auto` parameters), this is seamless.
 
 Code reference: [`examples/optimization/drag_optimization.cpp`](../../examples/optimization/drag_optimization.cpp)
 
-### Step 1: The Shared Physics Function
-Use `auto` for arguments whenever you want to support mixed types (e.g., multiplying a `double` constant by a `SymbolicScalar` variable).
+The shared physics function works for `double`, `SymbolicScalar`, or a mix of both:
 
 ```cpp
-// Works for double, SymbolicScalar, or a mix of both!
-auto compute_drag(auto rho, auto v, auto S, 
+auto compute_drag(auto rho, auto v, auto S,
                   auto Cd0, auto k, auto Cl, auto Cl0) {
-    // Dynamic pressure
     auto q = 0.5 * rho * janus::pow(v, 2.0);
-    // Drag polar
     auto Cd = Cd0 + k * janus::pow(Cl - Cl0, 2.0);
-    // Drag force
     return q * S * Cd;
 }
 ```
 
-### Step 2: Using it in Optimization
-Just pass your variables and constants. The compiler deduces the return type automatically (`double * Symbolic -> Symbolic`).
+Using it in optimization requires no casting or explicit templates:
 
 ```cpp
 janus::Opti opti;
 
-// 1. Decision Variables (Symbolic)
-auto V = opti.variable(50.0); 
+auto V = opti.variable(50.0);
 auto Cl = opti.variable(0.5);
 
-// 2. Constants (Numeric)
 const double rho = 1.225;
 const double S = 16.0;
 
-// 3. Call the SHARED function directly
-// No casting, no explicit templates needed. Just like Python!
-auto D = compute_drag(
-    rho,            // double
-    V,              // SymbolicScalar
-    S,              // double
-    0.02,           // double literal
-    0.04,           // double literal
-    Cl,             // SymbolicScalar
-    0.1             // double literal
-);
+auto D = compute_drag(rho, V, S, 0.02, 0.04, Cl, 0.1);
 
-// 4. Optimize directly on the physics result
-opti.minimize(D); // Minimize Drag
+opti.minimize(D);
 opti.subject_to_bounds(V, 20.0, 150.0);
 ```
 
-### Why this matters
+Why this matters:
 *   **Zero Boilerplate**: No `template <typename T>` syntax required for users.
 *   **Type Safety**: Still statically checked at compile time.
 *   **Performance**: Compiles down to optimized machine code (Numeric mode) or efficient graph construction (Symbolic mode).
 
----
-
-## 4. Advanced: Bounds Handling
+### Bounds Handling
 
 Janus provides explicit helpers for variable bounds, which is more efficient than general constraints for the solver.
 
@@ -133,14 +113,36 @@ auto vec = opti.variable(10, 0.0);
 opti.subject_to_bounds(vec, -5.0, 5.0);
 ```
 
+### Parametric Sweeps
 
-For more details on vector operations and trajectory optimization, see the [Brachistochrone Example](../../examples/optimization/brachistochrone_opti.cpp).
+Run the same optimization across a range of parameter values with automatic warm-starting:
 
----
+```cpp
+janus::Opti opti;
 
-## 5. Scaling Diagnostics and Nondimensionalization
+auto rho = opti.parameter(1.225);
+auto V = opti.variable(50.0);
 
-Poor scaling is a common failure mode for nonlinear programs. `janus::Opti` now exposes three
+auto drag = 0.5 * rho * V * V * S * Cd0;
+opti.minimize(drag);
+opti.subject_to(V >= 10.0);
+
+std::vector<double> rho_values = {1.2, 1.0, 0.8, 0.6};
+auto result = opti.solve_sweep(rho, rho_values);
+
+for (size_t i = 0; i < result.size(); ++i) {
+    std::cout << "rho=" << result.param_values[i]
+              << " V*=" << result.solutions[i].value(V) << "\n";
+}
+```
+
+See the full example: [`examples/optimization/parametric_sweep.cpp`](../../examples/optimization/parametric_sweep.cpp)
+
+## Advanced Usage
+
+### Scaling Diagnostics and Nondimensionalization
+
+Poor scaling is a common failure mode for nonlinear programs. `janus::Opti` exposes three
 practical tools:
 
 - Variable scales can still be supplied explicitly through `variable(..., scale, ...)`.
@@ -150,13 +152,9 @@ practical tools:
 ```cpp
 janus::Opti opti;
 
-// Zero initial guess, but large finite bounds -> inferred variable scale is 1e6
 auto x = opti.variable(0.0, std::nullopt, -1e6, 1e6);
 
-// Tell the solver to see this equality as (x - 1e6) / 1e6 == 0
 opti.subject_to(x == 1e6, 1e6);
-
-// Tell the solver to minimize ((x - 1e6)^2) / 1e12
 opti.minimize(janus::pow(x - 1e6, 2), 1e12);
 
 auto report = opti.analyze_scaling();
@@ -176,70 +174,39 @@ The report summarizes:
 
 This is intended as a pre-solve diagnostic pass, not a full automatic reformulation engine.
 
----
+### Solution Persistence & Warm Starting
 
-## 6. Solution Persistence & Warm Starting
+Janus allows you to save optimization results to JSON and use them to warm-start subsequent runs. This is crucial for complex problems where a good initial guess can significantly reduce solve time.
 
-Janus allowed you to save optimization results to JSON and use them to warm-start subsequent runs. This is crucial for complex problems where a good initial guess can significantly reduce solve time.
-
-### Saving Results
-Use `.save()` on the solution object to persist variable values:
+**Saving Results:**
 
 ```cpp
 auto sol = opti.solve();
 
-// Save specific variables to a JSON file
 std::map<std::string, janus::SymbolicScalar> vars;
 vars["x"] = x;
 vars["y"] = y;
 sol.save("solution.json", vars);
 ```
 
-### Loading & Warm Starting
-Use `janus::OptiSol::load()` to retrieve previous results. You can use these values to initialize variables in a new optimization run.
+**Loading & Warm Starting:**
 
 ```cpp
-// Load cache
 try {
     auto cache = janus::OptiSol::load("solution.json");
-    
-    // Check if variable exists in cache
+
     double x_init = cache.count("x") ? cache["x"][0] : 0.0;
-    
-    // Create variable with cached value as initial guess
+
     auto x = opti.variable(x_init);
 } catch (...) {
     // Handle cold start (file not found, etc.)
 }
 ```
 
----
+## See Also
 
-## 7. Parametric Sweeps
-
-Run the same optimization across a range of parameter values with automatic warm-starting:
-
-```cpp
-janus::Opti opti;
-
-// Create a parameter (can be changed between solves)
-auto rho = opti.parameter(1.225);  // Air density
-auto V = opti.variable(50.0);
-
-// Define problem using parameter
-auto drag = 0.5 * rho * V * V * S * Cd0;
-opti.minimize(drag);
-opti.subject_to(V >= 10.0);
-
-// Sweep parameter across values
-std::vector<double> rho_values = {1.2, 1.0, 0.8, 0.6};
-auto result = opti.solve_sweep(rho, rho_values);
-
-// Access results
-for (size_t i = 0; i < result.size(); ++i) {
-    std::cout << "rho=" << result.param_values[i]
-              << " V*=" << result.solutions[i].value(V) << "\n";
-}
-```
-
-See the full example: [`examples/optimization/parametric_sweep.cpp`](../../examples/optimization/parametric_sweep.cpp)
+- [Symbolic Computing Guide](symbolic_computing.md) - Building symbolic expressions for optimization
+- [Interpolation Guide](interpolation.md) - Using interpolation as surrogate models in optimization
+- [`examples/optimization/rosenbrock.cpp`](../../examples/optimization/rosenbrock.cpp) - Rosenbrock benchmark
+- [`examples/optimization/brachistochrone_opti.cpp`](../../examples/optimization/brachistochrone_opti.cpp) - Trajectory optimization example
+- [`include/janus/optimization/Opti.hpp`](../../include/janus/optimization/Opti.hpp) - `janus::Opti` implementation

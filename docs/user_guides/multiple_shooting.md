@@ -1,77 +1,117 @@
-# Multiple Shooting User Guide
+# Multiple Shooting
 
-`janus::MultipleShooting` provides a transcription method for optimal control problems that enforces continuity via high-accuracy numerical integration (using CasADi's integrator interface, e.g., CVODES or IDAS).
+`janus::MultipleShooting` provides a transcription method for optimal control problems that enforces continuity via high-accuracy numerical integration (using CasADi's integrator interface, e.g., CVODES or IDAS). It divides the time horizon into intervals with piecewise-constant controls and connects them with continuity constraints. This works in **symbolic mode** via the `janus::Opti` interface. The class lives in `<janus/optimization/MultiShooting.hpp>`.
 
-## Overview
+## Quick Start
 
-Multiple Shooting divides the time horizon into $N$ intervals. The controls are typically piecewise constant. The system dynamics are integrated over each interval $[t_k, t_{k+1}]$ starting from an initial state guess $x_k$. Continuity constraints ensure that the end of one interval matches the start of the next:
-$$ x_{k+1} = \int_{t_k}^{t_{k+1}} f(x(\tau), u_k) d\tau + x_k $$
+```cpp
+#include <janus/janus.hpp>
+
+janus::Opti opti;
+janus::MultipleShooting ms(opti);
+
+janus::MultiShootingOptions opts;
+opts.n_intervals = 20;
+opts.integrator = "cvodes";
+opts.tol = 1e-6;
+
+auto [x, u, tau] = ms.setup(3, 1, 0.0, 2.0, opts);
+
+ms.set_dynamics([](const janus::SymbolicVector& x,
+                    const janus::SymbolicVector& u,
+                    const janus::SymbolicScalar& t) {
+    janus::SymbolicVector dxdt(3);
+    dxdt(0) = x(2) * janus::sin(u(0));
+    dxdt(1) = -x(2) * janus::cos(u(0));
+    dxdt(2) = 9.81 * janus::cos(u(0));
+    return dxdt;
+});
+
+ms.add_continuity_constraints();
+ms.set_initial_state(janus::NumericVector{{0.0, 10.0, 0.001}});
+ms.set_final_state(0, 10.0);
+ms.set_final_state(1, 5.0);
+
+opti.minimize(/* objective */);
+auto sol = opti.solve();
+```
+
+## Core API
+
+| Method | Description |
+|--------|-------------|
+| `MultipleShooting(opti)` | Construct with a `janus::Opti` instance |
+| `setup(n_states, n_controls, t0, tf, opts)` | Create decision variables and time grid |
+| `set_dynamics(ode)` | Set the ODE function: `(x, u, t) -> dxdt` |
+| `add_continuity_constraints()` | Apply integrator-based continuity constraints |
+| `add_dynamics_constraints()` | Unified alias for `add_continuity_constraints()` |
+| `set_initial_state(x0)` | Set initial boundary condition |
+| `set_final_state(xf)` | Set final boundary condition |
+| `n_intervals()` | Number of shooting intervals |
+| `time_grid()` | Normalized time grid `[0, 1]` |
+
+**`MultiShootingOptions`** exposes:
+- `n_intervals`: number of shooting intervals
+- `integrator`: integrator type (`"cvodes"`, `"rk"`, `"idas"`)
+- `tol`: integrator tolerance
 
 ### Advantages over Direct Collocation
-- **High Accuracy**: Uses variable-step/variable-order integrators (like CVODES) instead of fixed-order polynomials.
-- **Stiffness Handling**: Better suited for stiff systems where explicit or low-order implicit schemes fail.
+- **High Accuracy**: Uses variable-step/variable-order integrators instead of fixed-order polynomials.
+- **Stiffness Handling**: Better suited for stiff systems where low-order schemes fail.
 - **Sparse Structure**: Retains the block-sparse structure of the NLP.
 
 ### Disadvantages
-- **Cost**: Evaluating derivatives (sensitivities) of the integrator can be computationally expensive compared to evaluating a polynomial defect.
-- **Initialization**: Can be harder to initialize if the dynamics are unstable.
+- **Cost**: Evaluating integrator sensitivities can be computationally expensive compared to polynomial defects.
+- **Initialization**: Can be harder to initialize if dynamics are unstable.
 
-## Basic Usage
+## Usage Patterns
 
-### 1. Include Header
-```cpp
-#include <janus/optimization/MultiShooting.hpp>
-```
+### Basic Workflow
 
-### 2. Setup
 ```cpp
 janus::Opti opti;
 janus::MultipleShooting ms(opti);
 
-// Options
 janus::MultiShootingOptions opts;
 opts.n_intervals = 20;
-opts.integrator = "cvodes"; // or "rk", "idas"
-opts.tol = 1e-6; // Integrator tolerance
+opts.integrator = "cvodes";
+opts.tol = 1e-6;
 
-// Setup variables (t0=0, tf=2.0)
 auto T = opti.variable(2.0); // Variable final time
 auto [x, u, tau] = ms.setup(n_states, n_controls, 0.0, T, opts);
-```
 
-### 3. Define Dynamics & Constraints
-```cpp
-// Define ODE
-// must return dxdt
-ms.set_dynamics([](const SymbolicVector& x, const SymbolicVector& u, const SymbolicScalar& t) {
-    return ...; 
+ms.set_dynamics([](const janus::SymbolicVector& x,
+                    const janus::SymbolicVector& u,
+                    const janus::SymbolicScalar& t) {
+    return /* dxdt */;
 });
 
-// Add continuity constraints (calling the integrator)
 ms.add_continuity_constraints();
-
-// Boundary conditions
 ms.set_initial_state(x0);
 ms.set_final_state(xf);
-```
 
-### 4. Solve
-```cpp
 opti.minimize(T);
 auto sol = opti.solve();
 ```
 
-## Unified Comparison Example
+### Unified Comparison Example
 
-The optimization demos are unified in:
+The file `examples/optimization/transcription_comparison_demo.cpp` runs and compares Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral on the same brachistochrone problem so you can compare solver behavior and NLP structure directly. It includes solve-time performance statistics and a convergence sweep across grid sizes.
 
-- `examples/optimization/transcription_comparison_demo.cpp`
+### When to Use
 
-This single file runs and compares:
-- Direct Collocation
-- Multiple Shooting
-- Pseudospectral
-- Birkhoff Pseudospectral
+| Use Case | Why |
+|----------|-----|
+| High-fidelity simulation | Integrator accuracy |
+| Stiff ODEs | Adaptive implicit methods |
+| Matching simulation results | Same integration scheme |
+| Fewer decision variables | Accuracy without more nodes |
 
-on the same brachistochrone problem so you can compare solver behavior and NLP structure directly.
-It also includes solve-time performance statistics and a convergence sweep across grid sizes.
+## See Also
+
+- [Transcription Methods Guide](transcription_methods.md) -- Comparison of all four transcription methods
+- [Direct Collocation Guide](collocation.md) -- Polynomial defect-based transcription
+- [Pseudospectral Guide](pseudospectral.md) -- Global polynomial transcription
+- [Birkhoff Pseudospectral Guide](birkhoff_pseudospectral.md) -- Birkhoff-form transcription
+- [transcription_comparison_demo.cpp](../../examples/optimization/transcription_comparison_demo.cpp) -- Unified comparison example
+- [MultiShooting.hpp](../../include/janus/optimization/MultiShooting.hpp) -- API reference

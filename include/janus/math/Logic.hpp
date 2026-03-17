@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Logic.hpp
+ * @brief Conditional selection, comparison, and logical operations
+ * @see Arithmetic.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -253,11 +259,6 @@ auto clamp(const Eigen::MatrixBase<Derived> &val, const Scalar &low, const Scala
 // --- Less Than (lt) ---
 /**
  * @brief Element-wise less than comparison
- * @return Boolean expression or mask
- */
-// --- Less Than (lt) ---
-/**
- * @brief Element-wise less than comparison
  * @tparam DerivedA First matrix type
  * @tparam DerivedB Second matrix type
  * @param a First matrix
@@ -423,6 +424,14 @@ template <JanusScalar T1, JanusScalar T2> auto logical_and(const T1 &x1, const T
     return x1 && x2;
 }
 
+/**
+ * @brief Element-wise logical AND for matrices
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask
+ */
 template <typename DerivedA, typename DerivedB>
 auto logical_and(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -445,6 +454,14 @@ template <JanusScalar T1, JanusScalar T2> auto logical_or(const T1 &x1, const T2
     return x1 || x2;
 }
 
+/**
+ * @brief Element-wise logical OR for matrices
+ * @tparam DerivedA First matrix type
+ * @tparam DerivedB Second matrix type
+ * @param a First matrix
+ * @param b Second matrix
+ * @return Boolean expression/mask
+ */
 template <typename DerivedA, typename DerivedB>
 auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     using Scalar = typename DerivedA::Scalar;
@@ -463,6 +480,12 @@ auto logical_or(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<De
  */
 template <JanusScalar T> auto logical_not(const T &x) { return !x; }
 
+/**
+ * @brief Element-wise logical NOT for a matrix
+ * @tparam Derived Eigen matrix type
+ * @param a Input matrix
+ * @return Boolean expression/mask
+ */
 template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {

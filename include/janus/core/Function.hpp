@@ -1,3 +1,5 @@
+/// @file Function.hpp
+/// @brief Symbolic function wrapper around CasADi with Eigen-native IO
 #pragma once
 
 #include "JanusError.hpp"
@@ -14,7 +16,8 @@
 namespace janus {
 
 /**
- * @brief Batch mapping backend for janus::Function::map().
+ * @brief Batch mapping backend for janus::Function::map()
+ * @see Function::map
  */
 enum class MapParallelization {
     Parallel, ///< CasADi OpenMP map backend (falls back to serial if unavailable)
@@ -37,7 +40,8 @@ inline std::string to_casadi_parallelization(MapParallelization parallelization)
 } // namespace detail
 
 /**
- * @brief Wrapper around casadi::Function to provide Janus-native types (Eigen)
+ * @brief Wrapper around casadi::Function providing Eigen-native IO
+ * @see SymbolicArg, make_function
  */
 class Function {
   public:
@@ -145,17 +149,25 @@ class Function {
 
     /**
      * @brief Evaluate function and return first output
+     * @tparam Args Argument types
+     * @param args Variadic arguments matching the function inputs
+     * @return First output matrix
      */
     template <typename... Args> auto eval(Args &&...args) const {
         auto results = operator()(std::forward<Args>(args)...);
         return results[0];
     }
 
-    // Explicit numeric vector overload
+    /// @brief Evaluate with a mutable vector of doubles
+    /// @param args Input values
+    /// @return Vector of numeric result matrices
     std::vector<NumericMatrix> operator()(std::vector<double> &args) const {
         return operator()(const_cast<const std::vector<double> &>(args));
     }
 
+    /// @brief Evaluate with a const vector of doubles
+    /// @param args Input values
+    /// @return Vector of numeric result matrices
     std::vector<NumericMatrix> operator()(const std::vector<double> &args) const {
         std::vector<casadi::DM> dm_args;
         dm_args.reserve(args.size());
@@ -196,10 +208,10 @@ class Function {
     }
 
     /**
-     * @brief Create a batched version of this function using a direct CasADi backend name.
-     *
-     * Advanced escape hatch for backend strings understood by CasADi, typically
-     * `openmp`, `serial`, or `unroll`.
+     * @brief Create a batched version using a direct CasADi backend name
+     * @param n Number of batch samples
+     * @param parallelization Backend string ("openmp", "serial", or "unroll")
+     * @return Batched Janus function wrapper
      */
     Function map(int n, const std::string &parallelization) const {
         if (n <= 0) {
@@ -221,10 +233,11 @@ class Function {
     }
 
     /**
-     * @brief Create a batched version of this function with an explicit CasADi backend name.
-     *
-     * Advanced escape hatch for backend strings understood by CasADi, typically
-     * `openmp`, `serial`, or `unroll`.
+     * @brief Create a batched version with explicit backend name and thread cap
+     * @param n Number of batch samples
+     * @param parallelization Backend string ("openmp", "serial", or "unroll")
+     * @param max_num_threads Maximum worker threads
+     * @return Batched Janus function wrapper
      */
     Function map(int n, const std::string &parallelization, int max_num_threads) const {
         if (n <= 0) {

@@ -1,27 +1,27 @@
-# Structural Transforms in Janus
+# Structural Transforms
 
-Janus now exposes a first structural-analysis layer for dense square residual systems built as `janus::Function`s. The current pipeline is intentionally scoped:
+Janus provides a structural-analysis layer for dense square residual systems built as `janus::Function`s. The current pipeline covers alias elimination on trivial affine rows, block-triangular decomposition (BLT), and tearing recommendations inside coupled blocks. This works in **symbolic mode** only, operating on the Jacobian sparsity pattern of a compiled function. Code lives in `<janus/core/StructuralTransforms.hpp>`.
 
-1. Alias elimination on trivial affine rows
-2. Block-triangular decomposition (BLT)
-3. Tearing recommendations inside coupled blocks
-
-Code generation of simplified kernels is still deferred. This guide covers the analysis and reduction APIs that exist today in `<janus/core/StructuralTransforms.hpp>`.
-
-## When To Use This
-
-Use structural transforms when you already have a residual function
+## Quick Start
 
 ```cpp
-F(x, p) -> r
+#include <janus/janus.hpp>
+
+auto x = janus::sym("x", 3, 1);
+auto p = janus::sym("p");
+janus::SymbolicScalar x0 = x(0), x1 = x(1), x2 = x(2);
+
+auto residual = janus::SymbolicScalar::vertcat({
+    x0 - x1,
+    x2 - p,
+    janus::sin(x0) + x2 - 2.0,
+});
+
+janus::Function fn("system", {x, p}, {residual});
+
+// Full pipeline: alias elimination -> BLT -> tearing
+auto analysis = janus::structural_analyze(fn);
 ```
-
-and the selected state block `x` and residual block `r` are both dense column vectors with the same dimension.
-
-Typical use cases:
-- simplifying algebraic systems before passing them to a nonlinear solver
-- identifying independent subsystems in a large residual graph
-- choosing candidate tear variables for block-coupled algebraic loops
 
 ## Core API
 
@@ -29,36 +29,53 @@ Typical use cases:
 #include <janus/janus.hpp>
 
 janus::StructuralTransformOptions opts;
-opts.input_idx = 0;
-opts.output_idx = 0;
+opts.input_idx = 0;   // which input block is the variable vector
+opts.output_idx = 0;  // which output block is the residual vector
 
 auto alias = janus::alias_eliminate(fn, opts);
-auto blt = janus::block_triangularize(fn, opts);
+auto blt   = janus::block_triangularize(fn, opts);
 auto analysis = janus::structural_analyze(fn, opts);
 ```
 
-`StructuralTransformOptions` currently exposes:
+**`StructuralTransformOptions`** exposes:
 - `input_idx`: which function input block is treated as the structural variable vector
 - `output_idx`: which function output block is treated as the residual vector
 - `max_alias_row_nnz`: maximum number of structural variable coefficients allowed in an alias row
 - `require_constant_alias_coefficients`: whether alias rows must have constant coefficients
 
-The selected input/output pair must satisfy:
-- dense column-vector shape
-- equal dimension
+The selected input/output pair must be dense column vectors with equal dimension. If not, Janus throws `janus::InvalidArgument`.
 
-If not, Janus throws `janus::InvalidArgument`.
+**`AliasEliminationResult`** returns:
+- `reduced_function`: same input ordering, but with the selected input block reduced to kept variables and the output containing only kept residual rows
+- `reconstruct_full_input`: maps reduced selected input block plus untouched original inputs back to the full original selected input block
+- kept/eliminated variable and residual indices
+- the explicit substitution list
 
-## Alias Elimination
+**`BLTDecomposition`** returns:
+- the structural incidence pattern
+- row and column permutations
+- fine and coarse block offsets
+- a vector of `StructuralBlock`s (each with `residual_indices`, `variable_indices`, `tear_variable_indices`)
+
+## Usage Patterns
+
+### When To Use This
+
+Use structural transforms when you already have a residual function `F(x, p) -> r` and the selected state block `x` and residual block `r` are both dense column vectors with the same dimension.
+
+Typical use cases:
+- simplifying algebraic systems before passing them to a nonlinear solver
+- identifying independent subsystems in a large residual graph
+- choosing candidate tear variables for block-coupled algebraic loops
+
+### Alias Elimination
 
 `alias_eliminate()` removes rows that are affine in the selected variables and structurally simple enough to solve directly.
 
 ```cpp
 auto x = janus::sym("x", 3, 1);
 auto p = janus::sym("p");
-janus::SymbolicScalar x0 = x(0);
-janus::SymbolicScalar x1 = x(1);
-janus::SymbolicScalar x2 = x(2);
+janus::SymbolicScalar x0 = x(0), x1 = x(1), x2 = x(2);
 
 auto residual = janus::SymbolicScalar::vertcat({
     x0 - x1,
@@ -75,12 +92,6 @@ For this system:
 - `x(2)` is replaced by `p`
 - the reduced system becomes one nonlinear equation in one kept variable
 
-`AliasEliminationResult` returns:
-- `reduced_function`: same input ordering as the original function, but the selected input block is reduced to kept variables and the output contains only kept residual rows
-- `reconstruct_full_input`: maps the reduced selected input block plus untouched original inputs back to the full original selected input block
-- kept/eliminated variable and residual indices
-- the explicit substitution list
-
 ### Reconstructing The Full State
 
 ```cpp
@@ -93,7 +104,7 @@ janus::NumericMatrix r_reduced = alias.reduced_function.eval(x_reduced, 0.5);
 
 This is useful when a solver operates on the reduced coordinates but downstream code still expects the original state layout.
 
-## BLT Decomposition
+### BLT Decomposition
 
 `block_triangularize()` uses the Jacobian sparsity of the selected residual block with respect to the selected variable block and runs CasADi's block-triangular factorization.
 
@@ -110,31 +121,18 @@ janus::Function fn("blt_blocks", {x}, {residual});
 auto blt = janus::block_triangularize(fn);
 ```
 
-`BLTDecomposition` returns:
-- the structural incidence pattern
-- row and column permutations
-- fine and coarse block offsets
-- a vector of `StructuralBlock`s
+Each `StructuralBlock` stores `residual_indices`, `variable_indices`, and `tear_variable_indices`. These indices are local to the selected input/output block, not global NLP variable numbers.
 
-Each `StructuralBlock` stores:
-- `residual_indices`
-- `variable_indices`
-- `tear_variable_indices`
+### Tearing Recommendations
 
-These indices are local to the selected input/output block, not global NLP variable numbers.
-
-## Tearing Recommendations
-
-Every coupled BLT block also gets a tearing recommendation.
-
-Today this is a heuristic pass:
+Every coupled BLT block also gets a tearing recommendation. Today this is a heuristic pass:
 - build the variable-dependency graph implied by the block incidence pattern
 - find strongly connected components
 - greedily remove the highest-degree variable inside cyclic SCCs until the block becomes acyclic
 
 The result is a recommendation, not a mandatory solve policy. It gives you a starting point for choosing iteration variables in algebraic loops.
 
-## Full Pipeline
+### Full Pipeline
 
 `structural_analyze()` runs the current pass ordering:
 
@@ -148,28 +146,26 @@ auto analysis = janus::structural_analyze(fn);
 
 This ordering matters. Alias elimination is first so obvious substitutions simplify the incidence graph before block detection and tearing run.
 
-## Example Walkthrough: `structural_transforms_demo.cpp`
+### Example Walkthrough: `structural_transforms_demo.cpp`
 
-The example `examples/math/structural_transforms_demo.cpp` shows the three core workflows in one place:
+The example `examples/math/structural_transforms_demo.cpp` shows the three core workflows:
 
 1. Alias elimination on a square residual with two trivial affine rows and one nonlinear reduced row.
 2. BLT decomposition on a system with two scalar blocks and one coupled `2x2` block.
 3. Tearing on a pure `3x3` algebraic cycle.
 
-It prints:
-- kept versus eliminated variables and residuals
-- the explicit substitution list from alias elimination
-- reconstructed full-state values from reduced coordinates
-- BLT block membership and tear-variable recommendations
+It prints kept versus eliminated variables, the explicit substitution list, reconstructed full-state values, and BLT block membership with tear-variable recommendations.
 
-Build and run it with:
+Build and run:
 
 ```bash
 ninja -C build structural_transforms_demo
 ./build/examples/structural_transforms_demo
 ```
 
-## Current Limits
+## Diagnostics & Troubleshooting
+
+### Current Limits
 
 The current implementation is deliberately conservative:
 - only dense square selected blocks are supported
@@ -178,3 +174,10 @@ The current implementation is deliberately conservative:
 - simplified residual/Jacobian code generation is not part of this pass yet
 
 That makes this layer useful for inspection and reduction now without pretending it is a full symbolic compiler pipeline.
+
+## See Also
+
+- [Structural Diagnostics Guide](structural_diagnostics.md) -- Observability and identifiability analysis
+- [Sparsity Guide](sparsity.md) -- Sparsity pattern extraction underpinning these transforms
+- [structural_transforms_demo.cpp](../../examples/math/structural_transforms_demo.cpp) -- Full example source
+- [StructuralTransforms.hpp](../../include/janus/core/StructuralTransforms.hpp) -- API reference

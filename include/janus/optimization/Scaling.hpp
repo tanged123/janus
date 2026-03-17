@@ -1,3 +1,8 @@
+/**
+ * @file Scaling.hpp
+ * @brief Scaling diagnostics and metadata for optimization problems
+ */
+
 #pragma once
 
 #include <optional>
@@ -7,17 +12,28 @@
 namespace janus {
 
 /**
- * @brief Severity used by Opti scaling diagnostics.
+ * @brief Severity used by Opti scaling diagnostics
+ *
+ * @see ScalingIssue for individual diagnostic items
+ * @see Opti::analyze_scaling for generating diagnostics
  */
-enum class ScalingIssueLevel { Warning, Critical };
+enum class ScalingIssueLevel {
+    Warning,  ///< Potential scaling concern
+    Critical  ///< Severe scaling issue likely to cause solver failure
+};
 
 /**
- * @brief Diagnostic category for a scaling issue.
+ * @brief Diagnostic category for a scaling issue
  */
-enum class ScalingIssueKind { Variable, Constraint, Objective, Summary };
+enum class ScalingIssueKind {
+    Variable,   ///< Issue with variable scaling
+    Constraint, ///< Issue with constraint scaling
+    Objective,  ///< Issue with objective scaling
+    Summary     ///< Aggregate issue across the problem
+};
 
 /**
- * @brief Thresholds controlling Opti scaling diagnostics.
+ * @brief Thresholds controlling Opti scaling diagnostics
  */
 struct ScalingAnalysisOptions {
     double normalized_low_warn = 1e-3;      ///< Warn when |value| / scale falls below this
@@ -27,7 +43,9 @@ struct ScalingAnalysisOptions {
 };
 
 /**
- * @brief One diagnostic item produced by `Opti::analyze_scaling()`.
+ * @brief One diagnostic item produced by `Opti::analyze_scaling()`
+ *
+ * @see ScalingReport for the aggregate container
  */
 struct ScalingIssue {
     ScalingIssueLevel level = ScalingIssueLevel::Warning;
@@ -42,7 +60,7 @@ struct ScalingIssue {
 };
 
 /**
- * @brief Scaling metadata for one declared variable block.
+ * @brief Scaling metadata for one declared variable block
  */
 struct VariableScalingInfo {
     int block_index = -1;
@@ -61,7 +79,7 @@ struct VariableScalingInfo {
 };
 
 /**
- * @brief Scaling metadata for one scalarized constraint row.
+ * @brief Scaling metadata for one scalarized constraint row
  */
 struct ConstraintScalingInfo {
     int row = -1;
@@ -78,7 +96,7 @@ struct ConstraintScalingInfo {
 };
 
 /**
- * @brief Scaling metadata for the current objective.
+ * @brief Scaling metadata for the current objective
  */
 struct ObjectiveScalingInfo {
     bool configured = false;
@@ -91,7 +109,7 @@ struct ObjectiveScalingInfo {
 };
 
 /**
- * @brief Top-level scalar summary for an Opti scaling report.
+ * @brief Top-level scalar summary for an Opti scaling report
  */
 struct ScalingSummary {
     int variable_blocks = 0;
@@ -104,15 +122,19 @@ struct ScalingSummary {
 };
 
 /**
- * @brief Aggregate result returned by `Opti::analyze_scaling()`.
+ * @brief Aggregate result returned by `Opti::analyze_scaling()`
+ *
+ * @see Opti::analyze_scaling for generating this report
  */
 struct ScalingReport {
-    ScalingSummary summary;
-    ObjectiveScalingInfo objective;
-    std::vector<VariableScalingInfo> variables;
-    std::vector<ConstraintScalingInfo> constraints;
-    std::vector<ScalingIssue> issues;
+    ScalingSummary summary;                          ///< Top-level numeric summary
+    ObjectiveScalingInfo objective;                   ///< Objective scaling metadata
+    std::vector<VariableScalingInfo> variables;       ///< Per-variable-block metadata
+    std::vector<ConstraintScalingInfo> constraints;   ///< Per-constraint-row metadata
+    std::vector<ScalingIssue> issues;                 ///< Detected scaling issues
 
+    /// @brief Check if any scaling issues were detected
+    /// @return true if the issues list is non-empty
     bool has_warnings() const { return !issues.empty(); }
 };
 

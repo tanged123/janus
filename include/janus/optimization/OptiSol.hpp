@@ -1,3 +1,8 @@
+/**
+ * @file OptiSol.hpp
+ * @brief Solution wrapper for extracting optimized values
+ */
+
 #pragma once
 
 #include "janus/core/JanusTypes.hpp"
@@ -20,6 +25,9 @@ namespace janus {
  *   auto sol = opti.solve();
  *   double x_opt = sol.value(x);
  *   NumericVector trajectory = sol.value(position);
+ *
+ * @see Opti::solve for obtaining an OptiSol
+ * @see SweepResult for parametric sweep solutions
  */
 class OptiSol {
   public:
@@ -111,6 +119,7 @@ class OptiSol {
 
     /**
      * @brief Access underlying CasADi solution
+     * @return reference to the CasADi OptiSol object
      */
     const casadi::OptiSol &casadi_sol() const { return cas_sol_; }
 
@@ -135,6 +144,8 @@ class OptiSol {
 
     /**
      * @brief Save solution map of vectors to JSON file
+     * @param filename output filename (e.g. "sol.json")
+     * @param named_vars map of variable names to symbolic vectors to save
      */
     void save(const std::string &filename,
               const std::map<std::string, SymbolicVector> &named_vars) const {

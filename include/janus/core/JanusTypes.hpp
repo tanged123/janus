@@ -1,3 +1,5 @@
+/// @file JanusTypes.hpp
+/// @brief Core type aliases for numeric and symbolic Eigen/CasADi interop
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -34,20 +36,22 @@ namespace janus {
 
 // --- Matrix Types ---
 /**
- * Universal Matrix Template
- *
- * Provides a unified matrix type for both numeric and symbolic backends.
- * Uses dynamic sizing for maximum flexibility.
+ * @brief Dynamic-size matrix for both numeric and symbolic backends
+ * @tparam Scalar Element type (double or casadi::MX)
  */
 template <typename Scalar>
 using JanusMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
 
+/**
+ * @brief Dynamic-size column vector for both numeric and symbolic backends
+ * @tparam Scalar Element type (double or casadi::MX)
+ */
 template <typename Scalar> using JanusVector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
 
 // --- Fixed-Size Types ---
 /**
- * Fixed-size vectors and matrices for performance-critical code.
- * Stack-allocated, no heap overhead, SIMD-friendly.
+ * @brief Fixed-size vectors and matrices for performance-critical code
+ * @tparam Scalar Element type (double or casadi::MX)
  */
 template <typename Scalar> using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
 template <typename Scalar> using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
@@ -58,24 +62,23 @@ template <typename Scalar> using Mat3 = Eigen::Matrix<Scalar, 3, 3>;
 template <typename Scalar> using Mat4 = Eigen::Matrix<Scalar, 4, 4>;
 
 // Numeric Backend
-using NumericScalar = double;
-using NumericMatrix = JanusMatrix<NumericScalar>; // Equivalent to Eigen::MatrixXd
-using NumericVector = JanusVector<NumericScalar>; // Equivalent to Eigen::VectorXd
+using NumericScalar = double;                     ///< Numeric scalar type
+using NumericMatrix = JanusMatrix<NumericScalar>; ///< Eigen::MatrixXd equivalent
+using NumericVector = JanusVector<NumericScalar>; ///< Eigen::VectorXd equivalent
 
 // Symbolic Backend
-using SymbolicScalar = casadi::MX;
-using SymbolicMatrix = JanusMatrix<SymbolicScalar>;
-using SymbolicVector = JanusVector<SymbolicScalar>;
+using SymbolicScalar = casadi::MX;                 ///< CasADi MX symbolic scalar
+using SymbolicMatrix = JanusMatrix<SymbolicScalar>; ///< Eigen matrix of MX elements
+using SymbolicVector = JanusVector<SymbolicScalar>; ///< Eigen vector of MX elements
 
 // --- Sparse Numeric Types ---
 /**
- * Sparse matrix types for efficient storage of large, sparse numeric data.
- *
- * @note These are for NUMERIC data only. For symbolic sparsity analysis,
- *       use janus::SparsityPattern (see <janus/core/Sparsity.hpp>).
+ * @brief Sparse matrix types for efficient storage of large, sparse numeric data
+ * @note For symbolic sparsity analysis, use janus::SparsityPattern.
+ * @see SparsityPattern
  */
-using SparseMatrix = Eigen::SparseMatrix<double>;
-using SparseTriplet = Eigen::Triplet<double>;
+using SparseMatrix = Eigen::SparseMatrix<double>;  ///< Sparse numeric matrix (CSC)
+using SparseTriplet = Eigen::Triplet<double>;       ///< (row, col, value) triplet
 
 // --- Symbolic Variable Creation ---
 
@@ -100,9 +103,6 @@ inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
 /**
  * @brief Create a named symbolic vector (returns SymbolicVector)
  *
- * Convenience overload that returns SymbolicVector (Eigen container) directly.
- * This is syntactic sugar for `sym_vec(name, size)`.
- *
  * @code
  * auto x = janus::sym_vector("x", 3);  // Returns SymbolicVector
  * @endcode
@@ -110,6 +110,7 @@ inline SymbolicScalar sym(const std::string &name, int rows, int cols = 1) {
  * @param name Name of the variable
  * @param size Number of elements
  * @return SymbolicVector with MX elements
+ * @see sym_vec, sym_vec_pair
  */
 inline SymbolicVector sym_vector(const std::string &name, int size) {
     casadi::MX mx = casadi::MX::sym(name, size, 1);
@@ -121,23 +122,17 @@ inline SymbolicVector sym_vector(const std::string &name, int size) {
 }
 
 /**
- * @brief Create a symbolic vector as SymbolicVector (Eigen container of MX)
- *
- * Creates a single CasADi MX vector internally, then unpacks it into an
- * Eigen container. This preserves the connection to the original symbolic
- * primitive, which is required for correct jacobian computation.
+ * @brief Create a symbolic vector preserving the CasADi primitive connection
  *
  * @code
- * auto state = janus::sym_vec("state", 3);    // Returns SymbolicVector
- * auto dydt = my_ode(state, theta);           // Works with JanusVector<Scalar>
- *
- * // For jacobian, use to_mx to get a compatible representation
+ * auto state = janus::sym_vec("state", 3);
  * auto jac = janus::jacobian({janus::to_mx(dydt)}, {janus::to_mx(state)});
  * @endcode
  *
  * @param name Name of the variable
  * @param size Number of elements
  * @return SymbolicVector with MX elements from single underlying vector
+ * @see sym_vector, sym_vec_pair
  */
 inline SymbolicVector sym_vec(const std::string &name, int size) {
     // Delegate to sym_vector - they are equivalent
@@ -147,15 +142,15 @@ inline SymbolicVector sym_vec(const std::string &name, int size) {
 /**
  * @brief Create symbolic vector and return both SymbolicVector and underlying MX
  *
- * Use this when you need both:
- * - The SymbolicVector for templated functions
- * - The original MX for janus::Function or janus::jacobian
- *
  * @code
  * auto [state_vec, state_mx] = janus::sym_vec_pair("state", 3);
- * auto dydt = my_ode(state_vec, theta);
  * auto jac = janus::jacobian({janus::to_mx(dydt)}, {state_mx, theta});
  * @endcode
+ *
+ * @param name Name of the variable
+ * @param size Number of elements
+ * @return Pair of (SymbolicVector, underlying MX)
+ * @see sym_vec
  */
 inline std::pair<SymbolicVector, SymbolicScalar> sym_vec_pair(const std::string &name, int size) {
     casadi::MX mx = casadi::MX::sym(name, size, 1);
@@ -238,28 +233,32 @@ inline SymbolicVector as_vector(const casadi::MX &m) {
     return v;
 }
 
-// Backwards compatibility alias
+/// @brief Backwards compatibility alias for as_vector
+/// @param m Input CasADi MX (column vector)
+/// @return SymbolicVector
+/// @see as_vector
 inline SymbolicVector to_eigen_vec(const casadi::MX &m) { return as_vector(m); }
 
 /**
- * @brief Universal Symbolic Argument Wrapper
+ * @brief Universal symbolic argument wrapper for Function inputs/outputs
  *
- * Allows automatic flattening of Eigen matrices (SymbolicMatrix) and Scalars (SymbolicScalar)
- * into a single casadi::MX type for function definitions and Jacobians.
- * Enables mixed initializer lists: {scalar_sym, matrix_sym}.
+ * Allows automatic flattening of Eigen matrices and MX scalars into a single
+ * casadi::MX type. Enables mixed initializer lists: {scalar_sym, matrix_sym}.
+ *
+ * @see Function
  */
 class SymbolicArg {
   public:
-    // From Scalar (MX)
     /**
      * @brief Construct from single symbolic scalar (MX)
+     * @param s Symbolic scalar value
      */
     SymbolicArg(const SymbolicScalar &s) : mx_(s) {}
 
-    // From Matrix (Eigen<MX>)
     /**
      * @brief Construct from Eigen matrix of symbolic scalars
-     * Flattens the matrix into a CasADi DM/MX structure if needed or fills an MX.
+     * @tparam Derived Eigen expression type
+     * @param e Eigen matrix to flatten into MX
      */
     template <typename Derived> SymbolicArg(const Eigen::MatrixBase<Derived> &e) {
         if (e.size() == 0) {
@@ -274,14 +273,15 @@ class SymbolicArg {
         }
     }
 
-    // Implicit conversion to MX
     /**
      * @brief Implicit conversion to CasADi MX
+     * @return Underlying MX object
      */
     operator SymbolicScalar() const { return mx_; }
 
     /**
      * @brief Get underlying CasADi MX object
+     * @return Copy of the stored MX
      */
     SymbolicScalar get() const { return mx_; }
 

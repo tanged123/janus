@@ -14,10 +14,14 @@ namespace janus {
 
 /**
  * @brief Base exception for all Janus errors
- * Derives from std::runtime_error for catch compatibility
+ * @see InvalidArgument, RuntimeError, InterpolationError, IntegrationError
  */
 class JanusError : public std::runtime_error {
   public:
+    /**
+     * @brief Construct with a descriptive message
+     * @param what Error description (automatically prefixed with "[janus]")
+     */
     explicit JanusError(const std::string &what) : std::runtime_error("[janus] " + what) {}
 };
 
@@ -26,6 +30,8 @@ class JanusError : public std::runtime_error {
  */
 class InvalidArgument : public JanusError {
   public:
+    /// @brief Construct with a descriptive message
+    /// @param what Error description
     explicit InvalidArgument(const std::string &what) : JanusError(what) {}
 };
 
@@ -34,6 +40,8 @@ class InvalidArgument : public JanusError {
  */
 class RuntimeError : public JanusError {
   public:
+    /// @brief Construct with a descriptive message
+    /// @param what Error description
     explicit RuntimeError(const std::string &what) : JanusError(what) {}
 };
 
@@ -42,6 +50,8 @@ class RuntimeError : public JanusError {
  */
 class InterpolationError : public JanusError {
   public:
+    /// @brief Construct with a descriptive message
+    /// @param what Error description (automatically prefixed with "Interpolation:")
     explicit InterpolationError(const std::string &what) : JanusError("Interpolation: " + what) {}
 };
 
@@ -50,6 +60,8 @@ class InterpolationError : public JanusError {
  */
 class IntegrationError : public JanusError {
   public:
+    /// @brief Construct with a descriptive message
+    /// @param what Error description (automatically prefixed with "Integration:")
     explicit IntegrationError(const std::string &what) : JanusError("Integration: " + what) {}
 };
 

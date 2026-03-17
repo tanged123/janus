@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Interpolate.hpp
+ * @brief N-dimensional interpolation (linear, Hermite, B-spline, nearest)
+ * @see ScatteredInterpolator.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"

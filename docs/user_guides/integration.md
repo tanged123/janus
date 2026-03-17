@@ -1,8 +1,6 @@
 # ODE Integration
 
-Janus provides explicit ODE integrators for simulation with dual-mode (numeric/symbolic) support,
-plus structure-preserving and stiff mass-matrix integrators for the cases where generic RK
-integration is the wrong tool.
+Janus provides explicit ODE integrators for simulation with dual-mode (numeric/symbolic) support, plus structure-preserving and stiff mass-matrix integrators for the cases where generic RK integration is the wrong tool. All step functions work in both numeric and symbolic modes, making them suitable for simulation, trajectory optimization, and sensitivity analysis.
 
 ## Quick Start
 
@@ -22,22 +20,32 @@ double t = 0.0, dt = 0.1;
 y = janus::rk4_step(dynamics, y, t, dt);
 ```
 
-## Step Integrators
+## Core API
+
+### Step Integrators
 
 | Function | Order | Evaluations | Use Case |
 |----------|-------|-------------|----------|
-| `euler_step` | 1st | 1 | Fast, low accuracy |
-| `rk2_step` | 2nd | 2 | Moderate accuracy |
-| `rk4_step` | 4th | 4 | General purpose |
-| `rk45_step` | 4th/5th | 7 | Adaptive stepping |
-| `stormer_verlet_step` | 2nd | 2 accel evals | Symplectic mechanical/orbital systems |
-| `rkn4_step` | 4th | 4 accel evals | Second-order systems without state augmentation |
+| `janus::euler_step` | 1st | 1 | Fast, low accuracy |
+| `janus::rk2_step` | 2nd | 2 | Moderate accuracy |
+| `janus::rk4_step` | 4th | 4 | General purpose |
+| `janus::rk45_step` | 4th/5th | 7 | Adaptive stepping |
+| `janus::stormer_verlet_step` | 2nd | 2 accel evals | Symplectic mechanical/orbital systems |
+| `janus::rkn4_step` | 4th | 4 accel evals | Second-order systems without state augmentation |
+
+### Trajectory Solvers
+
+*   **`janus::solve_ivp(dynamics, t_span, y0, n_eval)`**: Full trajectory integration for first-order systems.
+*   **`janus::solve_second_order_ivp(accel, t_span, q0, v0, n_eval, opts)`**: Trajectory integration for second-order systems with separate coordinates and velocities.
+*   **`janus::solve_ivp_mass_matrix(rhs, mass, t_span, y0, n_eval, opts)`**: Stiff and mass-matrix systems `M(t,y) y' = f(t,y)`.
+
+## Usage Patterns
 
 ### RK4 Step (Recommended)
 
 ```cpp
-// Harmonic oscillator: y'' = -ω²y
-// State: [y, v] where dy/dt=v, dv/dt=-ω²y
+// Harmonic oscillator: y'' = -w^2*y
+// State: [y, v] where dy/dt=v, dv/dt=-w^2*y
 double omega = 2.0;
 
 auto dynamics = [omega](double t, const janus::NumericVector& s) {
@@ -63,7 +71,7 @@ double tol = 1e-6;
 
 while (t < t_final) {
     auto result = janus::rk45_step(dynamics, y, t, dt);
-    
+
     if (result.error < tol) {
         y = result.y5;  // Accept step
         t += dt;
@@ -76,12 +84,7 @@ while (t < t_final) {
 
 ### Structure-Preserving Second-Order Steppers
 
-When your dynamics are naturally written as
-
-`q'' = a(t, q)`
-
-it is better to integrate that form directly than to augment it into a generic
-first-order state and run plain RK4.
+When your dynamics are naturally written as `q'' = a(t, q)`, it is better to integrate that form directly than to augment it into a generic first-order state and run plain RK4.
 
 ```cpp
 janus::NumericVector q(1), v(1);
@@ -97,11 +100,10 @@ q = step.q;
 v = step.v;
 ```
 
-- `stormer_verlet_step(...)` is symplectic and keeps long-horizon energy error bounded for
-  separable Hamiltonian systems.
-- `rkn4_step(...)` is a higher-order Runge-Kutta-Nystrom method for the same `q'' = a(t, q)` API.
+- `janus::stormer_verlet_step(...)` is symplectic and keeps long-horizon energy error bounded for separable Hamiltonian systems.
+- `janus::rkn4_step(...)` is a higher-order Runge-Kutta-Nystrom method for the same `q'' = a(t, q)` API.
 
-## Trajectory Solver
+### Trajectory Solver
 
 For full trajectory integration, use `solve_ivp`:
 
@@ -117,8 +119,7 @@ auto sol = janus::solve_ivp(
 // sol.y - solution matrix (rows=states, cols=time)
 ```
 
-For second-order systems, use `solve_second_order_ivp(...)` to keep coordinates and velocities
-separate:
+For second-order systems, use `solve_second_order_ivp(...)` to keep coordinates and velocities separate:
 
 ```cpp
 janus::SecondOrderIvpOptions opts;
@@ -137,13 +138,9 @@ auto sol = janus::solve_second_order_ivp(
 // sol.v - generalized velocities, rows = velocities, cols = time
 ```
 
-## Stiff And Mass-Matrix Systems
+### Stiff and Mass-Matrix Systems
 
-For systems of the form
-
-`M(t, y) y' = f(t, y)`
-
-Janus now provides a dedicated solver surface:
+For systems of the form `M(t, y) y' = f(t, y)`, Janus provides a dedicated solver surface:
 
 ```cpp
 janus::MassMatrixIvpOptions opts;
@@ -169,12 +166,10 @@ auto sol = janus::solve_ivp_mass_matrix(
 ```
 
 - `MassMatrixIntegratorMethod::RosenbrockEuler` is a one-stage linearly implicit stiff integrator.
-- `MassMatrixIntegratorMethod::Bdf1` solves the backward-Euler residual directly and can handle
-  simple singular mass-matrix systems.
-- `solve_ivp_mass_matrix_expr(...)` uses CasADi IDAS on the symbolic expression path by rewriting
-  the mass-matrix system into a semi-explicit DAE.
+- `MassMatrixIntegratorMethod::Bdf1` solves the backward-Euler residual directly and can handle simple singular mass-matrix systems.
+- `solve_ivp_mass_matrix_expr(...)` uses CasADi IDAS on the symbolic expression path by rewriting the mass-matrix system into a semi-explicit DAE.
 
-## Symbolic Mode
+### Symbolic Mode
 
 All step functions work with symbolic types for optimization:
 
@@ -210,7 +205,7 @@ auto step = janus::stormer_verlet_step(
 );
 ```
 
-## Component-Based Integration (Icarus Pattern)
+### Component-Based Integration (Icarus Pattern)
 
 For simulation frameworks with component models:
 
@@ -223,10 +218,9 @@ public:
     virtual JanusVector<Scalar> compute_derivative(Scalar t) const = 0;
 };
 
-// Your component inherits IntegrableState
 class RigidBody : public IntegrableState<double> {
     Vec3<double> position, velocity, acceleration;
-    
+
     JanusVector<double> get_state() const override { /* ... */ }
     void set_state(const JanusVector<double>& s) override { /* ... */ }
     JanusVector<double> compute_derivative(double t) const override {
@@ -237,4 +231,11 @@ class RigidBody : public IntegrableState<double> {
 };
 ```
 
-See [integration_demo.cpp](file:///home/tanged/sources/janus/examples/integration_demo.cpp) for complete example.
+## See Also
+
+- [Symbolic Computing Guide](symbolic_computing.md) - Symbolic mode for optimization
+- [Optimization Guide](optimization.md) - Using integrators in trajectory optimization
+- [`examples/integration_demo.cpp`](../../examples/integration_demo.cpp) - Complete integration example
+- [`examples/simulation/brachistochrone.cpp`](../../examples/simulation/brachistochrone.cpp) - Brachistochrone simulation
+- [`include/janus/math/IntegratorStep.hpp`](../../include/janus/math/IntegratorStep.hpp) - Step integrator API
+- [`include/janus/math/Integrate.hpp`](../../include/janus/math/Integrate.hpp) - Trajectory solver API
