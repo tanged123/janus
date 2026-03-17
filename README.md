@@ -1,4 +1,4 @@
-# Janus
+# Janus 👥
 
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://tanged123.github.io/janus/) [![Janus CI](https://github.com/tanged123/janus/actions/workflows/ci.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/ci.yml) [![Clang-Format Check](https://github.com/tanged123/janus/actions/workflows/format.yml/badge.svg)](https://github.com/tanged123/janus/actions/workflows/format.yml) [![codecov](https://codecov.io/github/tanged123/janus/graph/badge.svg?token=0DSF7KK8W7)](https://codecov.io/github/tanged123/janus)
 
@@ -42,29 +42,32 @@ nix fmt                         # Format everything
 
 ## Project Structure
 
-```
+```plaintext
 janus/
-  include/janus/
-    core/                  # Type system, concepts, diagnostics, sparsity, structural analysis, IO
-    math/                  # Trig, calculus, autodiff, interpolation, integration, root finding,
-                           #   quadrature, PCE, linalg, quaternions, rotations, surrogates
-    optimization/          # Opti interface, scaling, collocation, multiple shooting,
-                           #   pseudospectral, Birkhoff pseudospectral
-    janus.hpp              # Umbrella header
-  examples/
-    intro/                 # Getting started (numeric, energy, sparsity, printing)
-    math/                  # Branching, graphs, loops, sensitivity, PCE, structural analysis
-    interpolation/         # N-D tables, scattered interpolation, root finding, file-based tables
-    simulation/            # ODE integration, drag, brachistochrone, hybrid, attitudes
-    optimization/          # Rosenbrock, drag, beam, brachistochrone, sweeps, transcription comparison
-    integration_demo.cpp   # RK4, RK45, Stormer-Verlet, mass-matrix integrators
-  tests/                   # GoogleTest suites mirroring include/ layout (core/, math/, optimization/)
-  docs/
-    user_guides/           # 18 topic guides (see Documentation below)
-    patterns/              # Reusable patterns (branching, loops, hybrid optimization)
-    design_overview.md     # Architecture deep-dive
-  scripts/                 # Build, test, CI, coverage, formatting, doc generation
-  flake.nix                # Nix dev environment and package definition
+├── docs/                        # Documentation
+│   ├── user_guides/             # 18 topic guides (see Documentation below)
+│   ├── patterns/                # Reusable patterns (branching, loops, hybrid optimization)
+│   └── design_overview.md       # Architecture deep-dive
+├── examples/                    # 30 runnable demos
+│   ├── intro/                   # Getting started (numeric, energy, sparsity, printing)
+│   ├── math/                    # Branching, graphs, loops, sensitivity, PCE, structural analysis
+│   ├── interpolation/           # N-D tables, scattered interpolation, root finding, file-based tables
+│   ├── simulation/              # ODE integration, drag, brachistochrone, hybrid, attitudes
+│   └── optimization/            # Rosenbrock, drag, beam, brachistochrone, sweeps, transcription comparison
+├── include/
+│   └── janus/
+│       ├── core/                # Type system, concepts, diagnostics, sparsity, structural analysis, IO
+│       ├── math/                # Trig, calculus, autodiff, interpolation, integration, root finding,
+│       │                        #   quadrature, PCE, linalg, quaternions, rotations, surrogates
+│       ├── optimization/        # Opti interface, scaling, collocation, multiple shooting,
+│       │                        #   pseudospectral, Birkhoff pseudospectral
+│       ├── utils/               # Utility helpers (JSON)
+│       ├── janus.hpp            # Main umbrella include
+│       └── using.hpp            # Convenience aliases/imports
+├── scripts/                     # Build, test, CI, coverage, formatting, doc generation
+├── tests/                       # GoogleTest suites (core/, math/, optimization/)
+├── CMakeLists.txt
+└── flake.nix                    # Nix dev environment and package definition
 ```
 
 ## Architecture Overview
@@ -115,17 +118,21 @@ Hosted on [GitHub Pages](https://tanged123.github.io/janus/).
 | [structural_transforms](docs/user_guides/structural_transforms.md) | Alias elimination and BLT decomposition for residual systems |
 | [structural_diagnostics](docs/user_guides/structural_diagnostics.md) | Structural observability analysis for state estimation |
 
-## Key Features
+## Features
 
-**Core** -- Dual-mode type system, C++20 concept constraints, compile-time dispatch, runtime diagnostics, graph serialization and visualization.
-
-**Math** -- Automatic differentiation (forward/reverse via CasADi), N-D interpolation (gridded, scattered, B-spline), root finding (Newton-Raphson, bracketing with globalization), discrete and continuous calculus, stochastic quadrature, polynomial chaos expansion, linear algebra (templated Eigen ops), quaternions and rotations, surrogate models (sigmoid, softmax smoothing).
-
-**Integration** -- `solve_ivp` with RK4, RK45 (adaptive), Stormer-Verlet (symplectic), mass-matrix DAE integration, second-order ODE support, discrete integration utilities.
-
-**Optimization** -- `janus::Opti` high-level NLP interface (IPOPT, SNOPT, QPOASES), variable/constraint scaling, direct collocation, multiple shooting, pseudospectral, Birkhoff pseudospectral transcriptions, parametric sweeps.
-
-**Structural Analysis** -- Jacobian/Hessian sparsity detection, alias elimination, BLT (block lower triangular) decomposition, structural observability checking.
+- 🎭 **Dual-Mode Physics**: Write once, run as Numeric (Fast C++) or Symbolic (CasADi Graph).
+- 🔢 **Unified Math**: Std/CasADi agnostic math functions (`janus::sin`, `janus::pow`, `janus::where`).
+- ⚡ **Linear Algebra**: Eigen-based matrix operations compatible with symbolic types, policy-driven linear solvers.
+- 📉 **Optimization**: High-level `Opti` interface for NLP solvers (IPOPT/SNOPT/QPOASES) with Direct Collocation, Multiple Shooting, Pseudospectral, and Birkhoff Pseudospectral transcriptions. Variable/constraint scaling diagnostics, parametric sweeps.
+- 🔁 **Differentiation**: Automatic differentiation (Forward/Reverse) via CasADi, sparse Jacobian/Hessian pipelines, sensitivity regime selection, matrix-free HVPs.
+- ⏱️ **Integration**: ODE solvers (`solve_ivp`), Runge-Kutta methods, Stormer-Verlet (symplectic), second-order and mass-matrix integrators, discrete integration.
+- 📈 **Interpolation**: 1D, 2D, Sparse, and N-D table lookups with B-spline support.
+- 📐 **Geometry**: Quaternions, Rotation Matrices, Euler Angles.
+- 🔍 **Root Finding**: Multi-method globalization stack (trust-region, line-search, Broyden, pseudo-transient), implicit function builders.
+- 🧠 **Surrogates**: Differentiable approximations (sigmoid, softmax, smooth abs/max/min/clamp) for discontinuous functions.
+- 📊 **Stochastic Analysis**: Polynomial chaos expansion, stochastic quadrature (Gauss, Clenshaw-Curtis, Smolyak sparse grids).
+- 🔬 **Structural Analysis**: Sparsity detection, alias elimination, BLT decomposition, structural observability/identifiability analysis.
+- 💾 **IO**: Graph visualization, serialization, HTML export.
 
 ## Examples
 
@@ -180,3 +187,15 @@ int main() {
 **Adding examples:** Drop a `.cpp` file in the appropriate `examples/` subdirectory and add it to `examples/CMakeLists.txt`. Run `./scripts/run_examples.sh` to verify.
 
 **PR workflow:** Fork, branch, make changes, ensure `./scripts/verify.sh` passes (build + test + examples), open a PR against `main`.
+
+## Inspiration & Credits
+
+Janus is heavily inspired by **AeroSandbox**, Peter Sharpe's Python-based design optimization framework. Janus serves as a C++ implementation and extension of the "Code Transformations" paradigm pioneered by Sharpe.
+
+- **Primary Inspiration**: [AeroSandbox](https://github.com/peterdsharpe/AeroSandbox) by Peter Sharpe.
+- **Theoretical Foundation**: Sharpe, Peter D. *AeroSandbox: A Differentiable Framework for Aircraft Design Optimization*. PhD Thesis, MIT, 2024. [Read Thesis](https://github.com/peterdsharpe/AeroSandbox/blob/master/tutorial/sharpe-pds-phd-AeroAstro-2024-thesis.pdf)
+
+Janus is built upon the shoulders of giants:
+
+- **[Eigen](https://eigen.tuxfamily.org/)**: For high-performance linear algebra and numeric storage.
+- **[CasADi](https://web.casadi.org/)**: For symbolic graph generation, automatic differentiation, and optimization interfaces.
