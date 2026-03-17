@@ -56,6 +56,16 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
      */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, double tf, const CollocationOptions &opts = {}) {
+        if (opts.n_nodes < 2) {
+            throw InvalidArgument("DirectCollocation: n_nodes must be >= 2");
+        }
+        if (n_states < 1) {
+            throw InvalidArgument("DirectCollocation: n_states must be >= 1");
+        }
+        if (n_controls < 0) {
+            throw InvalidArgument("DirectCollocation: n_controls must be >= 0");
+        }
+
         n_states_ = n_states;
         n_controls_ = n_controls;
         n_nodes_ = opts.n_nodes;
@@ -82,6 +92,7 @@ class DirectCollocation : public TranscriptionBase<DirectCollocation> {
 
         setup_complete_ = true;
         dynamics_set_ = false;
+        dynamics_constraints_added_ = false;
         return {states_, controls_, tau_};
     }
 

@@ -5,6 +5,7 @@
 
 #include "OptiSol.hpp"
 #include "janus/core/JanusError.hpp"
+#include <optional>
 #include <vector>
 
 namespace janus {
@@ -12,13 +13,17 @@ namespace janus {
 /// @brief Result of a parametric sweep
 ///
 /// Stores solutions obtained by solving an optimization problem
-/// across a range of parameter values.
+/// across a range of parameter values. Each entry in @c solutions
+/// corresponds 1:1 with @c param_values; failed solves are represented
+/// as @c std::nullopt.
 ///
 /// @code
 /// auto result = opti.solve_sweep(param, {0.1, 0.2, 0.3, 0.4, 0.5});
 /// for (int i = 0; i < result.size(); ++i) {
-///     std::cout << "param=" << result.param_values[i]
-///               << " obj=" << result.objective(i) << "\n";
+///     if (result.converged[i]) {
+///         std::cout << "param=" << result.param_values[i]
+///                   << " obj=" << result.objective(i, obj_expr) << "\n";
+///     }
 /// }
 /// @endcode
 ///
@@ -28,8 +33,8 @@ struct SweepResult {
     /// Parameter values that were swept
     std::vector<double> param_values;
 
-    /// Solutions at each parameter value (only for converged points)
-    std::vector<OptiSol> solutions;
+    /// Solutions at each parameter value (nullopt for failed solves)
+    std::vector<std::optional<OptiSol>> solutions;
 
     /// Number of iterations for each solve
     std::vector<int> iterations;
@@ -51,36 +56,58 @@ struct SweepResult {
     /// @param i sweep index
     /// @param objective_expr objective expression passed to minimize/maximize
     /// @return optimized objective value at sweep point i
+    /// @throws InvalidArgument if index is out of range or point did not converge
     double objective(size_t i, const SymbolicScalar &objective_expr) const {
         if (i >= solutions.size()) {
             throw InvalidArgument("SweepResult::objective: index out of range");
         }
-        return solutions[i].value(objective_expr);
+        if (!solutions[i].has_value()) {
+            throw InvalidArgument("SweepResult::objective: solve did not converge at index " +
+                                  std::to_string(i));
+        }
+        return solutions[i]->value(objective_expr);
     }
 
-    /// @brief Extract scalar variable values across all sweep points
+    /// @brief Extract scalar variable values across converged sweep points
     /// @param var symbolic scalar to evaluate
     /// @return vector of values, one per converged sweep point
     NumericVector values(const SymbolicScalar &var) const {
-        NumericVector result(static_cast<int>(solutions.size()));
-        for (size_t i = 0; i < solutions.size(); ++i) {
-            result(static_cast<int>(i)) = solutions[i].value(var);
+        // Count converged points
+        int n_converged = 0;
+        for (const auto &sol : solutions) {
+            if (sol.has_value()) {
+                ++n_converged;
+            }
+        }
+        NumericVector result(n_converged);
+        int j = 0;
+        for (const auto &sol : solutions) {
+            if (sol.has_value()) {
+                result(j++) = sol->value(var);
+            }
         }
         return result;
     }
 
-    /// @brief Extract vector variable values across all sweep points
+    /// @brief Extract vector variable values across converged sweep points
     /// @param var symbolic vector to evaluate
-    /// @return matrix with columns corresponding to sweep points
+    /// @return matrix with columns corresponding to converged sweep points
     NumericMatrix values(const SymbolicVector &var) const {
-        if (solutions.empty()) {
+        // Collect converged solutions
+        std::vector<size_t> converged_indices;
+        for (size_t i = 0; i < solutions.size(); ++i) {
+            if (solutions[i].has_value()) {
+                converged_indices.push_back(i);
+            }
+        }
+        if (converged_indices.empty()) {
             return NumericMatrix(0, 0);
         }
-        auto first = solutions[0].value(var);
-        NumericMatrix result(first.size(), static_cast<int>(solutions.size()));
+        auto first = solutions[converged_indices[0]]->value(var);
+        NumericMatrix result(first.size(), static_cast<int>(converged_indices.size()));
         result.col(0) = first;
-        for (size_t i = 1; i < solutions.size(); ++i) {
-            result.col(static_cast<int>(i)) = solutions[i].value(var);
+        for (size_t j = 1; j < converged_indices.size(); ++j) {
+            result.col(static_cast<int>(j)) = solutions[converged_indices[j]]->value(var);
         }
         return result;
     }

@@ -647,8 +647,10 @@ class Opti {
      *
      *   auto result = opti.solve_sweep(rho, {1.0, 1.1, 1.2, 1.3});
      *   for (size_t i = 0; i < result.size(); ++i) {
-     *       std::cout << "rho=" << result.param_values[i]
-     *                 << " x*=" << result.solutions[i].value(x) << "\n";
+     *       if (result.converged[i]) {
+     *           std::cout << "rho=" << result.param_values[i]
+     *                     << " x*=" << result.solutions[i]->value(x) << "\n";
+     *       }
      *   }
      * @endcode
      *
@@ -695,14 +697,15 @@ class Opti {
 
             try {
                 auto sol = opti_.solve();
-                result.solutions.emplace_back(sol);
                 result.iterations.push_back(sol.stats().count("iter_count")
                                                 ? static_cast<int>(sol.stats().at("iter_count"))
                                                 : -1);
+                result.solutions.emplace_back(sol);
                 result.converged.push_back(true);
                 result.errors.emplace_back();
             } catch (const std::exception &e) {
                 result.all_converged = false;
+                result.solutions.emplace_back(std::nullopt);
                 result.converged.push_back(false);
                 result.errors.push_back(e.what());
                 result.iterations.push_back(-1);

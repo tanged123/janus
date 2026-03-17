@@ -393,15 +393,23 @@ Four transcription methods are available, all sharing a common `TranscriptionBas
 
 - **Direct collocation** -- `docs/user_guides/collocation.md`
 - **Multiple shooting** -- `docs/user_guides/multiple_shooting.md`
-- **Pseudospectral** (LG/LGR) -- `docs/user_guides/pseudospectral.md`
+- **Pseudospectral** (LGL/CGL) -- `docs/user_guides/pseudospectral.md`
 - **Birkhoff pseudospectral** (LGL/CGL) -- `docs/user_guides/birkhoff_pseudospectral.md`
 
 ```cpp
-janus::DirectCollocation problem(N_segments, dynamics, t0, tf);
-problem.set_state_bounds(lower, upper);
-problem.set_control_bounds(u_lower, u_upper);
-problem.set_boundary_conditions(x0, xf);
-auto [sol, t, x, u] = problem.solve();
+janus::Opti opti;
+janus::DirectCollocation colloc(opti);
+auto [X, U, tau] = colloc.setup(n_states, n_controls, t0, tf);
+
+colloc.set_dynamics([](const auto& x, const auto& u, const auto& t) {
+    return dynamics(x, u, t);
+});
+colloc.add_dynamics_constraints();
+colloc.set_initial_state(x0);
+colloc.set_final_state(xf);
+
+opti.minimize(objective);
+auto sol = opti.solve();
 ```
 
 ---
@@ -425,7 +433,7 @@ auto [sol, t, x, u] = problem.solve();
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints |
 | Collocation | `docs/user_guides/collocation.md` | Direct collocation |
 | Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting |
-| Pseudospectral | `docs/user_guides/pseudospectral.md` | LG/LGR pseudospectral |
+| Pseudospectral | `docs/user_guides/pseudospectral.md` | LGL/CGL pseudospectral |
 | Birkhoff Pseudospectral | `docs/user_guides/birkhoff_pseudospectral.md` | LGL/CGL Birkhoff |
 | Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of methods |
 

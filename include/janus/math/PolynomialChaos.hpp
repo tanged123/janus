@@ -193,7 +193,7 @@ Scalar raw_jacobi_polynomial(int degree, const Scalar &x, double alpha, double b
         const double nn = static_cast<double>(n);
         const double two_n_ab = 2.0 * nn + alpha + beta;
         const double a_n = 2.0 * (nn + 1.0) * (nn + alpha + beta + 1.0) * two_n_ab;
-        const double b_n =
+        const Scalar b_n =
             (two_n_ab + 1.0) * (two_n_ab * (two_n_ab + 2.0) * x + alpha * alpha - beta * beta);
         const double c_n = 2.0 * (nn + alpha) * (nn + beta) * (two_n_ab + 2.0);
         Scalar p_np1 = (b_n * p_n - c_n * p_nm1) / a_n;

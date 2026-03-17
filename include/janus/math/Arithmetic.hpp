@@ -79,7 +79,7 @@ template <JanusScalar T> T pow(const T &base, const T &exponent) {
 
 /**
  * @brief Computes power function base^exponent for scalars (mixed types)
- * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @tparam T Non-double Janus scalar (e.g., SymbolicScalar)
  * @param base Base value
  * @param exponent Exponent value
  * @return base raised to exponent
@@ -96,7 +96,7 @@ T pow(const T &base, double exponent) {
 
 /**
  * @brief Computes power function base^exponent for scalars (mixed types: double base)
- * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @tparam T Non-double Janus scalar (e.g., SymbolicScalar)
  * @param base Base value
  * @param exponent Exponent value
  * @return base raised to exponent

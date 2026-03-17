@@ -65,7 +65,7 @@ Method-specific aliases:
 Uses polynomial interpolation to approximate state trajectories and enforces dynamics via **defect constraints**.
 
 **How it works:**
-```
+```text
 Trapezoidal:      x[k+1] - x[k] = h/2 * (f[k] + f[k+1])
 Hermite-Simpson:  x[k+1] - x[k] = h/6 * (f[k] + 4*f_mid + f[k+1])
 ```
@@ -115,7 +115,7 @@ Uses an integration matrix formulation: `X = x_a * 1 + B * V`, `V = (dt / 2) * F
 
 ### Problem Structure
 
-```
+```text
 Collocation (31 nodes, 3 states, 1 control):
   Decision variables: 31x3 + 31x1 = 124
   Constraints: 30x3 (defects) + BCs
@@ -135,7 +135,7 @@ Birkhoff Pseudospectral (31 nodes, 3 states, 1 control):
 
 ### Decision Flowchart
 
-```
+```text
 +----------------------------------------------+
 | Is the system stiff or integration-sensitive? |
 +--------------+-------------------------------+

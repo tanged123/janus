@@ -105,11 +105,10 @@ template <typename Derived> class TranscriptionBase {
         if (!setup_complete_) {
             throw RuntimeError("TranscriptionBase: call setup() before set_dynamics()");
         }
-        if (dynamics_set_) {
+        if (dynamics_constraints_added_) {
             throw RuntimeError(
-                "TranscriptionBase: set_dynamics() cannot be called twice after "
-                "add_dynamics_constraints(); remove and re-add constraints before changing "
-                "dynamics");
+                "TranscriptionBase: set_dynamics() cannot be called after "
+                "add_dynamics_constraints(); call setup() again to start fresh");
         }
 
         dynamics_ = [fn = std::forward<Func>(dynamics)](
@@ -143,6 +142,7 @@ template <typename Derived> class TranscriptionBase {
             throw RuntimeError("TranscriptionBase: call setup() before add_dynamics_constraints()");
         }
         static_cast<Derived *>(this)->add_dynamics_constraints_impl();
+        dynamics_constraints_added_ = true;
     }
 
     /** @brief Alias for add_dynamics_constraints() */
@@ -163,6 +163,7 @@ template <typename Derived> class TranscriptionBase {
 
     bool setup_complete_ = false;
     bool dynamics_set_ = false;
+    bool dynamics_constraints_added_ = false;
 
     NumericVector tau_;
     SymbolicMatrix states_;

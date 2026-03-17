@@ -184,6 +184,8 @@ janus::NumericVector coeffs =
 Use regression when you have collocation samples without matching quadrature weights:
 
 ```cpp
+// continued from "Projection Coefficients" above (reuses basis, values)
+
 janus::NumericVector nodes(6);
 nodes << -1.0, -0.6, -0.2, 0.2, 0.6, 1.0;
 
@@ -201,6 +203,8 @@ The final `ridge` argument is an optional Tikhonov regularization parameter. Whe
 The main Janus-specific payoff is that the sampled response can stay symbolic:
 
 ```cpp
+// continued from "Regression Coefficients" above (reuses basis, nodes, samples)
+
 auto a = janus::sym("a");
 janus::SymbolicVector sample_values(nodes.size());
 

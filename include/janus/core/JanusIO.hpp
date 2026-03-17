@@ -92,9 +92,14 @@ template <typename Derived> auto eval(const Eigen::MatrixBase<Derived> &mat) {
 }
 
 /// @brief Evaluate a symbolic scalar to a double
-/// @param val Symbolic scalar (must contain no free variables)
+/// @param val Symbolic scalar (must be 1x1 and contain no free variables)
 /// @return Numeric value
+/// @throws RuntimeError if val is not 1x1 or contains free variables
 inline double eval(const SymbolicScalar &val) {
+    if (val.size1() != 1 || val.size2() != 1) {
+        throw RuntimeError("eval scalar failed: expected 1x1 symbolic expression, got " +
+                           std::to_string(val.size1()) + "x" + std::to_string(val.size2()));
+    }
     try {
         casadi::Function f("f", {}, {val});
         auto res = f(std::vector<casadi::DM>{});
@@ -378,7 +383,7 @@ namespace detail {
 
 /// @brief Escape a string for embedding in a JavaScript string literal
 /// @param content Raw string
-/// @return Escaped string
+/// @return Escaped string safe for use inside a \<script\> tag
 inline std::string escape_for_js(const std::string &content) {
     std::string escaped;
     for (char c : content) {
@@ -390,6 +395,8 @@ inline std::string escape_for_js(const std::string &content) {
             escaped += "\\n";
         else if (c == '\r')
             escaped += "\\r";
+        else if (c == '<')
+            escaped += "\\u003C";
         else
             escaped += c;
     }
@@ -398,7 +405,7 @@ inline std::string escape_for_js(const std::string &content) {
 
 /// @brief Escape a string for embedding in JSON
 /// @param s Raw string
-/// @return Escaped string
+/// @return Escaped string safe for use inside a \<script\> tag
 inline std::string escape_for_json(const std::string &s) {
     std::string result;
     for (char c : s) {
@@ -412,6 +419,8 @@ inline std::string escape_for_json(const std::string &s) {
             result += "\\r";
         else if (c == '\t')
             result += "\\t";
+        else if (c == '<')
+            result += "\\u003C";
         else
             result += c;
     }

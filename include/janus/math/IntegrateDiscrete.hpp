@@ -176,7 +176,7 @@ auto integrate_cubic(const Eigen::MatrixBase<DerivedF> &f, const Eigen::MatrixBa
  * @param x Grid points
  * @param multiply_by_dx If true, returns interval integrals; if false, returns average values
  * @param method "forward_euler", "backward_euler", "trapezoidal", "simpson", or "cubic"
- * @param method_endpoints "lower_order", "ignore", or "periodic"
+ * @param method_endpoints "lower_order" or "ignore"
  * @return Vector of interval integrals or averages
  */
 template <typename DerivedF, typename DerivedX>

@@ -96,7 +96,7 @@ janus::SymbolicScalar // = casadi::MX
 
 ### Choosing a Method
 
-```
+```text
 Use Case                              Recommended Method
 ---------------------------------------------------------
 Fast lookup, low accuracy             Nearest
@@ -108,7 +108,7 @@ Symbolic differentiation              Linear or BSpline
 
 ### Smoothness Comparison
 
-```
+```text
                 Grid Point
                     |
                     v
@@ -133,7 +133,7 @@ Grid values must be flattened in **Fortran order** (column-major), where the fir
 
 For a 2x3 grid with coordinates `x = [0, 1]` and `y = [0, 1, 2]`:
 
-```
+```text
 Grid Layout (visual):          Flattening Order:
     y=0   y=1   y=2
 x=0  a     b     c            [a, d, b, e, c, f]
@@ -214,7 +214,7 @@ auto dy_dx = janus::jacobian(y_sym, x_sym);
 
 N-D extrapolation is fully supported. For each dimension that falls outside bounds, the extrapolation adds a correction term:
 
-```
+```text
 result = interp(clamped_query) + sum( slope_d * (query_d - boundary_d) )
 ```
 
@@ -363,7 +363,7 @@ auto result = janus::interpn<double>(points, values, xi);
 
 Both numeric and symbolic interpolation use **CasADi** as the underlying engine:
 
-```
+```text
 +-----------------------------------------------------+
 |                   janus::interpn                     |
 +-----------------------------------------------------+

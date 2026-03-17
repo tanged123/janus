@@ -56,6 +56,7 @@ auto dynamics = [omega](double t, const janus::NumericVector& s) {
 
 janus::NumericVector state(2);
 state << 1.0, 0.0;  // y=1, v=0
+double t = 0.0;
 
 for (int i = 0; i < 100; ++i) {
     state = janus::rk4_step(dynamics, state, t, 0.01);

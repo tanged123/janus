@@ -135,7 +135,7 @@ struct ScalingReport {
 
     /// @brief Check if any scaling issues were detected
     /// @return true if the issues list is non-empty
-    bool has_warnings() const { return !issues.empty(); }
+    bool has_issues() const { return !issues.empty(); }
 };
 
 } // namespace janus

@@ -26,7 +26,11 @@ dc.add_defect_constraints();
 dc.set_initial_state(janus::NumericVector{{0.0, 0.0}});
 dc.set_final_state(janus::NumericVector{{1.0, 0.0}});
 
-opti.minimize(/* objective */);
+// Minimize control effort: sum of u^2 at each node
+janus::SymbolicScalar obj = 0;
+for (int k = 0; k < dc.n_nodes(); ++k)
+    obj = obj + u(k, 0) * u(k, 0);
+opti.minimize(obj);
 auto sol = opti.solve();
 ```
 
@@ -52,12 +56,12 @@ auto sol = opti.solve();
 | `CollocationScheme::HermiteSimpson` | 4th | Uses cubic interpolation with midpoint |
 
 **Trapezoidal:**
-```
+```text
 x[k+1] - x[k] = 0.5 * h * (f[k] + f[k+1])
 ```
 
 **Hermite-Simpson:**
-```
+```text
 x_mid = 0.5*(x[k] + x[k+1]) + h/8*(f[k] - f[k+1])
 x[k+1] - x[k] = h/6 * (f[k] + 4*f_mid + f[k+1])
 ```

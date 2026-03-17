@@ -137,7 +137,7 @@ janus::NumericMatrix jac_nz = J.values(x_val);
 
 ```cpp
 auto x = janus::sym("x", 5);
-auto phi = 0;
+janus::SymbolicScalar phi = 0;
 for (int k = 0; k < 4; ++k) {
     auto diff = x(k + 1) - x(k);
     phi = phi + diff * diff;
@@ -242,8 +242,8 @@ Sometimes you have **black-box functions** where symbolic sparsity analysis is n
 ```cpp
 // For lambda/callable functions
 auto sp = janus::nan_propagation_sparsity(
-    [](const NumericVector& x) {
-        NumericVector y(x.size());
+    [](const janus::NumericVector& x) {
+        janus::NumericVector y(x.size());
         for (int i = 0; i < x.size(); ++i) y(i) = x(i) * x(i);
         return y;
     },
@@ -254,8 +254,8 @@ janus::Function fn(...);
 auto sp = janus::nan_propagation_sparsity(fn);
 
 // With custom options (reference point)
-NaNSparsityOptions opts;
-opts.reference_point = NumericVector{{1.0, 2.0, 3.0}};
+janus::NaNSparsityOptions opts;
+opts.reference_point = janus::NumericVector{{1.0, 2.0, 3.0}};
 auto sp = janus::nan_propagation_sparsity(fn, opts);
 ```
 

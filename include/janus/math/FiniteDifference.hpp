@@ -30,8 +30,19 @@ enum class IntegrationMethod {
 
 /**
  * @brief Parse integration method from string
+ *
+ * Accepted names (case-sensitive):
+ * - "trapezoidal", "trapezoid", "midpoint" -> IntegrationMethod::Trapezoidal
+ * - "forward_euler", "forward euler"       -> IntegrationMethod::ForwardEuler
+ * - "backward_euler", "backward euler",
+ *   "backwards_euler", "backwards euler"   -> IntegrationMethod::BackwardEuler
+ *
+ * @note "midpoint" is treated as an alias for Trapezoidal (both use the same
+ *       averaging formula).
+ *
  * @param method Method name string
  * @return Corresponding IntegrationMethod enum value
+ * @throws InvalidArgument if the method name is not recognized
  */
 inline IntegrationMethod parse_integration_method(const std::string &method) {
     if (method == "trapezoidal" || method == "trapezoid" || method == "midpoint") {

@@ -123,6 +123,9 @@ janus::Opti opti;
 auto rho = opti.parameter(1.225);
 auto V = opti.variable(50.0);
 
+const double S = 16.0;    // Reference area [m^2]
+const double Cd0 = 0.02;  // Zero-lift drag coefficient
+
 auto drag = 0.5 * rho * V * V * S * Cd0;
 opti.minimize(drag);
 opti.subject_to(V >= 10.0);
@@ -131,8 +134,10 @@ std::vector<double> rho_values = {1.2, 1.0, 0.8, 0.6};
 auto result = opti.solve_sweep(rho, rho_values);
 
 for (size_t i = 0; i < result.size(); ++i) {
-    std::cout << "rho=" << result.param_values[i]
-              << " V*=" << result.solutions[i].value(V) << "\n";
+    if (result.converged[i]) {
+        std::cout << "rho=" << result.param_values[i]
+                  << " V*=" << result.solutions[i]->value(V) << "\n";
+    }
 }
 ```
 
@@ -158,7 +163,7 @@ opti.subject_to(x == 1e6, 1e6);
 opti.minimize(janus::pow(x - 1e6, 2), 1e12);
 
 auto report = opti.analyze_scaling();
-if (report.has_warnings()) {
+if (report.has_issues()) {
     for (const auto& issue : report.issues) {
         std::cout << issue.label << ": " << issue.message << "\n";
     }

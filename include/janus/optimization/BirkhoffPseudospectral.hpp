@@ -59,6 +59,12 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
         if (opts.n_nodes < 2) {
             throw InvalidArgument("BirkhoffPseudospectral: n_nodes must be >= 2");
         }
+        if (n_states < 1) {
+            throw InvalidArgument("BirkhoffPseudospectral: n_states must be >= 1");
+        }
+        if (n_controls < 0) {
+            throw InvalidArgument("BirkhoffPseudospectral: n_controls must be >= 0");
+        }
 
         n_states_ = n_states;
         n_controls_ = n_controls;
@@ -107,6 +113,7 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
 
         setup_complete_ = true;
         dynamics_set_ = false;
+        dynamics_constraints_added_ = false;
         return {states_, controls_, tau_};
     }
 

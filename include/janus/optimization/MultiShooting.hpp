@@ -83,6 +83,16 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup_impl(int n_states, int n_controls, double t0, double tf_val, bool variable_tf,
                const MultiShootingOptions &opts) {
+        if (opts.n_intervals < 1) {
+            throw InvalidArgument("MultipleShooting: n_intervals must be >= 1");
+        }
+        if (n_states < 1) {
+            throw InvalidArgument("MultipleShooting: n_states must be >= 1");
+        }
+        if (n_controls < 0) {
+            throw InvalidArgument("MultipleShooting: n_controls must be >= 0");
+        }
+
         n_states_ = n_states;
         n_controls_ = n_controls;
         opts_ = opts;
@@ -114,6 +124,7 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
         tau_ = linspace(0.0, 1.0, n_nodes_);
         setup_complete_ = true;
         dynamics_set_ = false;
+        dynamics_constraints_added_ = false;
         integrator_ = casadi::Function();
 
         return {states_, controls_, tau_};
