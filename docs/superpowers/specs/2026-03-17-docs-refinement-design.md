@@ -8,7 +8,7 @@ Janus v2.0.0 was just released with a massive feature PR adding polynomial chaos
 
 ## 1. Doxygen Comment Standard
 
-Standardize comment style across all 44 headers in `include/janus/`.
+Standardize comment style across all 42 headers in `include/janus/` (core: 8, math: 21, optimization: 10, utils: 1, top-level: 2).
 
 ### Format
 
@@ -48,10 +48,12 @@ enum class InterpolationMethod {
 
 - Every file gets `@file` + `@brief` at the top
 - Every public class/struct/function gets `@brief`
-- `@param`/`@return`/`@tparam` only where non-obvious (skip for self-documenting names)
+- Every public function gets `@param`/`@return`/`@tparam` annotations (mandatory, not selective)
 - `@see` for cross-references between related APIs
 - Enum values get `///<` inline comments
+- `@example` blocks are allowed and encouraged where they exist -- do not remove them
 - No `@details` blocks -- keep it concise
+- Both `///` and `/** */` styles are accepted; maintain consistency within each file (do not mix styles in one file)
 - Existing doxygen comments that already match this style are left alone
 
 ## 2. User Guide Standard Template
@@ -99,7 +101,8 @@ Common workflows and recipes. Real-world-ish examples with explanation.
 ### Rules
 
 - Every guide gets H1 -> Quick Start -> Core API -> Usage Patterns flow
-- "See Also" section is mandatory -- minimum one cross-reference
+- The one-paragraph intro under H1 replaces any existing "Overview" or "Introduction" sections -- do not keep both
+- "See Also" section is mandatory -- minimum one link to another user guide AND one link to an example or header file
 - Code examples use `janus::` namespace (not `using namespace janus`)
 - Guides that don't need Advanced/Diagnostics sections omit them
 - No theory/math preamble before Quick Start
@@ -154,17 +157,17 @@ Code style, how to add tests/examples, PR workflow.
 - Architecture section added
 - Feature list condensed and grouped
 - Contributing section added
-- Single usage example removed -- pointed to examples/ and guides
+- Current full usage example replaced with a condensed (10-15 line) dual-mode snippet showing the core value proposition
 
 ## 4. Design Overview & Usage Guide Refresh
 
 ### design_overview.md
 
-- Update to reflect v2.0.0 scope (PCE, quadrature, structural diagnostics, sparsity, root finding, linear solve policies, second-order integrators, scaling)
+- Update to reflect v2.0.0 scope (PCE, quadrature, structural diagnostics, sparsity, root finding, linear solve policies, second-order integrators, scaling, error handling)
 - Keep philosophical structure (Code Transformations, Template-First, Dual Backend, Dispatch, Structural vs Value, Branching, Loops)
 - Remove or update completed roadmap phases
 - Add cross-references to new user guides
-- Target ~150 lines max
+- Target ~150 lines max (currently 89 -- growth ceiling, not reduction target)
 
 ### janus_usage_guide.md
 
@@ -172,21 +175,40 @@ Code style, how to add tests/examples, PR workflow.
 - Add sections for new features not currently covered
 - Cross-reference user guides rather than duplicating content
 - Standardize code examples to `janus::` namespace
-- Serve as a map, not a manual
+- Serve as a map, not a manual -- trim comprehensive API tables and replace with brief descriptions that link to the relevant user guide for details
 
 ## 5. Doxyfile Configuration
 
 - Add `PROJECT_NUMBER = 2.0.0`
 - Verify `PROJECT_BRIEF` is set
 - Ensure `USE_MDFILE_AS_MAINPAGE = README.md`
-- Add `docs/janus_usage_guide.md` to INPUT
-- Add `EXCLUDE_PATTERNS` for `docs/implementation_plans/` and `docs/saved_work/`
+- Full intended INPUT: `README.md include docs/design_overview.md docs/janus_usage_guide.md docs/user_guides docs/patterns`
+- EXCLUDE_PATTERNS: `docs/implementation_plans/* docs/saved_work/* docs/design_reviews/* docs/examples/*`
 - Keep `EXTRACT_ALL=YES`
 - Verify `GENERATE_TREEVIEW=YES`
+
+### Verification
+
+- Run `doxygen Doxyfile` with `WARN_IF_UNDOCUMENTED=YES` -- confirm zero warnings for public symbols
+- Diff the Doxyfile and confirm only the specified keys changed
+
+## Verification Criteria
+
+| Area | Done when |
+|------|-----------|
+| Doxygen headers | Every `.hpp` has `@file`+`@brief`; every public function has `@brief`+`@param`+`@return`; `doxygen` runs with zero undocumented warnings |
+| User guides | Every guide has H1, Quick Start, Core API, Usage Patterns, See Also sections |
+| README | Follows the approved structure; builds contributor-first flow |
+| design_overview.md | Covers all v2.0.0 modules; <= 150 lines |
+| janus_usage_guide.md | No stale API references; links to user guides instead of duplicating API tables |
+| Doxyfile | Only specified keys changed; generates clean HTML |
 
 ## Scope Exclusions
 
 - `docs/implementation_plans/` -- left as-is
+- `docs/design_reviews/` -- left as-is (excluded from Doxygen output)
+- `docs/saved_work/` -- left as-is (excluded from Doxygen output)
+- `docs/examples/` -- left as-is (excluded from Doxygen output)
 - No CHANGELOG.md
-- No new user guides -- only standardize existing ones
+- No new user guides -- only standardize existing 18
 - Header comment content preserved -- only style standardized
