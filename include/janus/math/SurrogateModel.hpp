@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <numeric>
+#include <string>
 #include <vector>
 
 namespace janus {
@@ -121,19 +122,154 @@ template <typename T1, typename T2> auto softmin(const T1 &a, const T2 &b, doubl
  *
  * @param x Input value
  * @param beta Sharpness parameter (default 1.0). Higher = closer to ReLU.
- * @param threshold Stability threshold (default 20.0). For beta*x > threshold, returns x (linear).
+ * @param threshold Retained for backwards compatibility. Unused by the smooth implementation.
  * @return Softplus value
  */
-template <typename T> auto softplus(const T &x, double beta = 1.0, double threshold = 20.0) {
-    // Logic:
-    // if (beta * x > threshold) return x
-    // else return (1/beta) * log(1 + exp(beta * x))
+namespace detail {
+inline void validate_hardness(double hardness, const char *function_name) {
+    if (hardness <= 0.0) {
+        throw InvalidArgument(std::string(function_name) + ": hardness must be positive");
+    }
+}
 
-    auto bx = beta * x;
-    auto linear_approx = x;
-    auto smooth_approx = (1.0 / beta) * janus::log(1.0 + janus::exp(bx));
+inline void validate_rho(double rho) {
+    if (rho <= 0.0) {
+        throw InvalidArgument("ks_max: rho must be positive");
+    }
+}
 
-    return janus::where(bx > threshold, linear_approx, smooth_approx);
+template <std::floating_point T> auto softplus_scalar(const T &x, double beta) {
+    const auto bx = beta * x;
+    const auto shift = bx > 0.0 ? bx : 0.0;
+    return (shift + std::log(std::exp(-shift) + std::exp(bx - shift))) / beta;
+}
+
+inline auto softplus_scalar(const SymbolicScalar &x, double beta) {
+    const auto bx = beta * x;
+    // CasADi's logsumexp applies max-shift stabilization internally:
+    // logsumexp(a) = max(a) + log(sum(exp(a - max(a))))
+    return SymbolicScalar::logsumexp(SymbolicScalar::vertcat({SymbolicScalar(0.0), bx})) / beta;
+}
+} // namespace detail
+
+template <JanusScalar T> auto softplus(const T &x, double beta = 1.0, double /*threshold*/ = 20.0) {
+    return detail::softplus_scalar(x, beta);
+}
+
+template <typename Derived>
+auto softplus(const Eigen::MatrixBase<Derived> &x, double beta = 1.0, double threshold = 20.0) {
+    using Scalar = typename Derived::Scalar;
+    return x.derived().unaryExpr(
+        [beta, threshold](const Scalar &v) { return janus::softplus(v, beta, threshold); });
+}
+
+// ======================================================================
+// Smooth Approximation Suite
+// ======================================================================
+
+/**
+ * @brief Smooth approximation of absolute value.
+ *
+ * Implemented as smooth_max(x, -x), which is C-infinity and approaches |x|
+ * as hardness -> infinity.
+ *
+ * @param x Input value
+ * @param hardness Sharpness parameter. Higher values approach abs(x).
+ * @return Smooth approximation of |x|
+ */
+template <typename T> auto smooth_abs(const T &x, double hardness = 1.0) {
+    detail::validate_hardness(hardness, "smooth_abs");
+    return -x + softplus(2.0 * x, hardness);
+}
+
+/**
+ * @brief Pairwise smooth maximum.
+ *
+ * Uses the identity max(a, b) = b + relu(a - b), replacing relu with softplus.
+ * This remains C-infinity and approaches max(a, b) as hardness -> infinity.
+ *
+ * @param a First value
+ * @param b Second value
+ * @param hardness Sharpness parameter. Higher values approach max(a, b).
+ * @return Smooth approximation of max(a, b)
+ */
+template <typename T1, typename T2>
+auto smooth_max(const T1 &a, const T2 &b, double hardness = 1.0) {
+    detail::validate_hardness(hardness, "smooth_max");
+    return b + softplus(a - b, hardness);
+}
+
+/**
+ * @brief Pairwise smooth minimum.
+ *
+ * Uses the identity min(a, b) = a - relu(a - b), replacing relu with softplus.
+ * This remains C-infinity and approaches min(a, b) as hardness -> infinity.
+ *
+ * @param a First value
+ * @param b Second value
+ * @param hardness Sharpness parameter. Higher values approach min(a, b).
+ * @return Smooth approximation of min(a, b)
+ */
+template <typename T1, typename T2>
+auto smooth_min(const T1 &a, const T2 &b, double hardness = 1.0) {
+    detail::validate_hardness(hardness, "smooth_min");
+    return a - softplus(a - b, hardness);
+}
+
+/**
+ * @brief Smooth approximation of clamp(x, low, high).
+ *
+ * Implemented by composing smooth_max and smooth_min.
+ *
+ * @param x Input value
+ * @param low Lower bound
+ * @param high Upper bound
+ * @param hardness Sharpness parameter. Higher values approach hard clamping.
+ * @return Smooth approximation of clamp(x, low, high)
+ */
+template <typename TX, typename TLow, typename THigh>
+auto smooth_clamp(const TX &x, const TLow &low, const THigh &high, double hardness = 1.0) {
+    detail::validate_hardness(hardness, "smooth_clamp");
+    return smooth_min(smooth_max(x, low, hardness), high, hardness);
+}
+
+/**
+ * @brief Kreisselmeier-Steinhauser smooth maximum aggregator.
+ *
+ * Commonly used to aggregate many constraints into one smooth surrogate:
+ * ks_max(values, rho) = (1/rho) * log(sum(exp(rho * values_i)))
+ *
+ * @param values Values to aggregate
+ * @param rho Aggregation sharpness. Higher values approach max(values).
+ * @return Smooth maximum aggregate
+ */
+template <JanusScalar T> auto ks_max(const std::vector<T> &values, double rho = 1.0) {
+    if (values.empty()) {
+        throw InvalidArgument("ks_max: requires at least one value");
+    }
+    detail::validate_rho(rho);
+
+    if constexpr (std::is_floating_point_v<T>) {
+        const auto max_val = *std::max_element(values.begin(), values.end());
+        double sum_exp = 0.0;
+        for (const auto &value : values) {
+            sum_exp += std::exp(rho * (value - max_val));
+        }
+        return max_val + std::log(sum_exp) / rho;
+    } else {
+        return SymbolicScalar::logsumexp(rho * SymbolicScalar::vertcat(values)) / rho;
+    }
+}
+
+template <typename Derived>
+auto ks_max(const Eigen::MatrixBase<Derived> &values, double rho = 1.0) {
+    using Scalar = typename Derived::Scalar;
+    std::vector<Scalar> flattened;
+    flattened.reserve(static_cast<size_t>(values.size()));
+    for (Eigen::Index i = 0; i < values.size(); ++i) {
+        flattened.push_back(values.derived().coeff(i));
+    }
+    return ks_max(flattened, rho);
 }
 
 // ======================================================================
@@ -165,8 +301,10 @@ auto sigmoid(const T &x, SigmoidType type = SigmoidType::Tanh, double norm_min =
 
     switch (type) {
     case SigmoidType::Tanh:
-    case SigmoidType::Logistic:
         s = janus::tanh(x);
+        break;
+    case SigmoidType::Logistic:
+        s = janus::tanh(0.5 * x);
         break;
     case SigmoidType::Arctan:
         s = (2.0 / M_PI) * janus::atan((M_PI / 2.0) * x);

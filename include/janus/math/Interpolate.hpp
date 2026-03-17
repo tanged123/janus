@@ -92,6 +92,11 @@ inline std::string method_to_casadi_string(InterpolationMethod method) {
     }
 }
 
+inline const char *hermite_symbolic_error_message() {
+    return "Interpolator: Hermite/Catmull-Rom is numeric-only because interval selection "
+           "requires runtime comparisons. Use BSpline for symbolic or optimization queries.";
+}
+
 /**
  * @brief Flatten N-D values array in Fortran order for CasADi
  *
@@ -100,10 +105,146 @@ inline std::string method_to_casadi_string(InterpolationMethod method) {
  * the first dimension fastest.
  */
 template <typename Derived>
-inline NumericVector flatten_fortran_order(const Eigen::MatrixBase<Derived> &values) {
-    // For 2D matrices, transpose then flatten (equivalent to Fortran order)
-    NumericMatrix transposed = values.transpose();
-    return Eigen::Map<const NumericVector>(transposed.data(), transposed.size());
+inline JanusVector<typename Derived::Scalar>
+flatten_fortran_order(const Eigen::MatrixBase<Derived> &values) {
+    using Scalar = typename Derived::Scalar;
+    JanusVector<Scalar> flattened(values.size());
+
+    Eigen::Index idx = 0;
+    for (Eigen::Index j = 0; j < values.cols(); ++j) {
+        for (Eigen::Index i = 0; i < values.rows(); ++i) {
+            flattened(idx++) = values(i, j);
+        }
+    }
+
+    return flattened;
+}
+
+inline std::string symbolic_values_method_error_message(InterpolationMethod method) {
+    switch (method) {
+    case InterpolationMethod::Hermite:
+        return "interpn: symbolic table values are not supported for Hermite/Catmull-Rom "
+               "because interval selection remains numeric-only. Use BSpline for symbolic or "
+               "optimization queries.";
+    case InterpolationMethod::Nearest:
+        return "interpn: symbolic table values are not supported for Nearest because the "
+               "method is non-differentiable. Use Linear or BSpline.";
+    default:
+        return "interpn: symbolic table values are only supported for Linear and BSpline.";
+    }
+}
+
+struct InterpnGridData {
+    std::vector<std::vector<double>> grid;
+    int expected_size = 1;
+};
+
+inline InterpnGridData build_interpn_grid(const std::vector<NumericVector> &points,
+                                          const char *context) {
+    if (points.empty()) {
+        throw InterpolationError(std::string(context) + ": points cannot be empty");
+    }
+
+    const int n_dims = static_cast<int>(points.size());
+    InterpnGridData data;
+    data.grid.resize(n_dims);
+
+    for (int d = 0; d < n_dims; ++d) {
+        if (points[d].size() < 2) {
+            throw InterpolationError(std::string(context) + ": points[" + std::to_string(d) +
+                                     "] must have at least 2 points");
+        }
+
+        data.grid[d].resize(points[d].size());
+        Eigen::VectorXd::Map(data.grid[d].data(), points[d].size()) = points[d];
+
+        for (size_t i = 0; i + 1 < data.grid[d].size(); ++i) {
+            if (data.grid[d][i + 1] <= data.grid[d][i]) {
+                throw InterpolationError(std::string(context) + ": points[" + std::to_string(d) +
+                                         "] must be strictly increasing");
+            }
+        }
+
+        data.expected_size *= static_cast<int>(points[d].size());
+    }
+
+    return data;
+}
+
+inline void validate_bspline_grid(const std::vector<std::vector<double>> &grid,
+                                  const char *context) {
+    for (size_t d = 0; d < grid.size(); ++d) {
+        if (grid[d].size() < 4) {
+            throw InterpolationError(std::string(context) +
+                                     ": BSpline requires at least 4 grid points in dimension " +
+                                     std::to_string(d));
+        }
+    }
+}
+
+template <JanusScalar Scalar>
+inline JanusMatrix<Scalar> normalize_query_matrix(const JanusMatrix<Scalar> &xi, int n_dims,
+                                                  const char *context) {
+    if (xi.cols() != n_dims && xi.rows() != n_dims) {
+        throw InterpolationError(std::string(context) +
+                                 ": xi must have shape (n_points, n_dims) or (n_dims, n_points)");
+    }
+
+    const bool need_transpose = (xi.rows() == n_dims && xi.cols() != n_dims);
+    if (need_transpose) {
+        return xi.transpose().eval();
+    }
+    return xi.eval();
+}
+
+template <JanusScalar Scalar>
+inline SymbolicScalar clamp_query_point(const JanusVector<Scalar> &point,
+                                        const std::vector<std::vector<double>> &grid) {
+    SymbolicScalar clamped(point.size(), 1);
+    for (int d = 0; d < point.size(); ++d) {
+        SymbolicScalar value =
+            std::is_same_v<Scalar, SymbolicScalar> ? point(d) : SymbolicScalar(point(d));
+        value = SymbolicScalar::fmax(value, grid[d].front());
+        value = SymbolicScalar::fmin(value, grid[d].back());
+        clamped(d) = value;
+    }
+    return clamped;
+}
+
+template <JanusScalar Scalar>
+inline bool point_out_of_bounds_numeric(const JanusVector<Scalar> &point,
+                                        const std::vector<std::vector<double>> &grid) {
+    static_assert(std::is_floating_point_v<Scalar>);
+    for (int d = 0; d < point.size(); ++d) {
+        if (point(d) < grid[d].front() || point(d) > grid[d].back()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline SymbolicScalar point_out_of_bounds_symbolic(const SymbolicVector &point,
+                                                   const std::vector<std::vector<double>> &grid) {
+    SymbolicScalar out_of_bounds = SymbolicScalar(0);
+    for (int d = 0; d < point.size(); ++d) {
+        out_of_bounds = SymbolicScalar::logic_or(out_of_bounds, point(d) < grid[d].front());
+        out_of_bounds = SymbolicScalar::logic_or(out_of_bounds, point(d) > grid[d].back());
+    }
+    return out_of_bounds;
+}
+
+inline casadi::Function make_parametric_interpolant(const std::vector<std::vector<double>> &grid,
+                                                    InterpolationMethod method) {
+    if (method == InterpolationMethod::Hermite || method == InterpolationMethod::Nearest) {
+        throw InterpolationError(symbolic_values_method_error_message(method));
+    }
+    if (method == InterpolationMethod::BSpline) {
+        validate_bspline_grid(grid, "interpn");
+    }
+
+    casadi::Dict opts;
+    opts["inline"] = true;
+    return casadi::interpolant("interp_parametric", method_to_casadi_string(method), grid, 1, opts);
 }
 
 // ============================================================================
@@ -306,8 +447,9 @@ inline double hermite_interpn_numeric(const std::vector<std::vector<double>> &gr
  * (casadi::MX) evaluation via the same interface.
  *
  * For numeric queries, all methods (Linear, Hermite, BSpline, Nearest) are supported.
- * For symbolic queries, only Linear and BSpline are supported (Hermite and Nearest
- * require runtime interval finding which is incompatible with symbolic graphs).
+ * For symbolic queries, only Linear and BSpline are supported. Hermite requires
+ * runtime interval selection, so symbolic Hermite queries throw InterpolationError
+ * with guidance to use BSpline instead.
  *
  * @example 1D usage:
  * ```cpp
@@ -333,6 +475,10 @@ inline double hermite_interpn_numeric(const std::vector<std::vector<double>> &gr
  * query << 0.5, 0.5;
  * double result = interp(query);  // Query at (0.5, 0.5)
  * ```
+ *
+ * @note `Interpolator` caches numeric table data. For symbolic table values
+ *       that must remain optimization variables, use the free `interpn()`
+ *       overloads instead.
  */
 class Interpolator {
   private:
@@ -524,8 +670,7 @@ class Interpolator {
             return eval_numeric_scalar(query);
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             return eval_symbolic_scalar(query);
         }
@@ -559,8 +704,7 @@ class Interpolator {
             return eval_numeric_point(query);
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             return eval_symbolic_point(query);
         }
@@ -627,8 +771,7 @@ class Interpolator {
             }
         } else {
             if (m_use_custom_hermite) {
-                throw InterpolationError(
-                    "Interpolator: Hermite method not supported for symbolic types");
+                throw InterpolationError(detail::hermite_symbolic_error_message());
             }
             if (m_dims == 1) {
                 for (int i = 0; i < n_points; ++i) {
@@ -955,21 +1098,6 @@ class Interpolator {
 };
 
 // ============================================================================
-// Backwards Compatibility
-// ============================================================================
-
-/**
- * @brief Alias for 1D interpolation (backwards compatibility)
- * @deprecated Use Interpolator directly
- */
-using Interp1D = Interpolator;
-
-/**
- * @deprecated Use Interpolator directly
- */
-using JanusInterpolator = Interpolator;
-
-// ============================================================================
 // Free Function API (Backwards Compatibility)
 // ============================================================================
 
@@ -994,49 +1122,15 @@ JanusVector<Scalar> interpn(const std::vector<NumericVector> &points,
                             const NumericVector &values_flat, const JanusMatrix<Scalar> &xi,
                             InterpolationMethod method = InterpolationMethod::Linear,
                             std::optional<Scalar> fill_value = std::nullopt) {
-
-    // Validate inputs
-    if (points.empty()) {
-        throw InterpolationError("interpn: points cannot be empty");
-    }
-
+    const auto grid_data = detail::build_interpn_grid(points, "interpn");
     const int n_dims = static_cast<int>(points.size());
-
-    // Check xi dimensions
-    if (xi.cols() != n_dims && xi.rows() != n_dims) {
-        throw InterpolationError(
-            "interpn: xi must have shape (n_points, n_dims) or (n_dims, n_points)");
-    }
-
-    // Determine if we need to transpose xi
-    bool need_transpose = (xi.rows() == n_dims && xi.cols() != n_dims);
-    JanusMatrix<Scalar> xi_work;
-    if (need_transpose) {
-        xi_work = xi.transpose();
-    } else {
-        xi_work = xi;
-    }
+    JanusMatrix<Scalar> xi_work = detail::normalize_query_matrix(xi, n_dims, "interpn");
     const int n_points = static_cast<int>(xi_work.rows());
 
-    // Build grid for bounds checking
-    std::vector<std::vector<double>> grid(n_dims);
-    for (int d = 0; d < n_dims; ++d) {
-        grid[d].resize(points[d].size());
-        Eigen::VectorXd::Map(grid[d].data(), points[d].size()) = points[d];
-
-        if (!std::is_sorted(grid[d].begin(), grid[d].end())) {
-            throw InterpolationError("interpn: points[" + std::to_string(d) + "] must be sorted");
-        }
-    }
-
     // Validate values size
-    int expected_size = 1;
-    for (const auto &p : points) {
-        expected_size *= static_cast<int>(p.size());
-    }
-    if (values_flat.size() != expected_size) {
+    if (values_flat.size() != grid_data.expected_size) {
         throw InterpolationError("interpn: values_flat size mismatch. Expected " +
-                                 std::to_string(expected_size) + ", got " +
+                                 std::to_string(grid_data.expected_size) + ", got " +
                                  std::to_string(values_flat.size()));
     }
 
@@ -1051,13 +1145,8 @@ JanusVector<Scalar> interpn(const std::vector<NumericVector> &points,
         for (int i = 0; i < n_points; ++i) {
             bool out_of_bounds = false;
             if constexpr (std::is_floating_point_v<Scalar>) {
-                for (int d = 0; d < n_dims; ++d) {
-                    double val = xi_work(i, d);
-                    if (val < grid[d].front() || val > grid[d].back()) {
-                        out_of_bounds = true;
-                        break;
-                    }
-                }
+                NumericVector point = xi_work.row(i).transpose();
+                out_of_bounds = detail::point_out_of_bounds_numeric(point, grid_data.grid);
             }
 
             if (out_of_bounds) {
@@ -1079,29 +1168,62 @@ JanusVector<Scalar> interpn(const std::vector<NumericVector> &points,
 }
 
 /**
- * @brief Convenience overload for 2D interpolation with Eigen matrix values
+ * @brief N-dimensional interpolation with symbolic table values
  *
- * @deprecated Use Interpolator class instead
+ * This overload keeps the table coefficients symbolic so they can participate
+ * in optimization and automatic differentiation. It currently supports Linear
+ * and BSpline methods.
+ *
+ * @tparam Scalar Query scalar type (double or casadi::MX)
+ * @param points Vector of 1D coordinate arrays for each dimension
+ * @param values_flat Flattened symbolic table values in Fortran order
+ * @param xi Query points, shape (n_points, n_dimensions)
+ * @param method Interpolation method
+ * @param fill_value Optional value for out-of-bounds queries
+ * @return SymbolicVector of interpolated values at query points
  */
 template <typename Scalar>
-JanusVector<Scalar> interpn2d(const NumericVector &x_points, const NumericVector &y_points,
-                              const NumericMatrix &values,
-                              const Eigen::Matrix<Scalar, Eigen::Dynamic, 2> &xi,
-                              InterpolationMethod method = InterpolationMethod::Linear) {
+SymbolicVector interpn(const std::vector<NumericVector> &points, const SymbolicVector &values_flat,
+                       const JanusMatrix<Scalar> &xi,
+                       InterpolationMethod method = InterpolationMethod::Linear,
+                       std::optional<SymbolicScalar> fill_value = std::nullopt) {
+    const auto grid_data = detail::build_interpn_grid(points, "interpn");
+    const int n_dims = static_cast<int>(points.size());
+    JanusMatrix<Scalar> xi_work = detail::normalize_query_matrix(xi, n_dims, "interpn");
+    const int n_points = static_cast<int>(xi_work.rows());
 
-    // Validate dimensions
-    if (values.rows() != x_points.size() || values.cols() != y_points.size()) {
-        throw InterpolationError(
-            "interpn2d: values shape must match (x_points.size(), y_points.size())");
+    if (values_flat.size() != grid_data.expected_size) {
+        throw InterpolationError("interpn: values_flat size mismatch. Expected " +
+                                 std::to_string(grid_data.expected_size) + ", got " +
+                                 std::to_string(values_flat.size()));
     }
 
-    // Build points vector
-    std::vector<NumericVector> points = {x_points, y_points};
+    casadi::Function interp = detail::make_parametric_interpolant(grid_data.grid, method);
+    const SymbolicScalar coeffs = janus::as_mx(values_flat);
 
-    // Flatten values in Fortran order (column-major)
-    NumericVector values_flat = detail::flatten_fortran_order(values);
+    SymbolicVector result(n_points);
+    for (int i = 0; i < n_points; ++i) {
+        JanusVector<Scalar> point = xi_work.row(i).transpose();
+        SymbolicScalar clamped_point = detail::clamp_query_point(point, grid_data.grid);
+        SymbolicScalar interp_value = interp(std::vector<SymbolicScalar>{clamped_point, coeffs})[0];
 
-    return interpn<Scalar>(points, values_flat, xi, method);
+        if (fill_value.has_value()) {
+            if constexpr (std::is_floating_point_v<Scalar>) {
+                result(i) = detail::point_out_of_bounds_numeric(point, grid_data.grid)
+                                ? fill_value.value()
+                                : interp_value;
+            } else {
+                SymbolicScalar out_of_bounds =
+                    detail::point_out_of_bounds_symbolic(point, grid_data.grid);
+                result(i) =
+                    SymbolicScalar::if_else(out_of_bounds, fill_value.value(), interp_value);
+            }
+        } else {
+            result(i) = interp_value;
+        }
+    }
+
+    return result;
 }
 
 } // namespace janus

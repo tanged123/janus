@@ -1,9 +1,12 @@
 #pragma once
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
+#include "janus/core/JanusTypes.hpp"
 #include "janus/math/Arithmetic.hpp"
-#include "janus/math/Linalg.hpp"
 #include <Eigen/Dense>
+#include <algorithm>
+#include <type_traits>
+#include <utility>
 
 namespace janus {
 
@@ -39,6 +42,68 @@ auto where(const Cond &cond, const T1 &if_true, const T2 &if_false) {
         return if_else(cond, if_true, if_false);
     }
 }
+
+namespace detail {
+
+template <typename Cond, typename DerivedTrue, typename DerivedFalse>
+auto select(const Cond &cond, const Eigen::MatrixBase<DerivedTrue> &if_true,
+            const Eigen::MatrixBase<DerivedFalse> &if_false) {
+    if (if_true.rows() != if_false.rows() || if_true.cols() != if_false.cols()) {
+        throw InvalidArgument("select: matrix inputs must have the same shape");
+    }
+
+    using ResultScalar = std::decay_t<decltype(janus::where(
+        std::declval<Cond>(), std::declval<typename DerivedTrue::Scalar>(),
+        std::declval<typename DerivedFalse::Scalar>()))>;
+    using ResultMatrix =
+        Eigen::Matrix<ResultScalar, DerivedTrue::RowsAtCompileTime, DerivedTrue::ColsAtCompileTime,
+                      DerivedTrue::Options, DerivedTrue::MaxRowsAtCompileTime,
+                      DerivedTrue::MaxColsAtCompileTime>;
+
+    ResultMatrix res(if_true.rows(), if_true.cols());
+    for (Eigen::Index i = 0; i < if_true.rows(); ++i) {
+        for (Eigen::Index j = 0; j < if_true.cols(); ++j) {
+            res(i, j) = janus::where(cond, if_true(i, j), if_false(i, j));
+        }
+    }
+    return res;
+}
+
+inline bool is_symbolic_predicate(const SymbolicScalar &expr) {
+    if (expr.n_dep() == 0) {
+        return false;
+    }
+
+    switch (expr.op()) {
+    case casadi::OP_LT:
+    case casadi::OP_LE:
+    case casadi::OP_EQ:
+    case casadi::OP_NE:
+    case casadi::OP_AND:
+    case casadi::OP_OR:
+    case casadi::OP_NOT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline SymbolicScalar as_symbolic_predicate(const SymbolicScalar &expr) {
+    return is_symbolic_predicate(expr) ? expr : expr != 0;
+}
+
+template <typename Derived>
+SymbolicScalar count_symbolic_truthy(const Eigen::MatrixBase<Derived> &a) {
+    SymbolicScalar result = 0.0;
+    for (Eigen::Index i = 0; i < a.rows(); ++i) {
+        for (Eigen::Index j = 0; j < a.cols(); ++j) {
+            result = result + as_symbolic_predicate(a(i, j));
+        }
+    }
+    return result;
+}
+
+} // namespace detail
 
 // --- where (Vector/Matrix) ---
 /**
@@ -416,8 +481,7 @@ template <typename Derived> auto logical_not(const Eigen::MatrixBase<Derived> &a
 template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        // all is true if norm_inf(1 - a) == 0 (all a are 1)
-        return SymbolicScalar::norm_inf(1.0 - to_mx(a)) == 0;
+        return detail::count_symbolic_truthy(a) == static_cast<double>(a.size());
     } else {
         return (a.array() != 0).all();
     }
@@ -432,8 +496,7 @@ template <typename Derived> auto all(const Eigen::MatrixBase<Derived> &a) {
 template <typename Derived> auto any(const Eigen::MatrixBase<Derived> &a) {
     using Scalar = typename Derived::Scalar;
     if constexpr (std::is_same_v<Scalar, SymbolicScalar>) {
-        // any is true if norm_inf(a) > 0 (at least one non-zero)
-        return SymbolicScalar::norm_inf(to_mx(a)) != 0;
+        return detail::count_symbolic_truthy(a) >= 1.0;
     } else {
         return (a.array() != 0).any();
     }
@@ -481,11 +544,5 @@ Scalar select(std::initializer_list<CondType> conditions, std::initializer_list<
               const Scalar &default_value) {
     return select(std::vector<CondType>(conditions), std::vector<Scalar>(values), default_value);
 }
-
-// --- Clip ---
-/**
- * @brief Alias for clamp
- */
-template <typename... Args> auto clip(Args &&...args) { return clamp(std::forward<Args>(args)...); }
 
 } // namespace janus

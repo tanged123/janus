@@ -4,6 +4,8 @@
 #include "janus/math/Arithmetic.hpp"
 #include <Eigen/Dense>
 #include <optional>
+#include <type_traits>
+#include <utility>
 
 namespace janus {
 
@@ -39,6 +41,78 @@ auto trapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<Derived
 
     // Sum of element-wise product
     return (mean_y.array() * dx.array()).sum();
+}
+
+// --- cumtrapz(y, x) ---
+/**
+ * @brief Computes the cumulative trapezoidal integral.
+ *
+ * Returns a running integral with the same length as the inputs:
+ * out(0) = 0 and out(i) = integral from x(0) to x(i) using trapezoids.
+ *
+ * @tparam DerivedY Eigen vector type for Y
+ * @tparam DerivedX Eigen vector type for X
+ * @param y Values of function at x points
+ * @param x Grid points
+ * @return Vector of cumulative trapezoidal integrals
+ */
+template <typename DerivedY, typename DerivedX>
+auto cumtrapz(const Eigen::MatrixBase<DerivedY> &y, const Eigen::MatrixBase<DerivedX> &x) {
+    using Scalar = std::decay_t<decltype(0.5 *
+                                         (std::declval<typename DerivedY::Scalar>() +
+                                          std::declval<typename DerivedY::Scalar>()) *
+                                         (std::declval<typename DerivedX::Scalar>() -
+                                          std::declval<typename DerivedX::Scalar>()))>;
+    JanusVector<Scalar> result(y.size());
+
+    if (y.size() != x.size()) {
+        throw InvalidArgument("cumtrapz: y and x must have the same size");
+    }
+
+    if (y.size() == 0) {
+        return result;
+    }
+
+    result(0) = Scalar(0.0);
+    for (Eigen::Index i = 1; i < y.size(); ++i) {
+        const auto interval = 0.5 * (y(i - 1) + y(i)) * (x(i) - x(i - 1));
+        result(i) = result(i - 1) + interval;
+    }
+
+    return result;
+}
+
+/**
+ * @brief Computes the cumulative trapezoidal integral with uniform spacing.
+ *
+ * Returns a running integral with the same length as the input:
+ * out(0) = 0 and out(i) = integral over the first i intervals.
+ *
+ * @tparam DerivedY Eigen vector type for Y
+ * @tparam Spacing Scalar spacing type
+ * @param y Values of function samples
+ * @param dx Uniform spacing between samples
+ * @return Vector of cumulative trapezoidal integrals
+ */
+template <typename DerivedY, JanusScalar Spacing = double>
+auto cumtrapz(const Eigen::MatrixBase<DerivedY> &y, const Spacing &dx = 1.0) {
+    using Scalar = std::decay_t<decltype(0.5 *
+                                         (std::declval<typename DerivedY::Scalar>() +
+                                          std::declval<typename DerivedY::Scalar>()) *
+                                         std::declval<Spacing>())>;
+    JanusVector<Scalar> result(y.size());
+
+    if (y.size() == 0) {
+        return result;
+    }
+
+    result(0) = Scalar(0.0);
+    for (Eigen::Index i = 1; i < y.size(); ++i) {
+        const auto interval = 0.5 * (y(i - 1) + y(i)) * dx;
+        result(i) = result(i - 1) + interval;
+    }
+
+    return result;
 }
 
 // --- gradient_1d(y, x) ---
@@ -197,8 +271,10 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
 /**
  * @brief Computes gradient with periodic boundary conditions
  *
- * For periodic data (e.g., angles), this computes the gradient assuming
- * the data wraps around at the specified period.
+ * For data defined on a periodic domain, this computes the gradient assuming
+ * the final sample wraps around to the first sample. Samples should span one
+ * cycle without repeating the first point at the end; the wrap interval is
+ * inferred from `period - covered_span`.
  *
  * @tparam DerivedF Eigen vector type
  * @tparam Spacing Spacing type (scalar or vector)
@@ -212,11 +288,76 @@ auto gradient(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx = 1.0, int
 template <typename DerivedF, typename Spacing = double, typename Period>
 auto gradient_periodic(const Eigen::MatrixBase<DerivedF> &f, const Spacing &dx,
                        const Period &period, int edge_order = 1, int n = 1) {
-    // For periodic case, we need to handle wrapping
-    // This is simplified - full implementation would require centered_mod
-    // For now, delegate to standard gradient
-    // TODO: Implement proper periodic gradient with centered_mod
-    return gradient(f, dx, edge_order, n);
+    using Scalar = typename DerivedF::Scalar;
+    using Vector = JanusVector<Scalar>;
+
+    const Eigen::Index N = f.size();
+    Vector grad(N);
+
+    if (edge_order != 1 && edge_order != 2) {
+        throw InvalidArgument("gradient_periodic: edge_order must be 1 or 2");
+    }
+    if (n != 1 && n != 2) {
+        throw InvalidArgument("gradient_periodic: derivative order (n) must be 1 or 2");
+    }
+
+    if (N < 2) {
+        if (N > 0)
+            grad.setZero();
+        return grad;
+    }
+
+    Eigen::VectorXd dx_vec(N - 1);
+    if constexpr (std::is_arithmetic_v<Spacing>) {
+        dx_vec.setConstant(static_cast<double>(dx));
+    } else {
+        if (dx.size() == N) {
+            for (Eigen::Index i = 0; i < N - 1; ++i) {
+                dx_vec(i) = static_cast<double>(dx(i + 1) - dx(i));
+            }
+        } else if (dx.size() == N - 1) {
+            for (Eigen::Index i = 0; i < N - 1; ++i) {
+                dx_vec(i) = static_cast<double>(dx(i));
+            }
+        } else {
+            throw InvalidArgument("gradient_periodic: dx must be scalar, size N, or size N-1");
+        }
+    }
+
+    if (N == 2) {
+        if (n == 1) {
+            grad(0) = (f(1) - f(0)) / dx_vec(0);
+            grad(1) = grad(0);
+        } else {
+            grad.setZero();
+        }
+        return grad;
+    }
+
+    const double wrap_dx = static_cast<double>(period) - dx_vec.sum();
+    if (wrap_dx <= 0.0) {
+        throw InvalidArgument("gradient_periodic: period must exceed the covered span. Exclude "
+                              "duplicate endpoint samples.");
+    }
+
+    for (Eigen::Index i = 0; i < N; ++i) {
+        const Eigen::Index prev = (i == 0) ? N - 1 : i - 1;
+        const Eigen::Index next = (i == N - 1) ? 0 : i + 1;
+
+        const double hm = (i == 0) ? wrap_dx : dx_vec(i - 1);
+        const double hp = (i == N - 1) ? wrap_dx : dx_vec(i);
+
+        const auto dfm = f(i) - f(prev);
+        const auto dfp = f(next) - f(i);
+
+        if (n == 1) {
+            grad(i) = (hm * hm * dfp + hp * hp * dfm) / (hm * hp * (hm + hp));
+        } else {
+            grad(i) = 2.0 / (hm + hp) * (dfp / hp - dfm / hm);
+        }
+    }
+
+    return grad;
 }
 
 } // namespace janus

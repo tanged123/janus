@@ -63,16 +63,16 @@ void apply_brachistochrone_initial_guess(Opti &opti, const SymbolicMatrix &x,
         const double y_guess = 10.0 - 5.0 * s;
         const double v_guess = std::sqrt(std::max(0.0, 2.0 * 9.80665 * (10.0 - y_guess)));
 
-        opti.casadi_opti().set_initial(x(k, 0), x_guess);
-        opti.casadi_opti().set_initial(x(k, 1), y_guess);
-        opti.casadi_opti().set_initial(x(k, 2), std::max(1e-3, v_guess));
+        opti.set_initial(x(k, 0), x_guess);
+        opti.set_initial(x(k, 1), y_guess);
+        opti.set_initial(x(k, 2), std::max(1e-3, v_guess));
     }
 
     for (int k = 0; k < u.rows(); ++k) {
         const double s =
             (u.rows() > 1) ? static_cast<double>(k) / static_cast<double>(u.rows() - 1) : 0.5;
         const double theta_guess = 1.2 - 0.4 * s;
-        opti.casadi_opti().set_initial(u(k, 0), theta_guess);
+        opti.set_initial(u(k, 0), theta_guess);
     }
 }
 
@@ -203,7 +203,7 @@ RunResult solve_birkhoff(int n_nodes, double ref_time) {
     BirkhoffPseudospectral bk(opti);
     auto T = opti.variable(2.0, std::nullopt, 0.1, 10.0);
 
-    BirkhoffOptions opts;
+    BirkhoffPseudospectralOptions opts;
     opts.scheme = BirkhoffScheme::LGL;
     opts.n_nodes = n_nodes;
 

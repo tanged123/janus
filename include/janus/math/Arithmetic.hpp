@@ -364,11 +364,20 @@ template <JanusScalar T> T fmod(const T &x, const T &y) {
  */
 template <typename Derived, typename Scalar>
 auto fmod(const Eigen::MatrixBase<Derived> &x, const Scalar &y) {
-    if constexpr (std::is_same_v<typename Derived::Scalar, casadi::MX>) {
-        return fmod(x, y); // CasADi handles matrix fmod? Check docs or assume mapping.
-        // Actually, CasADi MX supports fmod.
+    if constexpr (std::is_same_v<typename Derived::Scalar, casadi::MX> ||
+                  std::is_same_v<Scalar, casadi::MX>) {
+        // Element-wise fmod when either operand is symbolic
+        using ResultScalar = casadi::MX;
+        Eigen::Matrix<ResultScalar, Derived::RowsAtCompileTime, Derived::ColsAtCompileTime> result(
+            x.rows(), x.cols());
+        const ResultScalar y_mx = static_cast<ResultScalar>(y);
+        for (Eigen::Index i = 0; i < x.rows(); ++i) {
+            for (Eigen::Index j = 0; j < x.cols(); ++j) {
+                result(i, j) = janus::fmod(static_cast<ResultScalar>(x(i, j)), y_mx);
+            }
+        }
+        return result;
     } else {
-        // For Eigen double, use binaryExpr
         return x.binaryExpr(Eigen::MatrixBase<Derived>::Constant(x.rows(), x.cols(), y),
                             [](double a, double b) { return std::fmod(a, b); });
     }

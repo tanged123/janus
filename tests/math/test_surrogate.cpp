@@ -1,10 +1,33 @@
 #include "../utils/TestUtils.hpp" // specific path to TestUtils
-#include "janus/janus.hpp"
+#include "janus/core/Function.hpp"
+#include "janus/core/JanusError.hpp"
+#include "janus/math/AutoDiff.hpp"
 #include "janus/math/SurrogateModel.hpp"
 #include <gtest/gtest.h>
 
 namespace janus {
 namespace test {
+namespace {
+
+template <typename Fn> double forward_difference(Fn &&fn, double x, double h) {
+    return (fn(x + h) - fn(x)) / h;
+}
+
+template <typename Fn> double backward_difference(Fn &&fn, double x, double h) {
+    return (fn(x) - fn(x - h)) / h;
+}
+
+template <typename Fn> double forward_second_difference(Fn &&fn, double x, double h) {
+    return (fn(x + 2.0 * h) - 2.0 * fn(x + h) + fn(x)) / (h * h);
+}
+
+template <typename Fn> double backward_second_difference(Fn &&fn, double x, double h) {
+    return (fn(x) - 2.0 * fn(x - h) + fn(x - 2.0 * h)) / (h * h);
+}
+
+double logistic(double x) { return 1.0 / (1.0 + std::exp(-x)); }
+
+} // namespace
 
 // ======================================================================
 // Softmax Tests
@@ -86,14 +109,193 @@ TEST(SurrogateTests, SoftplusNumeric) {
     EXPECT_NEAR(softplus(-100.0), 0.0, 1e-5);
 
     // Large positive -> linear
-    EXPECT_NEAR(softplus(100.0), 100.0, 1e-5);
+    EXPECT_NEAR(softplus(1000.0), 1000.0, 1e-5);
 }
 
 TEST(SurrogateTests, SoftplusSymbolic) {
     auto x = janus::sym("x");
     auto expr = softplus(x);
-    double val = janus::Function({x}, {expr}).eval(0.0)(0, 0);
-    EXPECT_NEAR(val, std::log(2.0), 1e-5);
+    janus::Function f({x}, {expr});
+
+    EXPECT_NEAR(f.eval(0.0)(0, 0), std::log(2.0), 1e-5);
+    EXPECT_NEAR(f.eval(1000.0)(0, 0), 1000.0, 1e-5);
+}
+
+TEST(SurrogateTests, SoftplusNumericDerivativesRemainSmoothAcrossLegacyThreshold) {
+    constexpr double beta = 3.0;
+    constexpr double threshold = 2.0;
+    constexpr double transition = threshold / beta;
+    constexpr double h = 1e-4;
+
+    auto fn = [&](double x) { return softplus(x, beta, threshold); };
+
+    const double d1_left = backward_difference(fn, transition, h);
+    const double d1_right = forward_difference(fn, transition, h);
+    const double d2_left = backward_second_difference(fn, transition, h);
+    const double d2_right = forward_second_difference(fn, transition, h);
+
+    const double sigma = logistic(beta * transition);
+    const double expected_second = beta * sigma * (1.0 - sigma);
+
+    EXPECT_NEAR(d1_left, sigma, 5e-4);
+    EXPECT_NEAR(d1_right, sigma, 5e-4);
+    EXPECT_NEAR(d1_left, d1_right, 5e-4);
+
+    EXPECT_NEAR(d2_left, expected_second, 5e-3);
+    EXPECT_NEAR(d2_right, expected_second, 5e-3);
+    EXPECT_NEAR(d2_left, d2_right, 5e-3);
+}
+
+TEST(SurrogateTests, SoftplusSymbolicDerivativesRemainSmoothAcrossLegacyThreshold) {
+    constexpr double beta = 3.0;
+    constexpr double threshold = 2.0;
+    constexpr double transition = threshold / beta;
+    constexpr double h = 1e-4;
+
+    auto x = janus::sym("x");
+    auto expr = softplus(x, beta, threshold);
+    auto first = janus::jacobian(expr, x);
+    auto second = janus::hessian(expr, x);
+
+    janus::Function first_fn({x}, {first});
+    janus::Function second_fn({x}, {second});
+
+    const double d1_left = first_fn.eval(transition - h)(0, 0);
+    const double d1_right = first_fn.eval(transition + h)(0, 0);
+    const double d2_left = second_fn.eval(transition - h)(0, 0);
+    const double d2_right = second_fn.eval(transition + h)(0, 0);
+
+    const double sigma_left = logistic(beta * (transition - h));
+    const double sigma_right = logistic(beta * (transition + h));
+    const double expected_second_left = beta * sigma_left * (1.0 - sigma_left);
+    const double expected_second_right = beta * sigma_right * (1.0 - sigma_right);
+
+    EXPECT_NEAR(d1_left, sigma_left, 1e-9);
+    EXPECT_NEAR(d1_right, sigma_right, 1e-9);
+    EXPECT_NEAR(d1_left, d1_right, 1e-3);
+
+    EXPECT_NEAR(d2_left, expected_second_left, 1e-9);
+    EXPECT_NEAR(d2_right, expected_second_right, 1e-9);
+    EXPECT_NEAR(d2_left, d2_right, 1e-3);
+}
+
+// ======================================================================
+// Smooth Approximation Suite Tests
+// ======================================================================
+
+TEST(SurrogateTests, SmoothAbsNumericConvergesToAbsoluteValue) {
+    constexpr double hardness = 80.0;
+
+    EXPECT_NEAR(smooth_abs(-2.0, hardness), 2.0, 1e-6);
+    EXPECT_NEAR(smooth_abs(-0.5, hardness), 0.5, 1e-6);
+    EXPECT_NEAR(smooth_abs(1.25, hardness), 1.25, 1e-6);
+    EXPECT_NEAR(smooth_abs(0.0, hardness), std::log(2.0) / hardness, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothAbsSymbolicDerivativesExistAtOrigin) {
+    constexpr double hardness = 20.0;
+
+    auto x = janus::sym("x");
+    auto expr = smooth_abs(x, hardness);
+    auto first = janus::jacobian(expr, x);
+    auto second = janus::hessian(expr, x);
+
+    janus::Function f({x}, {expr});
+    janus::Function first_fn({x}, {first});
+    janus::Function second_fn({x}, {second});
+
+    EXPECT_NEAR(f.eval(0.0)(0, 0), std::log(2.0) / hardness, 1e-10);
+    EXPECT_NEAR(first_fn.eval(0.0)(0, 0), 0.0, 1e-10);
+    EXPECT_NEAR(second_fn.eval(0.0)(0, 0), hardness, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothMaxMinNumericConvergeToHardOperators) {
+    constexpr double hardness = 100.0;
+
+    EXPECT_NEAR(smooth_max(1.0, 3.0, hardness), 3.0, 1e-10);
+    EXPECT_NEAR(smooth_min(1.0, 3.0, hardness), 1.0, 1e-10);
+    EXPECT_NEAR(smooth_max(-2.0, -5.0, hardness), -2.0, 1e-10);
+    EXPECT_NEAR(smooth_min(-2.0, -5.0, hardness), -5.0, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothMaxMinSymbolicGradientsExistAtTie) {
+    constexpr double hardness = 15.0;
+
+    auto a = janus::sym("a");
+    auto b = janus::sym("b");
+
+    auto smax = smooth_max(a, b, hardness);
+    auto smin = smooth_min(a, b, hardness);
+
+    auto grad_max = janus::jacobian(smax, a, b);
+    auto grad_min = janus::jacobian(smin, a, b);
+
+    janus::Function grad_max_fn({a, b}, {grad_max});
+    janus::Function grad_min_fn({a, b}, {grad_min});
+
+    auto max_grad = grad_max_fn.eval(0.0, 0.0);
+    auto min_grad = grad_min_fn.eval(0.0, 0.0);
+
+    EXPECT_NEAR(max_grad(0, 0), 0.5, 1e-10);
+    EXPECT_NEAR(max_grad(0, 1), 0.5, 1e-10);
+    EXPECT_NEAR(min_grad(0, 0), 0.5, 1e-10);
+    EXPECT_NEAR(min_grad(0, 1), 0.5, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothClampNumericConvergesToClamp) {
+    constexpr double hardness = 100.0;
+
+    EXPECT_NEAR(smooth_clamp(-2.0, 0.0, 1.0, hardness), 0.0, 1e-10);
+    EXPECT_NEAR(smooth_clamp(0.4, 0.0, 1.0, hardness), 0.4, 1e-10);
+    EXPECT_NEAR(smooth_clamp(2.0, 0.0, 1.0, hardness), 1.0, 1e-10);
+}
+
+TEST(SurrogateTests, SmoothClampSymbolicGradientExistsAtBounds) {
+    constexpr double hardness = 25.0;
+
+    auto x = janus::sym("x");
+    auto expr = smooth_clamp(x, 0.0, 1.0, hardness);
+    auto grad = janus::jacobian(expr, x);
+
+    janus::Function grad_fn({x}, {grad});
+
+    const double grad_at_low = grad_fn.eval(0.0)(0, 0);
+    const double grad_at_high = grad_fn.eval(1.0)(0, 0);
+
+    EXPECT_GT(grad_at_low, 0.0);
+    EXPECT_LT(grad_at_low, 1.0);
+    EXPECT_GT(grad_at_high, 0.0);
+    EXPECT_LT(grad_at_high, 1.0);
+}
+
+TEST(SurrogateTests, KsMaxNumericConvergesToMaximum) {
+    constexpr double rho = 120.0;
+    const std::vector<double> values = {1.0, 2.0, 3.0};
+
+    EXPECT_NEAR(ks_max(values, rho), 3.0, 1e-10);
+
+    janus::NumericVector eigen_values(3);
+    eigen_values << 1.0, 2.0, 3.0;
+    EXPECT_NEAR(ks_max(eigen_values, rho), 3.0, 1e-10);
+}
+
+TEST(SurrogateTests, KsMaxSymbolicGradientExistsAndFormsConvexWeights) {
+    constexpr double rho = 9.0;
+
+    auto x = janus::sym("x");
+    auto y = janus::sym("y");
+    auto z = janus::sym("z");
+
+    auto expr = ks_max(std::vector<janus::SymbolicScalar>{x, y, z}, rho);
+    auto grad = janus::jacobian(expr, x, y, z);
+
+    janus::Function grad_fn({x, y, z}, {grad});
+    auto grad_val = grad_fn.eval(0.0, 0.0, 0.0);
+
+    EXPECT_NEAR(grad_val(0, 0), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val(0, 1), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val(0, 2), 1.0 / 3.0, 1e-10);
+    EXPECT_NEAR(grad_val.row(0).sum(), 1.0, 1e-10);
 }
 
 // ======================================================================
@@ -176,6 +378,13 @@ TEST(SurrogateTests, CoverageErrors) {
     std::vector<double> valid = {1.0, 2.0};
     EXPECT_THROW(janus::softmax(valid, -1.0), janus::InvalidArgument); // Invalid softness
     EXPECT_THROW(janus::softmax(valid, 0.0), janus::InvalidArgument);  // Invalid softness
+
+    EXPECT_THROW(janus::smooth_abs(0.0, 0.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_max(0.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_min(0.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::smooth_clamp(0.0, -1.0, 1.0, -1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::ks_max(std::vector<double>{}, 1.0), janus::InvalidArgument);
+    EXPECT_THROW(janus::ks_max(std::vector<double>{1.0, 2.0}, 0.0), janus::InvalidArgument);
 }
 
 } // namespace test

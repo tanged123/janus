@@ -1,0 +1,158 @@
+# Root Finding Guide
+
+This guide covers Janus's nonlinear root-finding utilities in `RootFinding.hpp`. The API now has two distinct roles:
+
+- Numeric nonlinear solves with a globalization stack for difficult residual systems
+- Symbolic implicit solves that stay differentiable inside CasADi graphs
+
+## Overview
+
+Janus expects a root-finding problem to look like:
+
+```cpp
+F(x) = 0
+```
+
+with:
+
+- one dense column-vector input `x`
+- one dense column-vector output `F(x)`
+- matching input and output dimensions
+
+The main entry points are:
+
+```cpp
+janus::RootResult<double> result = janus::rootfinder<double>(F, x0, opts);
+janus::NewtonSolver solver(F, opts);
+janus::Function implicit = janus::create_implicit_function(G, x_guess, opts);
+```
+
+## Numeric Solves
+
+`rootfinder<double>()` and `NewtonSolver::solve()` use Janus's own globalization stack. The default is `RootSolveStrategy::Auto`, which tries:
+
+1. Trust-region Newton (Levenberg-Marquardt)
+2. Line-search Newton
+3. Quasi-Newton Broyden updates
+4. Pseudo-transient continuation
+
+This is designed to be more robust than a bare Newton step when the initial Jacobian is poor, singular, or badly scaled.
+
+### Strategy Selection
+
+```cpp
+janus::RootFinderOptions opts;
+opts.strategy = janus::RootSolveStrategy::Auto;
+```
+
+Available numeric strategies:
+
+| Strategy | Use Case |
+|----------|----------|
+| `Auto` | Default. Best general-purpose option for trim and nonlinear residual solves. |
+| `TrustRegionNewton` | Good first choice when Jacobians are reliable and you want fast local convergence. |
+| `LineSearchNewton` | Useful when exact Newton steps are too aggressive but the Jacobian is still trustworthy. |
+| `QuasiNewtonBroyden` | Useful when recomputing exact Jacobians is expensive and secant updates are acceptable. |
+| `PseudoTransientContinuation` | Last-resort path for highly nonlinear or singular-start problems. |
+
+### Result Diagnostics
+
+Numeric solves return a `RootResult<double>` with method and convergence diagnostics:
+
+```cpp
+auto result = janus::rootfinder<double>(F, x0);
+
+if (result.converged) {
+    std::cout << result.x.transpose() << "\n";
+    std::cout << result.iterations << "\n";
+    std::cout << result.residual_norm << "\n";
+}
+```
+
+Useful fields:
+
+- `x`: final iterate
+- `converged`: whether the residual tolerance was met
+- `method`: which stage actually converged
+- `iterations`: total iterations used across the stack
+- `residual_norm`: final infinity norm of the residual
+- `step_norm`: last accepted step infinity norm
+- `message`: short status string
+
+### Example: Automatic Fallback
+
+This example starts from a singular Jacobian, so `Auto` falls through to pseudo-transient continuation:
+
+```cpp
+auto x = janus::sym("x");
+janus::Function F("singular_start", {x}, {x * x - 1.0});
+
+Eigen::VectorXd x0(1);
+x0 << 0.0;
+
+janus::RootFinderOptions opts;
+opts.max_iter = 60;
+opts.pseudo_transient_dt0 = 0.1;
+
+auto result = janus::rootfinder<double>(F, x0, opts);
+```
+
+### Example: Persistent Solver Reuse
+
+When you will solve the same residual system multiple times, use `NewtonSolver` so the residual and Jacobian kernels are compiled once:
+
+```cpp
+janus::RootFinderOptions opts;
+opts.strategy = janus::RootSolveStrategy::LineSearchNewton;
+
+janus::NewtonSolver solver(F, opts);
+
+auto res1 = solver.solve(x0_a);
+auto res2 = solver.solve(x0_b);
+```
+
+## Differentiable Implicit Solves
+
+`create_implicit_function()` is the right tool when the solve itself must remain inside a symbolic graph:
+
+```cpp
+G(x, p) = 0  ->  x(p)
+```
+
+Janus keeps this path on CasADi's differentiable `newton` rootfinder so exact implicit sensitivities are preserved.
+
+```cpp
+auto x = janus::sym("x");
+auto p = janus::sym("p");
+janus::Function G("G", {x, p}, {x * x - p});
+
+Eigen::VectorXd guess(1);
+guess << 1.0;
+
+auto x_of_p = janus::create_implicit_function(G, guess);
+auto dxdp = janus::jacobian(x_of_p(p)[0](0), p);
+```
+
+### Non-Default Implicit Slots
+
+If the unknown state is not the first input or the residual is not the first output, use `ImplicitFunctionOptions`:
+
+```cpp
+janus::ImplicitFunctionOptions implicit_opts;
+implicit_opts.implicit_input_index = 1;
+implicit_opts.implicit_output_index = 1;
+
+auto implicit = janus::create_implicit_function(G, guess, {}, implicit_opts);
+```
+
+## Symbolic `rootfinder`
+
+`rootfinder<janus::SymbolicScalar>()` also remains CasADi-rootfinder-backed. Use it when you want a symbolic solve node directly, but for optimization workflows the higher-level `create_implicit_function()` wrapper is usually cleaner.
+
+## Example Program
+
+See `examples/interpolation/rootfinding_demo.cpp` for a runnable example that demonstrates:
+
+- automatic fallback to pseudo-transient continuation
+- explicit line-search strategy selection with a persistent solver
+- differentiable implicit solve creation and symbolic differentiation

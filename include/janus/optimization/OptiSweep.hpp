@@ -24,7 +24,7 @@ struct SweepResult {
     /// Parameter values that were swept
     std::vector<double> param_values;
 
-    /// Solutions at each parameter value
+    /// Solutions at each parameter value (only for converged points)
     std::vector<OptiSol> solutions;
 
     /// Number of iterations for each solve
@@ -33,22 +33,22 @@ struct SweepResult {
     /// Whether all solves converged successfully
     bool all_converged = true;
 
+    /// Per-point convergence status (true = converged)
+    std::vector<bool> converged;
+
+    /// Error messages for failed points (empty string if converged)
+    std::vector<std::string> errors;
+
     /// Number of sweep points
     size_t size() const { return param_values.size(); }
 
-    /// Get objective value at sweep index
-    double objective(size_t i) const {
+    /// Get objective value at sweep index.
+    /// Requires the objective expression that was passed to minimize/maximize.
+    double objective(size_t i, const SymbolicScalar &objective_expr) const {
         if (i >= solutions.size()) {
             throw InvalidArgument("SweepResult::objective: index out of range");
         }
-        // Return the objective from solver stats
-        auto stats = solutions[i].stats();
-        if (stats.count("iterations")) {
-            // IPOPT stores final objective in solution
-        }
-        // Note: CasADi OptiSol doesn't directly expose objective
-        // User should evaluate their objective expression with sol.value()
-        return 0.0; // Placeholder - user evaluates objective manually
+        return solutions[i].value(objective_expr);
     }
 
     /// Extract values of a variable across all sweep points

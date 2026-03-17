@@ -17,6 +17,19 @@
 
 namespace janus {
 
+/**
+ * @brief Result of a second-order integration step.
+ *
+ * The returned state represents the generalized coordinates and generalized
+ * velocities at the end of the step.
+ *
+ * @tparam Scalar Numeric or symbolic scalar type
+ */
+template <typename Scalar> struct SecondOrderStepResult {
+    JanusVector<Scalar> q;
+    JanusVector<Scalar> v;
+};
+
 // ============================================================================
 // Forward Euler (1st order)
 // ============================================================================
@@ -125,6 +138,74 @@ JanusVector<Scalar> rk4_step(Func &&f, const JanusVector<Scalar> &x, Scalar t, S
     JanusVector<Scalar> k4 = f(t + dt, x3);
 
     return (x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)).eval();
+}
+
+// ============================================================================
+// Structure-preserving second-order integrators
+// ============================================================================
+
+/**
+ * @brief Stormer-Verlet / velocity-Verlet step for q'' = a(t, q).
+ *
+ * This method is symplectic for separable Hamiltonian systems where the
+ * acceleration depends only on the generalized coordinates. It is particularly
+ * useful for long-horizon orbital and mechanical propagation because it keeps
+ * energy error bounded instead of exhibiting the secular drift common to
+ * generic explicit Runge-Kutta methods.
+ *
+ * @tparam Scalar Numeric or symbolic scalar type
+ * @tparam AccelFunc Callable type a(t, q) -> qdd
+ * @param acceleration Acceleration function
+ * @param q Current generalized coordinates
+ * @param v Current generalized velocities
+ * @param t Current time
+ * @param dt Time step
+ * @return Coordinates and velocities at t + dt
+ */
+template <typename Scalar, typename AccelFunc>
+SecondOrderStepResult<Scalar>
+stormer_verlet_step(AccelFunc &&acceleration, const JanusVector<Scalar> &q,
+                    const JanusVector<Scalar> &v, Scalar t, Scalar dt) {
+    JanusVector<Scalar> a0 = acceleration(t, q);
+    JanusVector<Scalar> v_half = (v + 0.5 * dt * a0).eval();
+    JanusVector<Scalar> q_next = (q + dt * v_half).eval();
+    JanusVector<Scalar> a1 = acceleration(t + dt, q_next);
+    JanusVector<Scalar> v_next = (v_half + 0.5 * dt * a1).eval();
+    return SecondOrderStepResult<Scalar>{q_next, v_next};
+}
+
+/**
+ * @brief Classical 4th-order Runge-Kutta-Nystrom step for q'' = a(t, q).
+ *
+ * This method targets second-order systems directly, avoiding the need to
+ * rewrite them as first-order state-space systems before stepping them.
+ *
+ * @tparam Scalar Numeric or symbolic scalar type
+ * @tparam AccelFunc Callable type a(t, q) -> qdd
+ * @param acceleration Acceleration function
+ * @param q Current generalized coordinates
+ * @param v Current generalized velocities
+ * @param t Current time
+ * @param dt Time step
+ * @return Coordinates and velocities at t + dt
+ */
+template <typename Scalar, typename AccelFunc>
+SecondOrderStepResult<Scalar> rkn4_step(AccelFunc &&acceleration, const JanusVector<Scalar> &q,
+                                        const JanusVector<Scalar> &v, Scalar t, Scalar dt) {
+    JanusVector<Scalar> k1 = acceleration(t, q);
+
+    JanusVector<Scalar> q2 = (q + 0.5 * dt * v + (dt * dt / 8.0) * k1).eval();
+    JanusVector<Scalar> k2 = acceleration(t + 0.5 * dt, q2);
+
+    JanusVector<Scalar> q3 = (q + 0.5 * dt * v + (dt * dt / 8.0) * k2).eval();
+    JanusVector<Scalar> k3 = acceleration(t + 0.5 * dt, q3);
+
+    JanusVector<Scalar> q4 = (q + dt * v + (dt * dt / 2.0) * k3).eval();
+    JanusVector<Scalar> k4 = acceleration(t + dt, q4);
+
+    JanusVector<Scalar> q_next = (q + dt * v + (dt * dt / 6.0) * (k1 + k2 + k3)).eval();
+    JanusVector<Scalar> v_next = (v + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)).eval();
+    return SecondOrderStepResult<Scalar>{q_next, v_next};
 }
 
 // ============================================================================

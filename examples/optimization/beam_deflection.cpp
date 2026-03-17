@@ -54,7 +54,7 @@ int main() {
     std::string cache_file = "beam_solution.json";
     std::map<std::string, std::vector<double>> cache;
     try {
-        cache = janus::OptiCache::load(cache_file);
+        cache = janus::OptiSol::load(cache_file);
         std::cout << "Warm starting from " << cache_file << "\n";
     } catch (...) {
         std::cout << "Cold start (no cache found)\n";
@@ -155,7 +155,7 @@ int main() {
     std::cout << "Tip deflection (analytical):   " << tip_analytical << " m\n";
     std::cout << "Error: " << std::abs(tip_deflection - tip_analytical) / tip_analytical * 100
               << "%\n";
-    std::cout << "Solver iterations: " << sol.num_iterations() << "\n\n";
+    std::cout << "Solver iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
 
     // Print deflection profile
     std::cout << "Deflection Profile:\n";

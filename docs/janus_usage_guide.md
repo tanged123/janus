@@ -23,7 +23,7 @@
 
 - **Doxygen API Docs**: [https://tanged123.github.io/janus/index.html](https://tanged123.github.io/janus/index.html)
 - **Design Overview**: `docs/design_overview.md`
-- **User Guides**: `docs/user_guides/` (10 comprehensive guides)
+- **User Guides**: `docs/user_guides/` (comprehensive guides)
 
 ### Key Documentation Files
 
@@ -34,8 +34,13 @@
 | `docs/user_guides/numeric_computing.md` | Numeric mode guide |
 | `docs/user_guides/optimization.md` | Opti interface usage |
 | `docs/user_guides/interpolation.md` | Interpolation utilities |
+| `docs/user_guides/polynomial_chaos.md` | Polynomial chaos basis construction, coefficient fitting, symbolic moments |
+| `docs/user_guides/stochastic_quadrature.md` | Probability-measure quadrature rules, tensor grids, and Smolyak sparse grids |
+| `docs/user_guides/root_finding.md` | Nonlinear solve strategies and differentiable implicit solves |
 | `docs/user_guides/graph_visualization.md` | Computational graph visualization |
-| `docs/user_guides/sparsity.md` | Sparsity pattern analysis |
+| `docs/user_guides/sparsity.md` | Sparsity inspection, graph coloring, sparse derivative kernels |
+| `docs/user_guides/structural_diagnostics.md` | Structural observability and identifiability preflight checks |
+| `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, and tearing recommendations |
 | `docs/user_guides/collocation.md` | Direct collocation for trajectory optimization |
 | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | `docs/user_guides/transcription_methods.md` | Overview of trajectory optimization methods |
@@ -182,7 +187,9 @@ janus::as_vector(casadi_mx)    // MX → SymbolicVector
 | `JanusError.hpp` | Custom exception types | `InvalidArgument`, `IntegrationError`, `InterpolationError` |
 | `JanusIO.hpp` | I/O and graph visualization | `eval()`, `print()`, `to_dot()`, `graphviz()` |
 | `Function.hpp` | CasADi function wrapper | `Function` class for compiled symbolic functions |
-| `Sparsity.hpp` | Sparsity pattern analysis | `SparsityPattern`, `analyze_sparsity()`, `visualize_sparsity()` |
+| `Sparsity.hpp` | Sparsity analysis and sparse derivative kernels | `SparsityPattern`, `GraphColoring`, `sparse_jacobian()`, `sparse_hessian()`, `nan_propagation_sparsity()` |
+| `Diagnostics.hpp` | Structural observability and identifiability checks | `analyze_structural_observability()`, `analyze_structural_identifiability()`, `analyze_structural_diagnostics()` |
+| `StructuralTransforms.hpp` | Structural reduction and decomposition passes | `alias_eliminate()`, `block_triangularize()`, `structural_analyze()` |
 
 #### Key APIs in Core
 
@@ -202,6 +209,20 @@ janus::graphviz(expr, "output.pdf");
 // Function compilation
 janus::Function f("f", {x}, {result});
 auto output = f({5.0});
+
+// Sparse derivative kernels
+auto J = janus::sparse_jacobian(result, x);
+auto H = janus::sparse_hessian(objective, vars);
+auto nz = J.values(x_val);
+
+// Structural observability / identifiability checks
+auto obs = janus::analyze_structural_observability(measurement_fn, 0);
+auto id = janus::analyze_structural_identifiability(measurement_fn, 1);
+
+// Structural reduction and decomposition
+auto alias = janus::alias_eliminate(residual_fn);
+auto blt = janus::block_triangularize(residual_fn);
+auto analysis = janus::structural_analyze(residual_fn);
 ```
 
 ---
@@ -275,6 +296,10 @@ Symbolic-compatible branching and comparisons:
 |----------|-------------|
 | `jacobian({outputs}, {inputs})` | Multi-input/output Jacobian |
 | `hessian(output, inputs)` | Hessian matrix |
+| `hessian_vector_product(output, inputs, direction)` | Matrix-free Hessian action `H * v` |
+| `lagrangian_hessian_vector_product(...)` | Matrix-free second-order adjoint `∇²L(x, λ) v` |
+| `select_sensitivity_regime(...)` | Choose forward, adjoint, or checkpointed adjoint |
+| `sensitivity_jacobian(function, output_idx, input_idx, ...)` | Build a Jacobian function through the selected regime |
 
 ---
 
@@ -284,6 +309,8 @@ Symbolic-compatible branching and comparisons:
 |----------|-------------|
 | `dot(a, b)` | Dot product |
 | `cross(a, b)` | Cross product (3D) |
+| `solve(A, b)` | Default linear solve backend |
+| `solve(A, b, policy)` | Policy-selected dense, sparse-direct, or iterative linear solve |
 | `norm(v)` | Euclidean norm |
 | `normalize(v)` | Unit vector |
 | `trace(M)` | Matrix trace |
@@ -310,6 +337,38 @@ Methods: `"linear"`, `"cubic"`, `"monotonic"`
 
 ---
 
+#### Polynomial Chaos (`PolynomialChaos.hpp`)
+
+| Function | Description |
+|----------|-------------|
+| `pce_polynomial(dim, degree, x, normalized)` | Evaluate a univariate Hermite / Legendre / Jacobi / Laguerre basis term |
+| `pce_squared_norm(dim, degree, normalized)` | Probability-space squared norm for one basis term |
+| `PolynomialChaosBasis(dimensions, order, options)` | Build a multidimensional total-order or tensor-product basis |
+| `basis.evaluate(point)` | Evaluate all basis terms at one stochastic point |
+| `pce_projection_coefficients(...)` | Recover coefficients from weighted collocation samples |
+| `pce_regression_coefficients(...)` | Recover coefficients from sample regression / least squares |
+| `pce_mean(coeffs)` | Mean of a scalar PCE |
+| `pce_variance(basis, coeffs)` | Variance of a scalar PCE |
+
+See `docs/user_guides/polynomial_chaos.md` for sample layout, normalization, and symbolic-moment workflows.
+
+---
+
+#### Stochastic Quadrature (`Quadrature.hpp`)
+
+| Function | Description |
+|----------|-------------|
+| `stochastic_quadrature_rule(dim, order, rule)` | One-dimensional probability-measure quadrature rule |
+| `stochastic_quadrature_level(dim, level, rule)` | Refinement-level rule, including nested Clenshaw-Curtis |
+| `tensor_product_quadrature(rules)` | Tensor-product grid with Janus sample layout |
+| `smolyak_sparse_grid(dimensions, level, options)` | Sparse-grid collocation for higher-dimensional problems |
+| `pce_projection_coefficients(basis, rule, values)` | Direct projection from a univariate quadrature rule |
+| `pce_projection_coefficients(basis, grid, values)` | Direct projection from a tensor or Smolyak grid |
+
+See `docs/user_guides/stochastic_quadrature.md` for rule families, nesting behavior, and sparse-grid usage.
+
+---
+
 #### Spacing (`Spacing.hpp`)
 
 | Function | Description |
@@ -330,8 +389,13 @@ ODE integration:
 |----------|-------------|
 | `quad(f, a, b)` | Definite integral (Gauss-Kronrod) |
 | `solve_ivp(dynamics, x0, t_span)` | ODE IVP solver |
+| `solve_second_order_ivp(accel, q0, v0, t_span)` | Second-order trajectory solver (`q'' = a(t, q)`) |
+| `solve_ivp_mass_matrix(rhs, M, x0, t_span)` | Native stiff solver for `M(t, y) y' = f(t, y)` |
+| `solve_ivp_mass_matrix_expr(rhs, M, t, y, x0, t_span)` | Symbolic IDAS mass-matrix / DAE solve |
+| `stormer_verlet_step(accel, q, v, t, dt)` | Symplectic single-step integrator |
+| `rkn4_step(accel, q, v, t, dt)` | 4th-order Runge-Kutta-Nystrom step |
 
-Integration methods: `"RK4"`, `"CVODES"`, `"IDAS"`
+Integration methods: `RK4`, `StormerVerlet`, `RKN4`, `RosenbrockEuler`, `BDF1`, `CVODES`, `IDAS`
 
 ---
 
@@ -388,9 +452,20 @@ Full quaternion algebra class:
 
 | Function | Description |
 |----------|-------------|
-| `bisection(f, a, b)` | Bisection method |
-| `newton(f, df, x0)` | Newton-Raphson |
-| `find_root(f, x0)` | Automatic method selection |
+| `rootfinder(function, x0, opts)` | Solve `F(x)=0` for a dense column-vector state |
+| `NewtonSolver` | Reusable nonlinear solve wrapper with compiled residual/Jacobian kernels |
+| `create_implicit_function(function, x_guess, opts, implicit_opts)` | Differentiable implicit solve wrapper using CasADi rootfinder sensitivities |
+
+Numeric root finding uses a globalization stack with `RootSolveStrategy::Auto` by default:
+
+- Trust-region Newton (Levenberg-Marquardt)
+- Line-search Newton
+- Quasi-Newton Broyden updates
+- Pseudo-transient continuation
+
+`rootfinder<SymbolicScalar>()` and `create_implicit_function()` remain CasADi-rootfinder-backed so the solve stays differentiable inside symbolic graphs.
+
+See `docs/user_guides/root_finding.md` for strategy guidance, diagnostics, and a walkthrough of `examples/interpolation/rootfinding_demo.cpp`.
 
 ---
 
@@ -427,17 +502,22 @@ auto p = opti.parameter(5.0);
 
 // Objective
 opti.minimize(cost_function);
+opti.minimize(cost_function, 1e6);   // Explicit objective scaling
 opti.maximize(profit_function);
 
 // Constraints
 opti.subject_to(x >= 0);
+opti.subject_to(g == 0, 1e3);        // Explicit constraint scaling
 opti.subject_to(x * x + y * y <= 1);
 opti.subject_to_bounds(x, lower, upper);  // Box constraints
+
+// Diagnostics
+auto scaling = opti.analyze_scaling();
 
 // Solve
 auto sol = opti.solve();
 double x_val = sol.value(x);
-janus::NumericVector v_val = sol.value_vector(v);
+janus::NumericVector v_val = sol.value(v);
 ```
 
 #### Solver Configuration (`OptiOptions.hpp`)
@@ -500,8 +580,13 @@ Before implementing new functionality, check these existing guides to avoid dupl
 | Symbolic Computing | `docs/user_guides/symbolic_computing.md` | Symbolic mode, graph building, MX operations |
 | Optimization | `docs/user_guides/optimization.md` | Opti interface, constraints, solving |
 | Interpolation | `docs/user_guides/interpolation.md` | 1D/ND interp, methods, caching |
+| Polynomial Chaos | `docs/user_guides/polynomial_chaos.md` | Askey-scheme bases, projection/regression fitting, symbolic moments |
+| Stochastic Quadrature | `docs/user_guides/stochastic_quadrature.md` | Probability-measure nodes, tensor grids, Smolyak sparse grids |
+| Root Finding | `docs/user_guides/root_finding.md` | Nonlinear solves, globalization stack, implicit solve wrappers |
 | Graph Visualization | `docs/user_guides/graph_visualization.md` | DOT export, Graphviz, debugging |
-| Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, Jacobian structure |
+| Sparsity | `docs/user_guides/sparsity.md` | Sparsity patterns, graph coloring, sparse Jacobian/Hessian kernels |
+| Structural Diagnostics | `docs/user_guides/structural_diagnostics.md` | Observability, identifiability, structural rank deficiencies |
+| Structural Transforms | `docs/user_guides/structural_transforms.md` | Alias elimination, BLT decomposition, tearing recommendations |
 | Collocation | `docs/user_guides/collocation.md` | Direct collocation transcription |
 | Multiple Shooting | `docs/user_guides/multiple_shooting.md` | Multiple shooting transcription |
 | Transcription Methods | `docs/user_guides/transcription_methods.md` | Comparison of trajectory methods |

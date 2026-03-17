@@ -31,6 +31,11 @@ enum class RBFKernel {
 
 namespace detail {
 
+/// Regularization term for RBF interpolation matrix to prevent singularity
+constexpr double rbf_regularization = 1e-10;
+/// Threshold below which thin-plate spline uses linear fallback to avoid log(0)
+constexpr double rbf_zero_threshold = 1e-15;
+
 /**
  * @brief Evaluate RBF kernel φ(r) for a given distance
  *
@@ -43,7 +48,7 @@ inline double rbf_phi(double r, RBFKernel kernel, double epsilon = 1.0) {
     switch (kernel) {
     case RBFKernel::ThinPlateSpline:
         // φ(r) = r² log(r), with φ(0) = 0
-        return (r > 1e-15) ? r * r * std::log(r) : 0.0;
+        return (r > rbf_zero_threshold) ? r * r * std::log(r) : 0.0;
     case RBFKernel::Multiquadric:
         return std::sqrt(1.0 + (epsilon * r) * (epsilon * r));
     case RBFKernel::Gaussian:
@@ -53,7 +58,7 @@ inline double rbf_phi(double r, RBFKernel kernel, double epsilon = 1.0) {
     case RBFKernel::Cubic:
         return r * r * r;
     default:
-        return r * r * std::log(r + 1e-15);
+        return r * r * std::log(r + rbf_zero_threshold);
     }
 }
 
@@ -164,7 +169,7 @@ class ScatteredInterpolator {
             double max_val = points.col(d).maxCoeff();
             // Add small padding to avoid edge issues
             double padding = 0.01 * (max_val - min_val);
-            if (padding < 1e-10)
+            if (padding < detail::rbf_regularization)
                 padding = 0.1; // Handle constant dimension
             min_val -= padding;
             max_val += padding;
@@ -233,7 +238,7 @@ class ScatteredInterpolator {
         double min_val = x.minCoeff();
         double max_val = x.maxCoeff();
         double padding = 0.01 * (max_val - min_val);
-        if (padding < 1e-10)
+        if (padding < detail::rbf_regularization)
             padding = 0.1;
 
         std::vector<NumericVector> grid(1);
@@ -324,7 +329,7 @@ class ScatteredInterpolator {
         }
 
         // Add small regularization for numerical stability
-        Phi.diagonal().array() += 1e-10;
+        Phi.diagonal().array() += detail::rbf_regularization;
 
         // Solve Phi * weights = values
         NumericVector weights = solve(Phi, values);

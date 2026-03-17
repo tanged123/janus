@@ -1,7 +1,9 @@
 #include "../utils/TestUtils.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/IntegratorStep.hpp>
 
 // ============================================================================
 // Tests for euler_step
@@ -117,6 +119,57 @@ TEST(IntegratorStep, RK4MultipleSteps) {
 
     double exact = y0_val * std::exp(-lambda * 1.0);
     EXPECT_NEAR(y(0), exact, 1e-8);
+}
+
+// ============================================================================
+// Tests for structure-preserving second-order steppers
+// ============================================================================
+
+TEST(IntegratorStep, StormerVerletEnergyBoundedOnHarmonicOscillator) {
+    janus::NumericVector q(1);
+    janus::NumericVector v(1);
+    q(0) = 1.0;
+    v(0) = 0.0;
+
+    const double omega = 1.0;
+    const double dt = 0.2;
+    const int n_steps = 2000;
+    const double energy0 = 0.5 * (v.squaredNorm() + omega * omega * q.squaredNorm());
+    double max_energy_drift = 0.0;
+    double t = 0.0;
+
+    for (int i = 0; i < n_steps; ++i) {
+        auto step = janus::stormer_verlet_step(
+            [omega](double time, const janus::NumericVector &q_state) {
+                return (-omega * omega * q_state).eval();
+            },
+            q, v, t, dt);
+        q = step.q;
+        v = step.v;
+        t += dt;
+
+        const double energy = 0.5 * (v.squaredNorm() + omega * omega * q.squaredNorm());
+        max_energy_drift = std::max(max_energy_drift, std::abs(energy - energy0));
+    }
+
+    EXPECT_LT(max_energy_drift, 6e-3);
+}
+
+TEST(IntegratorStep, Rkn4StepHarmonicOscillator) {
+    janus::NumericVector q0(1);
+    janus::NumericVector v0(1);
+    q0(0) = 1.0;
+    v0(0) = 0.0;
+
+    const double omega = 2.0;
+    const double dt = 0.1;
+
+    auto step = janus::rkn4_step(
+        [omega](double time, const janus::NumericVector &q) { return (-omega * omega * q).eval(); },
+        q0, v0, 0.0, dt);
+
+    EXPECT_NEAR(step.q(0), std::cos(omega * dt), 1e-6);
+    EXPECT_NEAR(step.v(0), -omega * std::sin(omega * dt), 5e-6);
 }
 
 // ============================================================================
@@ -249,4 +302,28 @@ TEST(IntegratorStep, SymbolicEulerStep) {
     double x_next_numeric = static_cast<double>(res[0]);
     // Euler: x_next = x + dt * (-x) = 1 - 0.1 = 0.9
     EXPECT_NEAR(x_next_numeric, 0.9, 1e-10);
+}
+
+TEST(IntegratorStep, SymbolicStormerVerletStep) {
+    auto q = janus::sym_vec("q", 1);
+    auto v = janus::sym_vec("v", 1);
+    auto t = janus::sym("t");
+    auto dt = janus::sym("dt");
+
+    auto step = janus::stormer_verlet_step(
+        [](auto time, const auto &q_state) { return (-q_state).eval(); }, q, v, t, dt);
+
+    casadi::Function step_fn("stormer_verlet_step", {janus::to_mx(q), janus::to_mx(v), t, dt},
+                             {janus::to_mx(step.q), janus::to_mx(step.v)});
+
+    std::vector<casadi::DM> args = {
+        casadi::DM(1.0),
+        casadi::DM(0.0),
+        casadi::DM(0.0),
+        casadi::DM(0.1),
+    };
+    auto res = step_fn(args);
+
+    EXPECT_NEAR(static_cast<double>(res[0]), 0.995, 1e-10);
+    EXPECT_NEAR(static_cast<double>(res[1]), -0.09975, 1e-10);
 }

@@ -9,7 +9,9 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/optimization/Opti.hpp>
+#include <janus/optimization/OptiOptions.hpp>
 
 // =============================================================================
 // Solver Availability Tests
@@ -17,13 +19,13 @@
 
 TEST(OptiSolvers, SolverAvailable_IPOPT) {
     // IPOPT should always be available in a standard CasADi build
-    EXPECT_TRUE(janus::solver_available(janus::Solver::IPOPT));
+    EXPECT_TRUE(janus::solver_available(janus::Solver::Ipopt));
 }
 
 TEST(OptiSolvers, SolverName_ReturnsCorrectStrings) {
-    EXPECT_STREQ(janus::solver_name(janus::Solver::IPOPT), "ipopt");
-    EXPECT_STREQ(janus::solver_name(janus::Solver::SNOPT), "snopt");
-    EXPECT_STREQ(janus::solver_name(janus::Solver::QPOASES), "qpoases");
+    EXPECT_STREQ(janus::solver_name(janus::Solver::Ipopt), "ipopt");
+    EXPECT_STREQ(janus::solver_name(janus::Solver::Snopt), "snopt");
+    EXPECT_STREQ(janus::solver_name(janus::Solver::QpOases), "qpoases");
 }
 
 // =============================================================================
@@ -31,7 +33,7 @@ TEST(OptiSolvers, SolverName_ReturnsCorrectStrings) {
 // =============================================================================
 
 TEST(OptiSolvers, SNOPT_Rosenbrock2D) {
-    if (!janus::solver_available(janus::Solver::SNOPT)) {
+    if (!janus::solver_available(janus::Solver::Snopt)) {
         GTEST_SKIP() << "SNOPT not available in this CasADi build";
     }
 
@@ -44,14 +46,14 @@ TEST(OptiSolvers, SNOPT_Rosenbrock2D) {
     auto f = (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x);
     opti.minimize(f);
 
-    auto sol = opti.solve({.solver = janus::Solver::SNOPT, .verbose = false});
+    auto sol = opti.solve({.solver = janus::Solver::Snopt, .verbose = false});
 
     EXPECT_NEAR(sol.value(x), 1.0, 1e-4);
     EXPECT_NEAR(sol.value(y), 1.0, 1e-4);
 }
 
 TEST(OptiSolvers, SNOPT_Constrained) {
-    if (!janus::solver_available(janus::Solver::SNOPT)) {
+    if (!janus::solver_available(janus::Solver::Snopt)) {
         GTEST_SKIP() << "SNOPT not available in this CasADi build";
     }
 
@@ -66,7 +68,7 @@ TEST(OptiSolvers, SNOPT_Constrained) {
     auto f = (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x);
     opti.minimize(f);
 
-    auto sol = opti.solve({.solver = janus::Solver::SNOPT, .verbose = false});
+    auto sol = opti.solve({.solver = janus::Solver::Snopt, .verbose = false});
 
     // Verify constraint is satisfied
     double x_opt = sol.value(x);
@@ -75,7 +77,7 @@ TEST(OptiSolvers, SNOPT_Constrained) {
 }
 
 TEST(OptiSolvers, SNOPT_WithCustomOptions) {
-    if (!janus::solver_available(janus::Solver::SNOPT)) {
+    if (!janus::solver_available(janus::Solver::Snopt)) {
         GTEST_SKIP() << "SNOPT not available in this CasADi build";
     }
 
@@ -86,7 +88,7 @@ TEST(OptiSolvers, SNOPT_WithCustomOptions) {
     opti.subject_to(x >= 1);
 
     janus::OptiOptions opts;
-    opts.solver = janus::Solver::SNOPT;
+    opts.solver = janus::Solver::Snopt;
     opts.verbose = false;
     opts.snopt_opts.major_iterations_limit = 500;
     opts.snopt_opts.major_optimality_tolerance = 1e-8;
@@ -102,7 +104,7 @@ TEST(OptiSolvers, SNOPT_WithCustomOptions) {
 
 TEST(OptiSolvers, UnavailableSolverThrows) {
     // Create a synthetic test - if SNOPT is not available, verify error
-    if (janus::solver_available(janus::Solver::SNOPT)) {
+    if (janus::solver_available(janus::Solver::Snopt)) {
         GTEST_SKIP() << "SNOPT is available, cannot test unavailable case";
     }
 
@@ -110,7 +112,7 @@ TEST(OptiSolvers, UnavailableSolverThrows) {
     auto x = opti.variable(0.0);
     opti.minimize(x * x);
 
-    EXPECT_THROW(opti.solve({.solver = janus::Solver::SNOPT}), std::runtime_error);
+    EXPECT_THROW(opti.solve({.solver = janus::Solver::Snopt}), std::runtime_error);
 }
 
 // =============================================================================
@@ -119,12 +121,12 @@ TEST(OptiSolvers, UnavailableSolverThrows) {
 
 TEST(OptiSolvers, OptiOptionsBuilder) {
     auto opts = janus::OptiOptions{}
-                    .set_solver(janus::Solver::IPOPT)
+                    .set_solver(janus::Solver::Ipopt)
                     .set_max_iter(500)
                     .set_tol(1e-10)
                     .set_verbose(false);
 
-    EXPECT_EQ(opts.solver, janus::Solver::IPOPT);
+    EXPECT_EQ(opts.solver, janus::Solver::Ipopt);
     EXPECT_EQ(opts.max_iter, 500);
     EXPECT_DOUBLE_EQ(opts.tol, 1e-10);
     EXPECT_FALSE(opts.verbose);
@@ -152,7 +154,7 @@ TEST(OptiSolvers, IPOPT_ExplicitSolver) {
     auto f = (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x);
     opti.minimize(f);
 
-    auto sol = opti.solve({.solver = janus::Solver::IPOPT, .verbose = false});
+    auto sol = opti.solve({.solver = janus::Solver::Ipopt, .verbose = false});
 
     EXPECT_NEAR(sol.value(x), 1.0, 1e-4);
     EXPECT_NEAR(sol.value(y), 1.0, 1e-4);

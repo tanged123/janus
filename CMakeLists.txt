@@ -1,11 +1,28 @@
 cmake_minimum_required(VERSION 3.20)
 project(
   janus
-  VERSION 1.6.0
+  VERSION 2.0.0
   LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Fix for clangd on NixOS: CMake strips implicit system includes (like
+# /nix/store/...) from compile_commands.json. This forces them back in so clangd
+# can find them.
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
+      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+endif()
+
+# --- ccache support ---
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+  set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
 
 # --- Dependencies ---
 find_package(Eigen3 3.4 REQUIRED)

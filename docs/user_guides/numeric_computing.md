@@ -36,7 +36,8 @@ double result = my_physics(10.0);
 
 Janus provides wrappers for common linear algebra operations that work for both backends. In numeric mode, these delegate directly to efficient Eigen Decompositions.
 
-*   `janus::solve(A, b)` -> Uses `householderQr().solve()`.
+*   `janus::solve(A, b)` -> Uses the default backend policy (`ColPivHouseholderQR` for dense numeric matrices, CasADi default for symbolic, `SparseLU` for sparse numeric input).
+*   `janus::solve(A, b, policy)` -> Select dense direct, sparse direct, or iterative Krylov backends explicitly with `janus::LinearSolvePolicy`.
 *   `janus::inv(A)` -> Uses `inverse()`.
 *   `janus::det(A)` -> Uses `determinant()`.
 

@@ -163,7 +163,7 @@ int main() {
     std::cout << "\n=== RESULTS ===\n";
     std::cout << std::fixed << std::setprecision(4);
     std::cout << "Optimal time T* = " << T_opt << " seconds\n";
-    std::cout << "Solver iterations: " << sol.num_iterations() << "\n";
+    std::cout << "Solver iterations: " << sol.num_iterations().value_or(-1) << "\n";
     std::cout << "Dymos reference: T* ≈ 1.80185208 seconds\n\n";
 
     // Print trajectory

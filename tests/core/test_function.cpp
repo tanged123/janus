@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
+#include <janus/math/AutoDiff.hpp>
+#include <janus/math/Trig.hpp>
 #include <vector>
 
 TEST(FunctionTests, BasicEvaluation) {
@@ -149,4 +153,79 @@ TEST(FunctionTests, LambdaWithJanusMath) {
 
     auto res2 = f(1.0);
     EXPECT_NEAR(res2[0](0, 0), std::exp(1.0) + 1.0, 1e-9);
+}
+
+TEST(FunctionTests, MapBatchEvaluation) {
+    auto x = janus::sym("x", 2, 1);
+    janus::Function f("affine_batch", {x}, {3.0 * x - 1.0});
+
+    auto mapped = f.map(3, janus::MapParallelization::Parallel, 2);
+
+    janus::NumericMatrix X(2, 3);
+    X(0, 0) = 1.0;
+    X(1, 0) = 4.0;
+    X(0, 1) = 2.0;
+    X(1, 1) = 5.0;
+    X(0, 2) = 3.0;
+    X(1, 2) = 6.0;
+
+    auto res = mapped(X);
+    ASSERT_EQ(res.size(), 1);
+
+    const auto &Y = res[0];
+    ASSERT_EQ(Y.rows(), 2);
+    ASSERT_EQ(Y.cols(), 3);
+
+    EXPECT_NEAR(Y(0, 0), 2.0, 1e-9);
+    EXPECT_NEAR(Y(1, 0), 11.0, 1e-9);
+    EXPECT_NEAR(Y(0, 1), 5.0, 1e-9);
+    EXPECT_NEAR(Y(1, 1), 14.0, 1e-9);
+    EXPECT_NEAR(Y(0, 2), 8.0, 1e-9);
+    EXPECT_NEAR(Y(1, 2), 17.0, 1e-9);
+}
+
+TEST(FunctionTests, MapPreservesSymbolicDerivatives) {
+    auto x = janus::sym("x");
+    janus::Function square("square_batch", {x}, {x * x});
+    auto mapped = square.map(4, janus::MapParallelization::Parallel);
+
+    auto X = janus::sym("X", 1, 4);
+    janus::SymbolicScalar Y = janus::to_mx(mapped.eval(X));
+    janus::SymbolicScalar J = janus::jacobian(Y, X);
+    janus::Function jac_fn("mapped_square_jac", {X}, {J});
+
+    janus::NumericMatrix Xval(1, 4);
+    Xval(0, 0) = -2.0;
+    Xval(0, 1) = -0.5;
+    Xval(0, 2) = 1.5;
+    Xval(0, 3) = 3.0;
+
+    auto res = jac_fn(Xval);
+    ASSERT_EQ(res.size(), 1);
+
+    const auto &Jval = res[0];
+    ASSERT_EQ(Jval.rows(), 4);
+    ASSERT_EQ(Jval.cols(), 4);
+
+    EXPECT_NEAR(Jval(0, 0), -4.0, 1e-9);
+    EXPECT_NEAR(Jval(1, 1), -1.0, 1e-9);
+    EXPECT_NEAR(Jval(2, 2), 3.0, 1e-9);
+    EXPECT_NEAR(Jval(3, 3), 6.0, 1e-9);
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            if (i == j)
+                continue;
+            EXPECT_NEAR(Jval(i, j), 0.0, 1e-9);
+        }
+    }
+}
+
+TEST(FunctionTests, MapRejectsInvalidSizes) {
+    auto x = janus::sym("x");
+    janus::Function identity("identity_batch", {x}, {x});
+
+    EXPECT_THROW(identity.map(0), janus::InvalidArgument);
+    EXPECT_THROW(identity.map(-3, janus::MapParallelization::Parallel), janus::InvalidArgument);
+    EXPECT_THROW(identity.map(2, janus::MapParallelization::Parallel, 0), janus::InvalidArgument);
 }

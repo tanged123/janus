@@ -18,7 +18,7 @@ enum class BirkhoffScheme {
     CGL  ///< Chebyshev-Gauss-Lobatto nodes
 };
 
-struct BirkhoffOptions {
+struct BirkhoffPseudospectralOptions {
     BirkhoffScheme scheme = BirkhoffScheme::LGL;
     int n_nodes = 21; ///< Number of collocation nodes (including endpoints)
 };
@@ -30,7 +30,8 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
     explicit BirkhoffPseudospectral(Opti &opti) : TranscriptionBase<BirkhoffPseudospectral>(opti) {}
 
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
-    setup(int n_states, int n_controls, double t0, double tf, const BirkhoffOptions &opts = {}) {
+    setup(int n_states, int n_controls, double t0, double tf,
+          const BirkhoffPseudospectralOptions &opts = {}) {
         if (opts.n_nodes < 2) {
             throw InvalidArgument("BirkhoffPseudospectral: n_nodes must be >= 2");
         }
@@ -87,7 +88,7 @@ class BirkhoffPseudospectral : public TranscriptionBase<BirkhoffPseudospectral> 
 
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, const SymbolicScalar &tf,
-          const BirkhoffOptions &opts = {}) {
+          const BirkhoffPseudospectralOptions &opts = {}) {
         auto result = setup(n_states, n_controls, t0, 1.0, opts);
         tf_symbolic_ = tf;
         tf_is_variable_ = true;

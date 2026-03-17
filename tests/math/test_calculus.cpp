@@ -1,6 +1,8 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
+#include <janus/core/Function.hpp>
 #include <janus/core/JanusTypes.hpp>
+#include <janus/math/AutoDiff.hpp>
 #include <janus/math/Calculus.hpp>
 #include <janus/math/Linalg.hpp>
 
@@ -235,6 +237,79 @@ template <typename Scalar> void test_diff_trapz_gradient1d() {
     }
 }
 
+template <typename Scalar> void test_cumtrapz_nonuniform() {
+    using Vector = janus::JanusVector<Scalar>;
+
+    Vector x(3);
+    x << 0.0, 1.0, 3.0;
+    Vector y(3);
+    y << 0.0, 1.0, 9.0;
+
+    auto res = janus::cumtrapz(y, x);
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+        EXPECT_EQ(res.size(), 3);
+        EXPECT_DOUBLE_EQ(res(0), 0.0);
+        EXPECT_DOUBLE_EQ(res(1), 0.5);
+        EXPECT_DOUBLE_EQ(res(2), 10.5);
+    } else {
+        auto res_eval = janus::eval(res);
+        EXPECT_EQ(res_eval.size(), 3);
+        EXPECT_DOUBLE_EQ(res_eval(0), 0.0);
+        EXPECT_DOUBLE_EQ(res_eval(1), 0.5);
+        EXPECT_DOUBLE_EQ(res_eval(2), 10.5);
+    }
+}
+
+TEST(CalculusTests, CumtrapzNonuniformNumeric) { test_cumtrapz_nonuniform<double>(); }
+
+TEST(CalculusTests, CumtrapzNonuniformSymbolic) {
+    test_cumtrapz_nonuniform<janus::SymbolicScalar>();
+}
+
+TEST(CalculusTests, CumtrapzUniformSpacingNumeric) {
+    janus::JanusVector<double> y(3);
+    y << 0.0, 2.0, 4.0;
+
+    auto res = janus::cumtrapz(y, 1.0);
+
+    EXPECT_EQ(res.size(), 3);
+    EXPECT_DOUBLE_EQ(res(0), 0.0);
+    EXPECT_DOUBLE_EQ(res(1), 1.0);
+    EXPECT_DOUBLE_EQ(res(2), 4.0);
+}
+
+TEST(CalculusTests, CumtrapzSymbolicGraph) {
+    janus::NumericVector x(3);
+    x << 0.0, 1.0, 2.0;
+
+    auto [y, y_mx] = janus::sym_vec_pair("y", 3);
+    auto cum = janus::cumtrapz(y, x);
+
+    janus::Function f({y_mx}, {janus::to_mx(cum)});
+    janus::NumericVector y_val(3);
+    y_val << 0.0, 2.0, 4.0;
+    auto cum_val = f.eval(y_val);
+
+    EXPECT_DOUBLE_EQ(cum_val(0), 0.0);
+    EXPECT_DOUBLE_EQ(cum_val(1), 1.0);
+    EXPECT_DOUBLE_EQ(cum_val(2), 4.0);
+
+    auto J = janus::jacobian({janus::to_mx(cum)}, {y_mx});
+    janus::Function jac_fn({y_mx}, {J});
+    auto jac_val = jac_fn.eval(y_val);
+
+    EXPECT_DOUBLE_EQ(jac_val(0, 0), 0.0);
+    EXPECT_DOUBLE_EQ(jac_val(0, 1), 0.0);
+    EXPECT_DOUBLE_EQ(jac_val(0, 2), 0.0);
+    EXPECT_DOUBLE_EQ(jac_val(1, 0), 0.5);
+    EXPECT_DOUBLE_EQ(jac_val(1, 1), 0.5);
+    EXPECT_DOUBLE_EQ(jac_val(1, 2), 0.0);
+    EXPECT_DOUBLE_EQ(jac_val(2, 0), 0.5);
+    EXPECT_DOUBLE_EQ(jac_val(2, 1), 1.0);
+    EXPECT_DOUBLE_EQ(jac_val(2, 2), 0.5);
+}
+
 TEST(CalculusTests, DiffTrapzGradient1dNumeric) { test_diff_trapz_gradient1d<double>(); }
 
 TEST(CalculusTests, DiffTrapzGradient1dSymbolic) {
@@ -243,29 +318,41 @@ TEST(CalculusTests, DiffTrapzGradient1dSymbolic) {
 
 // --- Periodic and Error Tests ---
 
-template <typename Scalar> void test_gradient_periodic_wrapper() {
+template <typename Scalar> void test_gradient_periodic_wraparound() {
     using Vector = janus::JanusVector<Scalar>;
-    Vector x(5);
-    x << 0, 90, 180, 270, 360; // Degrees
-    Vector y(5);
-    // sin(x)
-    y << 0, 1, 0, -1, 0;
+    Vector y(4);
+    y << 0.0, 1.0, 0.0, -1.0; // sin(theta) sampled on [0, 2pi) at 90 deg increments
 
-    // This just dispatches to gradient() for now, but we want to cover the call
-    auto grad = janus::gradient_periodic(y, 90.0, 360.0);
+    auto grad = janus::gradient_periodic(y, M_PI / 2.0, 2.0 * M_PI);
 
-    // Check sizes
+    const double expected = 2.0 / M_PI;
+
     if constexpr (std::is_same_v<Scalar, double>) {
-        EXPECT_EQ(grad.size(), 5);
+        EXPECT_EQ(grad.size(), 4);
+        EXPECT_NEAR(grad(0), expected, 1e-10);
+        EXPECT_NEAR(grad(1), 0.0, 1e-10);
+        EXPECT_NEAR(grad(2), -expected, 1e-10);
+        EXPECT_NEAR(grad(3), 0.0, 1e-10);
     } else {
         auto g = janus::eval(grad);
-        EXPECT_EQ(g.size(), 5);
+        EXPECT_EQ(g.size(), 4);
+        EXPECT_NEAR(g(0), expected, 1e-10);
+        EXPECT_NEAR(g(1), 0.0, 1e-10);
+        EXPECT_NEAR(g(2), -expected, 1e-10);
+        EXPECT_NEAR(g(3), 0.0, 1e-10);
     }
 }
 
 TEST(CalculusTests, GradientPeriodic) {
-    test_gradient_periodic_wrapper<double>();
-    test_gradient_periodic_wrapper<janus::SymbolicScalar>();
+    test_gradient_periodic_wraparound<double>();
+    test_gradient_periodic_wraparound<janus::SymbolicScalar>();
+}
+
+TEST(CalculusTests, GradientPeriodicRejectsDuplicateEndpointSamples) {
+    janus::JanusVector<double> y(5);
+    y << 0.0, 1.0, 0.0, -1.0, 0.0;
+
+    EXPECT_THROW(janus::gradient_periodic(y, M_PI / 2.0, 2.0 * M_PI), janus::InvalidArgument);
 }
 
 TEST(CalculusTests, Errors) {
@@ -282,4 +369,9 @@ TEST(CalculusTests, Errors) {
 
     // Invalid n (derivative order)
     EXPECT_THROW(janus::gradient(y, 1.0, 1, 3), janus::InvalidArgument);
+
+    // cumtrapz input size mismatch
+    janus::JanusVector<double> bad_x(4);
+    bad_x.setZero();
+    EXPECT_THROW(janus::cumtrapz(y, bad_x), janus::InvalidArgument);
 }

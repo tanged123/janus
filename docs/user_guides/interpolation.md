@@ -108,6 +108,27 @@ interpn(const std::vector<Eigen::VectorXd>& points,
 
 `Eigen::Matrix<Scalar, Dynamic, 1>` - Vector of interpolated values at each query point.
 
+### Symbolic Table Values
+
+`interpn()` also accepts a `janus::SymbolicVector` of table values. This keeps
+the lookup table coefficients inside the symbolic graph so they can be optimized
+directly:
+
+```cpp
+auto [table_values, table_values_mx] = janus::sym_vec_pair("table", 4);
+
+janus::NumericMatrix xi(1, 2);
+xi << 0.25, 0.75;
+
+auto result = janus::interpn(points, table_values, xi,
+                             janus::InterpolationMethod::Linear);
+```
+
+This parameterized-table path currently supports `Linear` and `BSpline`.
+`Hermite` and `Nearest` remain numeric-only for table values. The cached
+`janus::Interpolator` class still stores numeric tables; use the free
+`interpn()` overloads when the table itself must stay symbolic.
+
 #### Type Aliases (Recommended)
 
 Use Janus types for better readability:
@@ -417,6 +438,10 @@ The Hermite method uses a **custom Catmull-Rom implementation** because CasADi d
 ```
 
 This provides C1 continuity (continuous first derivative) at all grid points.
+It is intentionally **numeric-only** in Janus: symbolic Hermite queries throw an
+`InterpolationError` because interval selection requires runtime comparisons that
+cannot be traced cleanly into a symbolic graph. For symbolic optimization workflows,
+use `InterpolationMethod::BSpline`.
 
 ---
 
@@ -479,7 +504,7 @@ auto f = janus::Function("lookup", {xi(0,0), xi(0,1)}, {z_sym(0)});
 | Method | Symbolic Mode | Reason |
 |--------|---------------|--------|
 | Linear | ✅ | Uses CasADi `interpolant` |
-| Hermite | ❌ | Requires interval finding (branching) |
+| Hermite | ❌ | Requires interval selection at runtime; Janus throws and recommends BSpline |
 | BSpline | ✅ | Uses CasADi `interpolant` |
 | Nearest | ❌ | Requires rounding (non-smooth) |
 
@@ -543,7 +568,7 @@ try {
 | "points cannot be empty" | Empty grid | Provide at least 2 points per dimension |
 | "points must be sorted" | Unsorted grid axis | Sort grid coordinates ascending |
 | "values_flat size mismatch" | Wrong value count | Ensure `prod(dims)` values in Fortran order |
-| "Hermite not supported for symbolic" | Using Hermite with MX | Use Linear or BSpline for symbolic |
+| "Hermite/Catmull-Rom is numeric-only" | Using Hermite with MX | Use Linear or BSpline for symbolic |
 | "BSpline: Need more data points" | Grid < 4 points | Use ≥4 points per dimension for BSpline |
 
 ---

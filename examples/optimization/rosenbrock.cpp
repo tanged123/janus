@@ -14,6 +14,22 @@
 #include <iostream>
 #include <janus/janus.hpp>
 
+namespace {
+
+void print_scaling_report(const janus::ScalingReport &report) {
+    std::cout << "    variable blocks : " << report.summary.variable_blocks << "\n";
+    std::cout << "    constraint rows : " << report.summary.scalar_constraints << "\n";
+    std::cout << "    jacobian nnz    : " << report.summary.jacobian_nnz << "\n";
+    std::cout << "    warnings        : " << report.issues.size() << "\n";
+
+    for (const auto &issue : report.issues) {
+        std::cout << "      - " << issue.label << ": " << issue.message
+                  << " (|.|/scale = " << issue.normalized_magnitude << ")\n";
+    }
+}
+
+} // namespace
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "Rosenbrock Optimization Benchmark\n";
@@ -42,7 +58,7 @@ int main() {
         std::cout << std::fixed << std::setprecision(6);
         std::cout << "  Optimal x: " << sol.value(x) << " (expected: 1.0)\n";
         std::cout << "  Optimal y: " << sol.value(y) << " (expected: 1.0)\n";
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -68,7 +84,7 @@ int main() {
         std::cout << "  Optimal x: " << sol.value(x) << "\n";
         std::cout << "  Optimal y: " << sol.value(y) << "\n";
         std::cout << "  x + y = " << sol.value(x) + sol.value(y) << " (should be >= 2)\n";
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -100,7 +116,7 @@ int main() {
             std::cout << "    x[" << i << "] = " << std::fixed << std::setprecision(4) << x_opt(i)
                       << " (expected: 1.0)\n";
         }
-        std::cout << "  Iterations: " << sol.num_iterations() << "\n\n";
+        std::cout << "  Iterations: " << sol.num_iterations().value_or(-1) << "\n\n";
     }
 
     // =========================================================================
@@ -138,6 +154,44 @@ int main() {
         std::cout << "    grad = [" << g_val(0, 0) << ", " << g_val(0, 1)
                   << "] (expected: [-2, 0])\n";
     }
+
+    // =========================================================================
+    // Problem 5: Scaling diagnostics and explicit scaling
+    // =========================================================================
+    std::cout << "\nProblem 5: Large-scale Rosenbrock with and without scaling\n";
+    std::cout
+        << "  Same symbolic problem, but x and y live near 1e6 and the raw objective is O(1e12).\n";
+    std::cout << "  This one actually changes IPOPT iteration count in this environment.\n\n";
+
+    auto run_scaled_case = [](const std::string &label, bool apply_scaling) {
+        janus::Opti opti;
+
+        auto x = opti.variable(-5e5);
+        auto y = opti.variable(2e6);
+        auto xn = x / 1e6;
+        auto yn = y / 1e6;
+        auto obj = 1e12 * ((1.0 - xn) * (1.0 - xn) + 100.0 * (yn - xn * xn) * (yn - xn * xn));
+
+        if (apply_scaling) {
+            opti.subject_to(x + y >= 2e6, 2e6);
+            opti.minimize(obj, 1e12);
+        } else {
+            opti.subject_to(x + y >= 2e6);
+            opti.minimize(obj);
+        }
+
+        std::cout << "  " << label << "\n";
+        auto report = opti.analyze_scaling();
+        print_scaling_report(report);
+
+        auto sol = opti.solve({.verbose = false});
+        std::cout << "    solution x*     : " << sol.value(x) << "\n";
+        std::cout << "    solution y*     : " << sol.value(y) << "\n";
+        std::cout << "    iterations      : " << sol.num_iterations().value_or(-1) << "\n\n";
+    };
+
+    run_scaled_case("Unscaled formulation", false);
+    run_scaled_case("Scaled formulation", true);
 
     std::cout << "\n========================================\n";
     std::cout << "Rosenbrock Optimization Complete!\n";

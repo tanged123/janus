@@ -10,7 +10,15 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
+#include <janus/math/AutoDiff.hpp>
+#include <janus/math/Logic.hpp>
+#include <janus/math/Spacing.hpp>
+#include <janus/math/Trig.hpp>
+#include <janus/optimization/Opti.hpp>
+#include <janus/optimization/OptiOptions.hpp>
 
 // =============================================================================
 // Rosenbrock Tests (based on AeroSandbox benchmarks)
@@ -111,6 +119,26 @@ TEST(OptiTest, MultipleConstraints) {
 
     // Maximum is at x + y = 1 boundary
     EXPECT_NEAR(sol.value(x) + sol.value(y), 1.0, 1e-6);
+}
+
+TEST(OptiTest, AllConstraintConjunction) {
+    janus::Opti opti;
+
+    auto x = opti.variable(2, -0.5);
+    janus::SymbolicVector cond(2);
+    cond(0) = x(0) >= 0.0;
+    cond(1) = x(1) >= 0.0;
+
+    opti.subject_to(janus::all(cond));
+
+    auto objective = (x(0) - 1.0) * (x(0) - 1.0) + (x(1) - 2.0) * (x(1) - 2.0);
+    opti.minimize(objective);
+
+    auto sol = opti.solve({.verbose = false});
+    janus::NumericVector x_opt = sol.value(x);
+
+    EXPECT_NEAR(x_opt(0), 1.0, 1e-6);
+    EXPECT_NEAR(x_opt(1), 2.0, 1e-6);
 }
 
 TEST(OptiTest, VariableBounds) {
@@ -751,6 +779,112 @@ TEST(OptiTest, CategoryTracking) {
     bool has_B = std::find(names.begin(), names.end(), "B") != names.end();
     EXPECT_TRUE(has_A);
     EXPECT_TRUE(has_B);
+}
+
+// =============================================================================
+// Scaling Tests
+// =============================================================================
+
+TEST(OptiTest, ScalingAnalysisUsesFiniteBoundsForDefaultVariableScale) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0, std::nullopt, -1e6, 1e6);
+    opti.minimize((x - 2.0) * (x - 2.0));
+
+    auto report = opti.analyze_scaling();
+
+    ASSERT_EQ(report.variables.size(), 1);
+    EXPECT_DOUBLE_EQ(report.variables[0].scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.variables[0].suggested_scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.variables[0].normalized_init_abs_max, 0.0);
+}
+
+TEST(OptiTest, ExplicitObjectiveAndConstraintScaling) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to(x == 1e6, 1e6);
+    opti.minimize(janus::pow(x - 1e6, 2), 1e12);
+
+    auto report = opti.analyze_scaling();
+
+    ASSERT_TRUE(report.objective.configured);
+    EXPECT_TRUE(report.objective.user_supplied_scale);
+    EXPECT_DOUBLE_EQ(report.objective.scale, 1e12);
+    EXPECT_DOUBLE_EQ(report.objective.normalized_value, 1.0);
+    ASSERT_EQ(report.constraints.size(), 1);
+    EXPECT_DOUBLE_EQ(report.constraints[0].scale, 1e6);
+    EXPECT_DOUBLE_EQ(report.constraints[0].normalized_magnitude, 1.0);
+    EXPECT_FALSE(report.has_warnings());
+
+    auto sol = opti.solve({.verbose = false});
+    EXPECT_NEAR(sol.value(x), 1e6, 1e-3);
+}
+
+TEST(OptiTest, ScalingAnalysisWarnsForLargeUnscaledObjectiveAndConstraint) {
+    janus::Opti opti;
+
+    auto x = opti.variable(0.0);
+    opti.subject_to(x == 1e6);
+    opti.minimize(janus::pow(x - 1e6, 2));
+
+    auto report = opti.analyze_scaling();
+
+    EXPECT_TRUE(report.has_warnings());
+
+    bool saw_constraint_warning = false;
+    bool saw_objective_warning = false;
+    for (const auto &issue : report.issues) {
+        saw_constraint_warning |= issue.kind == janus::ScalingIssueKind::Constraint;
+        saw_objective_warning |= issue.kind == janus::ScalingIssueKind::Objective;
+    }
+
+    EXPECT_TRUE(saw_constraint_warning);
+    EXPECT_TRUE(saw_objective_warning);
+}
+
+TEST(OptiTest, ScaleValidationErrors) {
+    EXPECT_THROW(janus::detail::validate_positive_scale(0.0, "scale"), janus::InvalidArgument);
+    EXPECT_THROW(
+        janus::detail::validate_positive_scale(std::numeric_limits<double>::quiet_NaN(), "scale"),
+        janus::InvalidArgument);
+    EXPECT_DOUBLE_EQ(janus::detail::max_finite_abs(-3.0, std::numeric_limits<double>::infinity()),
+                     3.0);
+    EXPECT_DOUBLE_EQ(janus::detail::constraint_violation(5.0, 0.0, true, 4.0, true), 1.0);
+
+    janus::Opti opti;
+    EXPECT_THROW(opti.variable(0.0, std::optional<double>(0.0)), janus::InvalidArgument);
+    EXPECT_THROW(opti.variable(3, 0.0, std::optional<double>(0.0)), janus::InvalidArgument);
+
+    janus::NumericVector init(2);
+    init << 1.0, 2.0;
+    EXPECT_THROW(opti.variable(init, std::optional<double>(0.0)), janus::InvalidArgument);
+
+    auto x = opti.variable(0.0);
+    EXPECT_THROW(opti.minimize(x * x, 0.0), janus::InvalidArgument);
+    EXPECT_THROW(opti.maximize(x, std::numeric_limits<double>::quiet_NaN()),
+                 janus::InvalidArgument);
+}
+
+TEST(OptiTest, ScalingAnalysisWarnsForTinyVariableAndScaleSpan) {
+    janus::Opti opti;
+
+    auto x = opti.variable(1e-9, std::optional<double>(1e4));
+    auto y = opti.variable(1.0, std::optional<double>(1e-3));
+    opti.minimize((x - 1.0) * (x - 1.0) + (y - 1.0) * (y - 1.0));
+
+    auto report = opti.analyze_scaling();
+
+    bool saw_variable_warning = false;
+    bool saw_summary_warning = false;
+    for (const auto &issue : report.issues) {
+        saw_variable_warning |= issue.kind == janus::ScalingIssueKind::Variable;
+        saw_summary_warning |= issue.kind == janus::ScalingIssueKind::Summary;
+    }
+
+    EXPECT_TRUE(saw_variable_warning);
+    EXPECT_TRUE(saw_summary_warning);
+    EXPECT_GT(report.summary.variable_scale_ratio, 1e6);
 }
 
 // =============================================================================

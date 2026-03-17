@@ -4,9 +4,28 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/core/Sparsity.hpp>
+#include <stdexcept>
 
 using namespace janus;
+
+namespace {
+
+NumericMatrix dense_from_sparse_values(const SparsityPattern &sp, const NumericMatrix &values) {
+    NumericMatrix dense = NumericMatrix::Zero(sp.n_rows(), sp.n_cols());
+    auto [rows, cols] = sp.get_triplet();
+    if (static_cast<size_t>(values.size()) != rows.size()) {
+        throw std::runtime_error("dense_from_sparse_values: value count mismatch");
+    }
+    for (Eigen::Index i = 0; i < values.size(); ++i) {
+        dense(rows[static_cast<size_t>(i)], cols[static_cast<size_t>(i)]) = values(i);
+    }
+    return dense;
+}
+
+} // namespace
 
 // ============================================================================
 // SparsityPattern Construction Tests
@@ -267,6 +286,91 @@ TEST(SparsityTests, FunctionJacobianSparsity) {
     EXPECT_EQ(sp.n_rows(), 3);
     EXPECT_EQ(sp.n_cols(), 3);
     EXPECT_EQ(sp.nnz(), 3); // Diagonal
+}
+
+TEST(SparsityTests, FunctionJacobianSparsitySelectedInputOutput) {
+    auto x = sym("x", 2, 1);
+    auto p = sym("p", 2, 1);
+    auto y0 = x + p;
+    auto y1 = SymbolicScalar::vertcat({x(0) * p(0), x(1) + p(1) * p(1)});
+
+    Function fn("mixed_io", {x, p}, {y0, y1});
+    auto sp = get_jacobian_sparsity(fn, 1, 1);
+
+    EXPECT_EQ(sp.n_rows(), 2);
+    EXPECT_EQ(sp.n_cols(), 2);
+    EXPECT_EQ(sp.nnz(), 2);
+    EXPECT_TRUE(sp.has_nz(0, 0));
+    EXPECT_TRUE(sp.has_nz(1, 1));
+    EXPECT_FALSE(sp.has_nz(0, 1));
+    EXPECT_FALSE(sp.has_nz(1, 0));
+}
+
+TEST(SparsityTests, SparseJacobianExpressionMatchesDenseJacobian) {
+    auto x = sym("x", 3);
+    auto f = SymbolicScalar::vertcat({x(0) * x(0) + x(1), 3.0 * x(2)});
+
+    auto sparse = sparse_jacobian(f, x);
+    Function dense_jac("dense_jac_expr", {x}, {SymbolicScalar::jacobian(f, x)});
+
+    NumericMatrix xval(3, 1);
+    xval << 2.0, -1.5, 4.0;
+
+    auto sparse_values = sparse.values(xval);
+    auto dense_values = dense_jac.eval(xval);
+    auto reconstructed = dense_from_sparse_values(sparse.sparsity(), sparse_values);
+
+    EXPECT_EQ(sparse.nnz(), 3);
+    EXPECT_EQ(sparse_values.rows(), sparse.nnz());
+    EXPECT_EQ(sparse_values.cols(), 1);
+    EXPECT_LT(sparse.forward_coloring().n_colors(), sparse.forward_coloring().n_entries());
+    EXPECT_LT(sparse.reverse_coloring().n_colors(), sparse.reverse_coloring().n_entries());
+    EXPECT_TRUE(reconstructed.isApprox(dense_values, 1e-12));
+}
+
+TEST(SparsityTests, SparseJacobianFunctionMatchesDenseJacobian) {
+    auto x = sym("x", 2, 1);
+    auto p = sym("p", 2, 1);
+    auto y0 = x + p;
+    auto y1 = SymbolicScalar::vertcat({x(0) * p(0), x(1) + p(1) * p(1)});
+
+    Function fn("mixed_sparse_jac", {x, p}, {y0, y1});
+    Function dense_jac("dense_jac_fn", {x, p}, {SymbolicScalar::jacobian(y1, p)});
+    auto sparse = sparse_jacobian(fn, 1, 1);
+
+    NumericMatrix xval(2, 1);
+    xval << 3.0, -2.0;
+    NumericMatrix pval(2, 1);
+    pval << 4.0, 5.0;
+
+    auto sparse_values = sparse.values(xval, pval);
+    auto dense_values = dense_jac.eval(xval, pval);
+    auto reconstructed = dense_from_sparse_values(sparse.sparsity(), sparse_values);
+
+    EXPECT_EQ(sparse.sparsity().nnz(), 2);
+    EXPECT_EQ(sparse.preferred_coloring().colorvec().size(), 2u);
+    EXPECT_TRUE(reconstructed.isApprox(dense_values, 1e-12));
+}
+
+TEST(SparsityTests, SparseHessianMatchesDenseHessian) {
+    auto x = sym("x", 3);
+    auto f = x(0) * x(1) + x(1) * x(1) + 0.5 * x(2) * x(2);
+
+    auto sparse = sparse_hessian(f, x);
+    Function dense_hess("dense_hess_expr", {x}, {SymbolicScalar::hessian(f, x)});
+
+    NumericMatrix xval(3, 1);
+    xval << 1.0, -2.0, 3.0;
+
+    auto sparse_values = sparse.values(xval);
+    auto dense_values = dense_hess.eval(xval);
+    auto reconstructed = dense_from_sparse_values(sparse.sparsity(), sparse_values);
+
+    EXPECT_EQ(sparse.nnz(), 4);
+    EXPECT_EQ(sparse_values.rows(), sparse.nnz());
+    EXPECT_EQ(sparse_values.cols(), 1);
+    EXPECT_LT(sparse.coloring().n_colors(), sparse.coloring().n_entries());
+    EXPECT_TRUE(reconstructed.isApprox(dense_values, 1e-12));
 }
 
 // ============================================================================

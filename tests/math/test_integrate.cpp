@@ -1,7 +1,10 @@
 #include "../utils/TestUtils.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Integrate.hpp>
 
 // ============================================================================
 // Tests for quad (definite integration)
@@ -154,6 +157,87 @@ TEST(Integrate, SolveIvpLogistic) {
     EXPECT_NEAR(sol.y(0, 99), K, 0.01);
 }
 
+TEST(Integrate, SolveSecondOrderIvpStormerVerletHarmonicOscillator) {
+    janus::SecondOrderIvpOptions opts;
+    opts.method = janus::SecondOrderIntegratorMethod::StormerVerlet;
+
+    auto sol = janus::solve_second_order_ivp(
+        [](double t, const janus::NumericVector &q) { return (-q).eval(); }, {0.0, 40.0}, {1.0},
+        {0.0}, 401, opts);
+
+    EXPECT_TRUE(sol.success);
+    EXPECT_EQ(sol.q.rows(), 1);
+    EXPECT_EQ(sol.v.rows(), 1);
+
+    const double energy0 = 0.5 * (sol.v(0, 0) * sol.v(0, 0) + sol.q(0, 0) * sol.q(0, 0));
+    double max_energy_drift = 0.0;
+    for (int i = 0; i < sol.t.size(); ++i) {
+        const double energy = 0.5 * (sol.v(0, i) * sol.v(0, i) + sol.q(0, i) * sol.q(0, i));
+        max_energy_drift = std::max(max_energy_drift, std::abs(energy - energy0));
+    }
+
+    EXPECT_LT(max_energy_drift, 2e-3);
+}
+
+TEST(Integrate, SolveSecondOrderIvpRkn4OscillatorAccuracy) {
+    janus::SecondOrderIvpOptions opts;
+    opts.method = janus::SecondOrderIntegratorMethod::RungeKuttaNystrom4;
+
+    const double omega = 2.0;
+    auto sol = janus::solve_second_order_ivp(
+        [omega](double t, const janus::NumericVector &q) { return (-omega * omega * q).eval(); },
+        {0.0, M_PI / omega}, {1.0}, {0.0}, 60, opts);
+
+    EXPECT_TRUE(sol.success);
+    EXPECT_NEAR(sol.q(0, sol.q.cols() - 1), -1.0, 1e-4);
+    EXPECT_NEAR(sol.v(0, sol.v.cols() - 1), 0.0, 1e-4);
+}
+
+TEST(Integrate, SolveIvpMassMatrixRosenbrockLinearStiff) {
+    janus::MassMatrixIvpOptions opts;
+    opts.method = janus::MassMatrixIntegratorMethod::RosenbrockEuler;
+    opts.substeps = 2;
+
+    auto sol = janus::solve_ivp_mass_matrix(
+        [](double t, const janus::NumericVector &y) {
+            janus::NumericVector rhs(1);
+            rhs(0) = -20.0 * y(0);
+            return rhs;
+        },
+        [](double t, const janus::NumericVector &y) {
+            janus::NumericMatrix M(1, 1);
+            M(0, 0) = 2.0;
+            return M;
+        },
+        {0.0, 0.5}, {1.0}, 80, opts);
+
+    EXPECT_TRUE(sol.success);
+    EXPECT_NEAR(sol.y(0, sol.y.cols() - 1), std::exp(-5.0), 2e-3);
+}
+
+TEST(Integrate, SolveIvpMassMatrixBdf1SingularConstraint) {
+    janus::MassMatrixIvpOptions opts;
+    opts.method = janus::MassMatrixIntegratorMethod::Bdf1;
+    opts.substeps = 2;
+
+    auto sol = janus::solve_ivp_mass_matrix(
+        [](double t, const janus::NumericVector &y) {
+            janus::NumericVector rhs(2);
+            rhs << y(1), 1.0 - y(0) - y(1);
+            return rhs;
+        },
+        [](double t, const janus::NumericVector &y) {
+            janus::NumericMatrix M = janus::NumericMatrix::Zero(2, 2);
+            M(0, 0) = 1.0;
+            return M;
+        },
+        {0.0, 1.0}, {0.0, 1.0}, 50, opts);
+
+    EXPECT_TRUE(sol.success);
+    EXPECT_NEAR(sol.y(0, sol.y.cols() - 1), 1.0 - std::exp(-1.0), 2e-3);
+    EXPECT_NEAR(sol.y(1, sol.y.cols() - 1), std::exp(-1.0), 2e-3);
+}
+
 // ============================================================================
 // Tests for solve_ivp_expr (expression-based symbolic)
 // ============================================================================
@@ -205,6 +289,28 @@ TEST(IntegrateSymbolic, SolveIvpExprOscillator) {
     EXPECT_NEAR(sol.y(0, 99), -1.0, 1e-3);
 }
 
+TEST(IntegrateSymbolic, SolveIvpMassMatrixExprSingularConstraint) {
+    auto t = janus::sym("t");
+    auto y = janus::sym("y", 2);
+
+    casadi::MX rhs = casadi::MX::vertcat({y(1), 1.0 - y(0) - y(1)});
+    casadi::MX M = casadi::MX::zeros(2, 2);
+    M(0, 0) = 1.0;
+
+    janus::NumericVector y0(2);
+    y0 << 0.0, 1.0;
+
+    janus::MassMatrixIvpOptions opts;
+    opts.abstol = 1e-10;
+    opts.reltol = 1e-10;
+
+    auto sol = janus::solve_ivp_mass_matrix_expr(rhs, M, t, y, {0.0, 1.0}, y0, 40, opts);
+
+    EXPECT_TRUE(sol.success);
+    EXPECT_NEAR(sol.y(0, sol.y.cols() - 1), 1.0 - std::exp(-1.0), 1e-5);
+    EXPECT_NEAR(sol.y(1, sol.y.cols() - 1), std::exp(-1.0), 1e-5);
+}
+
 // ============================================================================
 // Edge cases
 // ============================================================================
@@ -230,4 +336,25 @@ TEST(Integrate, SolveIvpSingleStep) {
     EXPECT_EQ(sol.t.size(), 2);
     EXPECT_NEAR(sol.y(0, 0), 1.0, 1e-10);
     EXPECT_NEAR(sol.y(0, 1), std::exp(-1.0), 1e-3);
+}
+
+TEST(Integrate, StructurePreservingErrors) {
+    janus::SecondOrderIvpOptions second_order_opts;
+    second_order_opts.substeps = 0;
+
+    EXPECT_THROW(janus::solve_second_order_ivp(
+                     [](double t, const janus::NumericVector &q) { return (-q).eval(); },
+                     {0.0, 1.0}, {1.0}, {0.0}, 10, second_order_opts),
+                 janus::IntegrationError);
+
+    janus::MassMatrixIvpOptions mass_opts;
+    mass_opts.max_newton_iterations = 0;
+
+    EXPECT_THROW(
+        janus::solve_ivp_mass_matrix([](double t, const janus::NumericVector &y) { return y; },
+                                     [](double t, const janus::NumericVector &y) {
+                                         return janus::NumericMatrix::Identity(y.size(), y.size());
+                                     },
+                                     {0.0, 1.0}, {1.0}, 10, mass_opts),
+        janus::IntegrationError);
 }

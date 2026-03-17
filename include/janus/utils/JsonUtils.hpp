@@ -114,8 +114,9 @@ inline std::map<std::string, std::vector<double>> read_json(const std::string &f
             if (!number_str.empty()) {
                 try {
                     vec.push_back(std::stod(number_str));
-                } catch (...) {
-                    // Ignore parsing errors for now or throw
+                } catch (const std::exception &e) {
+                    throw janus::RuntimeError("Malformed JSON: could not parse number '" +
+                                              number_str + "': " + e.what());
                 }
             }
         }

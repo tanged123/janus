@@ -1,8 +1,27 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
+#include <janus/core/Function.hpp>
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/Linalg.hpp> // for to_mx
 #include <janus/math/Logic.hpp>
+
+namespace {
+
+bool contains_op(const janus::SymbolicScalar &expr, casadi_int op) {
+    if (expr.n_dep() > 0 && expr.op() == op) {
+        return true;
+    }
+
+    for (casadi_int i = 0; i < expr.n_dep(); ++i) {
+        if (contains_op(expr.dep(i), op)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace
 
 template <typename Scalar> void test_logic_ops() {
     Scalar a = 1.0;
@@ -160,10 +179,10 @@ template <typename Scalar> void test_extended_logic() {
     auto res_all = janus::all(A);
     auto res_any = janus::any(A);
 
-    // Clip
+    // Clamp
     Matrix C(2, 2);
     C << -5.0, 5.0, 0.0, 10.0;
-    auto res_clip = janus::clip(C, 0.0, 2.0); // -> [0, 2; 0, 2]
+    auto res_clip = janus::clamp(C, 0.0, 2.0); // -> [0, 2; 0, 2]
 
     if constexpr (std::is_same_v<Scalar, double>) {
         // Numeric checks
@@ -331,6 +350,41 @@ TEST(LogicTests, NumericAllAny) {
 
     janus::NumericMatrix AllZeros = janus::NumericMatrix::Zero(2, 2);
     EXPECT_FALSE(janus::any(AllZeros));
+}
+
+TEST(LogicTests, SymbolicAllAnyTruthiness) {
+    auto [v, v_mx] = janus::sym_vec_pair("v", 2);
+    janus::Function f({v_mx}, {janus::all(v), janus::any(v)});
+
+    janus::NumericVector both_nonzero(2);
+    both_nonzero << 2.0, -3.0;
+    auto both_nonzero_eval = f(both_nonzero);
+    EXPECT_DOUBLE_EQ(both_nonzero_eval[0](0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(both_nonzero_eval[1](0, 0), 1.0);
+
+    janus::NumericVector one_zero(2);
+    one_zero << 2.0, 0.0;
+    auto one_zero_eval = f(one_zero);
+    EXPECT_DOUBLE_EQ(one_zero_eval[0](0, 0), 0.0);
+    EXPECT_DOUBLE_EQ(one_zero_eval[1](0, 0), 1.0);
+
+    janus::NumericVector all_zero(2);
+    all_zero << 0.0, 0.0;
+    auto all_zero_eval = f(all_zero);
+    EXPECT_DOUBLE_EQ(all_zero_eval[0](0, 0), 0.0);
+    EXPECT_DOUBLE_EQ(all_zero_eval[1](0, 0), 0.0);
+}
+
+TEST(LogicTests, SymbolicAllAnyUseConstraintReductionOps) {
+    auto v = janus::sym_vec("v", 2);
+    auto all_expr = janus::all(v);
+    auto any_expr = janus::any(v);
+
+    EXPECT_TRUE(contains_op(all_expr, casadi::OP_ADD));
+    EXPECT_FALSE(contains_op(all_expr, casadi::OP_NORMINF));
+
+    EXPECT_TRUE(contains_op(any_expr, casadi::OP_ADD));
+    EXPECT_FALSE(contains_op(any_expr, casadi::OP_NORMINF));
 }
 
 TEST(LogicTests, MixedTypeLogic) {

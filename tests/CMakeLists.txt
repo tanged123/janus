@@ -2,10 +2,12 @@ find_package(GTest REQUIRED)
 
 add_executable(test_core 
     test_core.cpp
+    core/test_diagnostics.cpp
     core/test_janus_io.cpp
     core/test_janus_types.cpp
     core/test_io_coverage.cpp
     core/test_sparsity.cpp
+    core/test_structural_transforms.cpp
 )
 target_link_libraries(test_core PRIVATE janus GTest::gtest_main)
 
@@ -36,6 +38,8 @@ add_executable(test_math
     math/test_coverage_gaps.cpp
     math/test_rootfinding.cpp
     math/test_orthogonal_polynomials.cpp
+    math/test_polynomial_chaos.cpp
+    math/test_quadrature.cpp
 )
 target_link_libraries(test_math PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_math)

@@ -12,6 +12,9 @@ std::pair<double, double> legendre_poly(int n, double x);
 
 namespace detail {
 
+/// Tolerance for zero-length integration intervals in Birkhoff matrix
+constexpr double polynomial_root_tolerance = 1e-15;
+
 inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
     if (n < 1) {
         throw InvalidArgument("gauss_legendre_rule: n must be >= 1");
@@ -50,6 +53,13 @@ inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
 }
 
 } // namespace detail
+
+/**
+ * @brief Gauss-Legendre nodes and weights on [-1, 1].
+ */
+inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
+    return detail::gauss_legendre_rule(n);
+}
 
 /**
  * @brief Evaluate Legendre polynomial P_n(x) and derivative P'_n(x)
@@ -325,7 +335,7 @@ inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
         const double b = nodes(i);
         const double half = 0.5 * (b - a);
         const double mid = 0.5 * (b + a);
-        if (std::abs(half) < 1e-15) {
+        if (std::abs(half) < detail::polynomial_root_tolerance) {
             continue; // first row stays zero
         }
 

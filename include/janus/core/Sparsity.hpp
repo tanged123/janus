@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Function.hpp"
 #include "JanusError.hpp"
 #include "JanusIO.hpp"
 #include "JanusTypes.hpp"
@@ -9,12 +10,10 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace janus {
-
-// Forward declaration
-class Function;
 
 /**
  * @brief Wrapper around CasADi Sparsity for pattern analysis
@@ -507,6 +506,312 @@ class SparsityPattern {
     casadi::Sparsity sp_;
 };
 
+/**
+ * @brief Wrapper around a CasADi graph coloring assignment.
+ *
+ * CasADi encodes a coloring as a sparse matrix with one nonzero per colored
+ * entry. Rows correspond to original derivative entries and columns correspond
+ * to compressed seed directions.
+ */
+class GraphColoring {
+  public:
+    GraphColoring() = default;
+    explicit GraphColoring(const casadi::Sparsity &coloring) : pattern_(coloring) {}
+
+    /**
+     * @brief Number of original entries being colored.
+     */
+    int n_entries() const { return pattern_.n_rows(); }
+
+    /**
+     * @brief Number of compressed seed directions (colors).
+     */
+    int n_colors() const { return pattern_.n_cols(); }
+
+    /**
+     * @brief Compression factor relative to one direction per entry.
+     */
+    double compression_ratio() const {
+        return n_colors() > 0 ? static_cast<double>(n_entries()) / n_colors() : 0.0;
+    }
+
+    /**
+     * @brief 0-based color assignment for each original entry.
+     */
+    std::vector<int> colorvec() const {
+        std::vector<int> colors(n_entries(), -1);
+        auto [rows, cols] = pattern_.get_triplet();
+        for (size_t i = 0; i < rows.size(); ++i) {
+            colors.at(rows[i]) = cols[i];
+        }
+        return colors;
+    }
+
+    /**
+     * @brief Access the sparse assignment matrix behind the coloring.
+     */
+    const SparsityPattern &pattern() const { return pattern_; }
+
+  private:
+    SparsityPattern pattern_;
+};
+
+/**
+ * @brief Preferred directional mode for a sparse Jacobian evaluator.
+ */
+enum class SparseJacobianMode { Forward, Reverse };
+
+namespace detail {
+
+inline std::vector<SymbolicScalar> to_mx_vector(const std::vector<SymbolicArg> &args) {
+    std::vector<SymbolicScalar> ret;
+    ret.reserve(args.size());
+    for (const auto &arg : args) {
+        ret.push_back(arg.get());
+    }
+    return ret;
+}
+
+inline std::vector<SymbolicArg> to_symbolic_args(const std::vector<SymbolicScalar> &args) {
+    std::vector<SymbolicArg> ret;
+    ret.reserve(args.size());
+    for (const auto &arg : args) {
+        ret.emplace_back(arg);
+    }
+    return ret;
+}
+
+inline SymbolicScalar stack_nonzeros(const SymbolicScalar &expr) {
+    std::vector<SymbolicScalar> nz = expr.get_nonzeros();
+    if (nz.empty()) {
+        return SymbolicScalar(0, 1);
+    }
+    return SymbolicScalar::vertcat(nz);
+}
+
+inline void validate_function_indices(const Function &fn, int output_idx, int input_idx,
+                                      const char *where) {
+    const auto &cfn = fn.casadi_function();
+    if (output_idx < 0 || output_idx >= cfn.n_out()) {
+        throw InvalidArgument(std::string(where) + ": output_idx out of range");
+    }
+    if (input_idx < 0 || input_idx >= cfn.n_in()) {
+        throw InvalidArgument(std::string(where) + ": input_idx out of range");
+    }
+}
+
+inline std::vector<SymbolicScalar> symbolic_inputs_like(const Function &fn,
+                                                        const std::string &prefix) {
+    const auto &cfn = fn.casadi_function();
+    std::vector<SymbolicScalar> inputs;
+    inputs.reserve(cfn.n_in());
+    for (int i = 0; i < cfn.n_in(); ++i) {
+        inputs.push_back(SymbolicScalar::sym(prefix + cfn.name_in(i), cfn.sparsity_in(i)));
+    }
+    return inputs;
+}
+
+inline GraphColoring make_forward_coloring(const casadi::Sparsity &jac_sparsity) {
+    return GraphColoring(jac_sparsity.T().uni_coloring(jac_sparsity));
+}
+
+inline GraphColoring make_reverse_coloring(const casadi::Sparsity &jac_sparsity) {
+    return GraphColoring(jac_sparsity.uni_coloring(jac_sparsity.T()));
+}
+
+struct SparseJacobianArtifacts {
+    SparsityPattern sparsity;
+    GraphColoring forward_coloring;
+    GraphColoring reverse_coloring;
+    Function values_function;
+};
+
+inline SparseJacobianArtifacts
+make_sparse_jacobian_artifacts(const std::vector<SymbolicArg> &expressions,
+                               const std::vector<SymbolicArg> &variables, const std::string &name) {
+    SymbolicScalar expr_cat = SymbolicScalar::vertcat(to_mx_vector(expressions));
+    SymbolicScalar var_cat = SymbolicScalar::vertcat(to_mx_vector(variables));
+    SymbolicScalar jac = SymbolicScalar::jacobian(expr_cat, var_cat);
+
+    Function values_function = name.empty() ? Function(variables, {stack_nonzeros(jac)})
+                                            : Function(name, variables, {stack_nonzeros(jac)});
+
+    return {
+        SparsityPattern(jac.sparsity()),
+        make_forward_coloring(jac.sparsity()),
+        make_reverse_coloring(jac.sparsity()),
+        std::move(values_function),
+    };
+}
+
+inline SparseJacobianArtifacts make_sparse_jacobian_artifacts(const Function &fn, int output_idx,
+                                                              int input_idx,
+                                                              const std::string &name) {
+    validate_function_indices(fn, output_idx, input_idx, "sparse_jacobian");
+
+    std::vector<SymbolicScalar> inputs = symbolic_inputs_like(fn, "_sj_");
+    std::vector<SymbolicScalar> outputs = fn.casadi_function()(inputs);
+    SymbolicScalar jac = SymbolicScalar::jacobian(outputs.at(output_idx), inputs.at(input_idx));
+
+    std::vector<SymbolicArg> input_args = to_symbolic_args(inputs);
+    Function values_function = name.empty() ? Function(input_args, {stack_nonzeros(jac)})
+                                            : Function(name, input_args, {stack_nonzeros(jac)});
+
+    return {
+        SparsityPattern(jac.sparsity()),
+        make_forward_coloring(jac.sparsity()),
+        make_reverse_coloring(jac.sparsity()),
+        std::move(values_function),
+    };
+}
+
+struct SparseHessianArtifacts {
+    SparsityPattern sparsity;
+    GraphColoring coloring;
+    Function values_function;
+};
+
+inline SparseHessianArtifacts
+make_sparse_hessian_artifacts(const SymbolicArg &expression,
+                              const std::vector<SymbolicArg> &variables, const std::string &name) {
+    SymbolicScalar var_cat = SymbolicScalar::vertcat(to_mx_vector(variables));
+    SymbolicScalar hess = SymbolicScalar::hessian(expression.get(), var_cat);
+
+    Function values_function = name.empty() ? Function(variables, {stack_nonzeros(hess)})
+                                            : Function(name, variables, {stack_nonzeros(hess)});
+
+    return {
+        SparsityPattern(hess.sparsity()),
+        GraphColoring(hess.sparsity().star_coloring()),
+        std::move(values_function),
+    };
+}
+
+inline SparseHessianArtifacts make_sparse_hessian_artifacts(const Function &fn, int output_idx,
+                                                            int input_idx,
+                                                            const std::string &name) {
+    validate_function_indices(fn, output_idx, input_idx, "sparse_hessian");
+
+    std::vector<SymbolicScalar> inputs = symbolic_inputs_like(fn, "_sh_");
+    std::vector<SymbolicScalar> outputs = fn.casadi_function()(inputs);
+    if (!outputs.at(output_idx).is_scalar()) {
+        throw InvalidArgument("sparse_hessian: selected function output must be scalar");
+    }
+
+    SymbolicScalar hess = SymbolicScalar::hessian(outputs.at(output_idx), inputs.at(input_idx));
+    std::vector<SymbolicArg> input_args = to_symbolic_args(inputs);
+    Function values_function = name.empty() ? Function(input_args, {stack_nonzeros(hess)})
+                                            : Function(name, input_args, {stack_nonzeros(hess)});
+
+    return {
+        SparsityPattern(hess.sparsity()),
+        GraphColoring(hess.sparsity().star_coloring()),
+        std::move(values_function),
+    };
+}
+
+inline SparsityPattern function_jacobian_sparsity(const Function &fn, int output_idx,
+                                                  int input_idx) {
+    validate_function_indices(fn, output_idx, input_idx, "get_jacobian_sparsity");
+    std::vector<SymbolicScalar> inputs = symbolic_inputs_like(fn, "_jsp_");
+    std::vector<SymbolicScalar> outputs = fn.casadi_function()(inputs);
+    return SparsityPattern(
+        SymbolicScalar::jacobian(outputs.at(output_idx), inputs.at(input_idx)).sparsity());
+}
+
+} // namespace detail
+
+/**
+ * @brief Cached sparse Jacobian evaluator with fixed structural ordering.
+ *
+ * The returned values are the structural nonzeros of the Jacobian in the same
+ * internal CCS ordering reported by `sparsity().get_triplet()` or
+ * `sparsity().get_ccs()`.
+ */
+class SparseJacobianEvaluator {
+  public:
+    SparseJacobianEvaluator(const SymbolicArg &expression, const SymbolicArg &variables,
+                            const std::string &name = "")
+        : artifacts_(detail::make_sparse_jacobian_artifacts({expression}, {variables}, name)) {}
+
+    SparseJacobianEvaluator(const std::vector<SymbolicArg> &expressions,
+                            const std::vector<SymbolicArg> &variables, const std::string &name = "")
+        : artifacts_(detail::make_sparse_jacobian_artifacts(expressions, variables, name)) {}
+
+    SparseJacobianEvaluator(const Function &fn, int output_idx = 0, int input_idx = 0,
+                            const std::string &name = "")
+        : artifacts_(detail::make_sparse_jacobian_artifacts(fn, output_idx, input_idx, name)) {}
+
+    const SparsityPattern &sparsity() const { return artifacts_.sparsity; }
+    int nnz() const { return artifacts_.sparsity.nnz(); }
+
+    const GraphColoring &forward_coloring() const { return artifacts_.forward_coloring; }
+    const GraphColoring &reverse_coloring() const { return artifacts_.reverse_coloring; }
+
+    SparseJacobianMode preferred_mode() const {
+        return forward_coloring().n_colors() <= reverse_coloring().n_colors()
+                   ? SparseJacobianMode::Forward
+                   : SparseJacobianMode::Reverse;
+    }
+
+    const GraphColoring &preferred_coloring() const {
+        return preferred_mode() == SparseJacobianMode::Forward ? artifacts_.forward_coloring
+                                                               : artifacts_.reverse_coloring;
+    }
+
+    const Function &values_function() const { return artifacts_.values_function; }
+
+    template <typename... Args> auto values(Args &&...args) const {
+        return artifacts_.values_function.eval(std::forward<Args>(args)...);
+    }
+
+    template <typename... Args> auto operator()(Args &&...args) const {
+        return values(std::forward<Args>(args)...);
+    }
+
+  private:
+    detail::SparseJacobianArtifacts artifacts_;
+};
+
+/**
+ * @brief Cached sparse Hessian evaluator with fixed structural ordering.
+ *
+ * The returned values are the structural nonzeros of the Hessian in the same
+ * internal CCS ordering reported by `sparsity().get_triplet()` or
+ * `sparsity().get_ccs()`.
+ */
+class SparseHessianEvaluator {
+  public:
+    SparseHessianEvaluator(const SymbolicArg &expression, const SymbolicArg &variables,
+                           const std::string &name = "")
+        : artifacts_(detail::make_sparse_hessian_artifacts(expression, {variables}, name)) {}
+
+    SparseHessianEvaluator(const SymbolicArg &expression, const std::vector<SymbolicArg> &variables,
+                           const std::string &name = "")
+        : artifacts_(detail::make_sparse_hessian_artifacts(expression, variables, name)) {}
+
+    SparseHessianEvaluator(const Function &fn, int output_idx = 0, int input_idx = 0,
+                           const std::string &name = "")
+        : artifacts_(detail::make_sparse_hessian_artifacts(fn, output_idx, input_idx, name)) {}
+
+    const SparsityPattern &sparsity() const { return artifacts_.sparsity; }
+    int nnz() const { return artifacts_.sparsity.nnz(); }
+
+    const GraphColoring &coloring() const { return artifacts_.coloring; }
+    const Function &values_function() const { return artifacts_.values_function; }
+
+    template <typename... Args> auto values(Args &&...args) const {
+        return artifacts_.values_function.eval(std::forward<Args>(args)...);
+    }
+
+    template <typename... Args> auto operator()(Args &&...args) const {
+        return values(std::forward<Args>(args)...);
+    }
+
+  private:
+    detail::SparseHessianArtifacts artifacts_;
+};
+
 // === Sparsity Query Functions ===
 
 /**
@@ -551,10 +856,27 @@ inline SparsityPattern sparsity_of_hessian(const SymbolicScalar &expr, const Sym
  */
 inline SparsityPattern get_jacobian_sparsity(const Function &fn, int output_idx = 0,
                                              int input_idx = 0) {
-    // Get the Jacobian function and extract its output sparsity
-    casadi::Function jac_fn = fn.casadi_function().jacobian();
-    casadi::Sparsity sp = jac_fn.sparsity_out(0);
-    return SparsityPattern(sp);
+    return detail::function_jacobian_sparsity(fn, output_idx, input_idx);
+}
+
+/**
+ * @brief Get Hessian sparsity of a scalar janus::Function output.
+ *
+ * @param fn The function
+ * @param output_idx Scalar output index (default 0)
+ * @param input_idx Input index to differentiate with respect to (default 0)
+ * @return SparsityPattern of the Hessian
+ */
+inline SparsityPattern get_hessian_sparsity(const Function &fn, int output_idx = 0,
+                                            int input_idx = 0) {
+    detail::validate_function_indices(fn, output_idx, input_idx, "get_hessian_sparsity");
+    std::vector<SymbolicScalar> inputs = detail::symbolic_inputs_like(fn, "_hsp_");
+    std::vector<SymbolicScalar> outputs = fn.casadi_function()(inputs);
+    if (!outputs.at(output_idx).is_scalar()) {
+        throw InvalidArgument("get_hessian_sparsity: selected function output must be scalar");
+    }
+    return SparsityPattern(
+        SymbolicScalar::hessian(outputs.at(output_idx), inputs.at(input_idx)).sparsity());
 }
 
 /**
@@ -573,6 +895,58 @@ inline SparsityPattern get_sparsity_out(const Function &fn, int output_idx = 0) 
     return SparsityPattern(sp);
 }
 
+/**
+ * @brief Compile a sparse Jacobian value evaluator from symbolic expressions.
+ */
+inline SparseJacobianEvaluator sparse_jacobian(const SymbolicArg &expression,
+                                               const SymbolicArg &variables,
+                                               const std::string &name = "") {
+    return SparseJacobianEvaluator(expression, variables, name);
+}
+
+/**
+ * @brief Compile a sparse Jacobian value evaluator from vector arguments.
+ */
+inline SparseJacobianEvaluator sparse_jacobian(const std::vector<SymbolicArg> &expressions,
+                                               const std::vector<SymbolicArg> &variables,
+                                               const std::string &name = "") {
+    return SparseJacobianEvaluator(expressions, variables, name);
+}
+
+/**
+ * @brief Compile a sparse Jacobian value evaluator from a janus::Function.
+ */
+inline SparseJacobianEvaluator sparse_jacobian(const Function &fn, int output_idx = 0,
+                                               int input_idx = 0, const std::string &name = "") {
+    return SparseJacobianEvaluator(fn, output_idx, input_idx, name);
+}
+
+/**
+ * @brief Compile a sparse Hessian value evaluator from symbolic expressions.
+ */
+inline SparseHessianEvaluator sparse_hessian(const SymbolicArg &expression,
+                                             const SymbolicArg &variables,
+                                             const std::string &name = "") {
+    return SparseHessianEvaluator(expression, variables, name);
+}
+
+/**
+ * @brief Compile a sparse Hessian value evaluator from vector arguments.
+ */
+inline SparseHessianEvaluator sparse_hessian(const SymbolicArg &expression,
+                                             const std::vector<SymbolicArg> &variables,
+                                             const std::string &name = "") {
+    return SparseHessianEvaluator(expression, variables, name);
+}
+
+/**
+ * @brief Compile a sparse Hessian value evaluator from a janus::Function.
+ */
+inline SparseHessianEvaluator sparse_hessian(const Function &fn, int output_idx = 0,
+                                             int input_idx = 0, const std::string &name = "") {
+    return SparseHessianEvaluator(fn, output_idx, input_idx, name);
+}
+
 // =============================================================================
 // NaN-Propagation Sparsity Detection
 // =============================================================================
@@ -582,7 +956,6 @@ inline SparsityPattern get_sparsity_out(const Function &fn, int output_idx = 0) 
  */
 struct NaNSparsityOptions {
     NumericVector reference_point; ///< Point to evaluate at (default: zeros)
-    double perturbation = 1e-7;    ///< Reserved for future finite-difference methods
 };
 
 /**

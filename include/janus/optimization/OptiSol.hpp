@@ -3,6 +3,10 @@
 #include "janus/core/JanusTypes.hpp"
 #include "janus/utils/JsonUtils.hpp"
 #include <casadi/casadi.hpp>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace janus {
 
@@ -83,24 +87,26 @@ class OptiSol {
 
     /**
      * @brief Get number of function evaluations
+     * @return Number of function evaluations, or nullopt if not available
      */
-    int num_function_evals() const {
+    std::optional<int> num_function_evals() const {
         auto s = stats();
         if (s.count("n_call_nlp_f")) {
             return static_cast<int>(s.at("n_call_nlp_f"));
         }
-        return -1;
+        return std::nullopt;
     }
 
     /**
      * @brief Get number of iterations
+     * @return Number of iterations, or nullopt if not available
      */
-    int num_iterations() const {
+    std::optional<int> num_iterations() const {
         auto s = stats();
         if (s.count("iter_count")) {
             return static_cast<int>(s.at("iter_count"));
         }
-        return -1;
+        return std::nullopt;
     }
 
     /**
@@ -144,6 +150,17 @@ class OptiSol {
         }
 
         janus::utils::write_json(filename, data);
+    }
+
+    /**
+     * @brief Load solution data from JSON file
+     *
+     * @param filename JSON file path
+     * @return Map of variable names to value vectors
+     * @throws RuntimeError if file cannot be read or parsed
+     */
+    static std::map<std::string, std::vector<double>> load(const std::string &filename) {
+        return janus::utils::read_json(filename);
     }
 
   private:

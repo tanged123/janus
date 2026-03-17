@@ -12,9 +12,9 @@ namespace janus {
  * IPOPT is always available. Others require separate installation.
  */
 enum class Solver {
-    IPOPT,  ///< Interior Point OPTimizer (default, always available)
-    SNOPT,  ///< Sparse Nonlinear OPTimizer (requires license)
-    QPOASES ///< QP solver for QP subproblems
+    Ipopt,  ///< Interior Point OPTimizer (default, always available)
+    Snopt,  ///< Sparse Nonlinear OPTimizer (requires license)
+    QpOases ///< QP solver for QP subproblems
 };
 
 // Forward declaration (implemented after solver_name)
@@ -28,11 +28,11 @@ inline bool solver_available(Solver solver);
  */
 inline const char *solver_name(Solver solver) {
     switch (solver) {
-    case Solver::SNOPT:
+    case Solver::Snopt:
         return "snopt";
-    case Solver::QPOASES:
+    case Solver::QpOases:
         return "qpoases";
-    case Solver::IPOPT:
+    case Solver::Ipopt:
     default:
         return "ipopt";
     }
@@ -96,11 +96,11 @@ struct SNOPTOptions {
  *   opti.solve(OptiOptions{}.set_verbose(false).set_max_iter(500));
  *
  * Usage (alternative solver):
- *   opti.solve({.solver = janus::Solver::SNOPT});
+ *   opti.solve({.solver = janus::Solver::Snopt});
  */
 struct OptiOptions {
     // Solver selection
-    Solver solver = Solver::IPOPT; ///< NLP solver to use
+    Solver solver = Solver::Ipopt; ///< NLP solver to use
     SNOPTOptions snopt_opts;       ///< SNOPT-specific options (if solver=SNOPT)
 
     // General solver options (used by all solvers where applicable)

@@ -1,7 +1,10 @@
 #include "../utils/TestUtils.hpp"
 #include <fstream>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusIO.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Trig.hpp>
 
 // ======================================================================
 // JanusIO.hpp Coverage

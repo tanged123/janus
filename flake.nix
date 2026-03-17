@@ -31,7 +31,7 @@
       {
         packages.default = stdenv.mkDerivation {
           pname = "janus";
-          version = "1.6.0";
+          version = "2.0.0";
           src = ./.;
 
           nativeBuildInputs = [
@@ -62,6 +62,7 @@
               eigen
               casadi
               gtest
+              ccache
               clang-tools
               doxygen
               graphviz

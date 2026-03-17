@@ -28,6 +28,24 @@ target_link_libraries(graph_visualization PRIVATE janus)
 add_executable(deep_graph_demo math/deep_graph_demo.cpp)
 target_link_libraries(deep_graph_demo PRIVATE janus)
 
+add_executable(sparse_derivative_pipeline math/sparse_derivative_pipeline.cpp)
+target_link_libraries(sparse_derivative_pipeline PRIVATE janus)
+
+add_executable(sensitivity_jacobian_demo math/sensitivity_jacobian_demo.cpp)
+target_link_libraries(sensitivity_jacobian_demo PRIVATE janus)
+
+add_executable(structural_transforms_demo math/structural_transforms_demo.cpp)
+target_link_libraries(structural_transforms_demo PRIVATE janus)
+
+add_executable(structural_diagnostics_demo math/structural_diagnostics_demo.cpp)
+target_link_libraries(structural_diagnostics_demo PRIVATE janus)
+
+add_executable(linear_solve_policy_demo math/linear_solve_policy_demo.cpp)
+target_link_libraries(linear_solve_policy_demo PRIVATE janus)
+
+add_executable(polynomial_chaos_demo math/polynomial_chaos_demo.cpp)
+target_link_libraries(polynomial_chaos_demo PRIVATE janus)
+
 # =============================================================================
 # Interpolation Examples
 # =============================================================================

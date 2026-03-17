@@ -14,15 +14,23 @@ BUILD_DIR="build/coverage"
 REPORT_DIR="$BUILD_DIR/html"
 mkdir -p "$BUILD_DIR"
 
+# Default jobs: half of available cores, capped at 6 (minimum 2)
+# This prevents OOM on 32GB systems with heavy template code (CasADi)
+DEFAULT_JOBS=$(( $(nproc) / 2 ))
+[ "$DEFAULT_JOBS" -lt 2 ] && DEFAULT_JOBS=2
+[ "$DEFAULT_JOBS" -gt 6 ] && DEFAULT_JOBS=6
+JOBS="${JOBS:-$DEFAULT_JOBS}"
+
 echo "=== Code Coverage Generation ==="
 echo "Build Directory: $BUILD_DIR"
+echo "Parallel jobs: $JOBS"
 
 # 1. Configure with Coverage Enabled
 cmake -B "$BUILD_DIR" -S . -DENABLE_COVERAGE=ON -G Ninja
 
 # 2. Build and Test
-cmake --build "$BUILD_DIR"
-CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target test
+cmake --build "$BUILD_DIR" -j "$JOBS"
+CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target test -j "$JOBS"
 
 # 2b. Run Examples (Treating them as Integration Tests)
 echo "Running examples to capture integration coverage..."

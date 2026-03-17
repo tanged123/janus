@@ -63,7 +63,76 @@ auto J = janus::jacobian({y}, {x});
 auto J_full = janus::jacobian({y}, {x, v});
 ```
 
-## 6. Full Workflow Example
+## 6. Sensitivity Regime Switching
+
+For compiled `janus::Function` objects, Janus can now choose between forward and adjoint
+Jacobian construction automatically based on parameter count, output count, and optional
+trajectory hints.
+
+```cpp
+janus::Function f("f", {x}, {y});
+
+auto rec = janus::select_sensitivity_regime(
+    f,
+    0,      // output block
+    0,      // input block
+    400,    // horizon length hint
+    true    // stiff trajectory hint
+);
+
+auto J_fun = janus::sensitivity_jacobian(f, 0, 0, 400, true);
+auto J = J_fun.eval(x_val);
+```
+
+Use `rec.integrator_options()` when you want the same recommendation expressed as
+CasADi/SUNDIALS options (`nfwd` or `nadj`, plus checkpoint settings for long-horizon adjoints).
+
+## 7. Matrix-Free Second-Order Products
+
+For large optimization problems, you often want `H * v` without ever forming the dense Hessian.
+Janus now exposes matrix-free Hessian-vector products for both plain scalar expressions and
+Lagrangians:
+
+```cpp
+auto x = janus::sym("x", 3);
+auto v = janus::sym("v", 3);
+auto lam = janus::sym("lam", 2);
+
+casadi::MX x0 = x(0);
+casadi::MX x1 = x(1);
+casadi::MX x2 = x(2);
+
+auto objective = x0 * x0 + x1 * x2 + janus::sin(x2);
+auto constraints = casadi::MX::vertcat({x0 + x1, x1 * x2});
+
+auto hvp = janus::hessian_vector_product(objective, x, v);
+auto lag_hvp =
+    janus::lagrangian_hessian_vector_product(objective, constraints, x, lam, v);
+```
+
+For compiled `janus::Function` objects, the wrappers return another `janus::Function`:
+
+```cpp
+janus::Function model("model", {x}, {objective});
+janus::Function hvp_fun = janus::hessian_vector_product(model, 0, 0);
+
+auto hv = hvp_fun.eval(x_val, v_val);   // original inputs..., then direction v
+```
+
+The Lagrangian variant appends the multiplier block first and the direction block last:
+
+```cpp
+janus::Function nlp_terms("nlp_terms", {x}, {objective, constraints});
+janus::Function lag_hvp_fun =
+    janus::lagrangian_hessian_vector_product(nlp_terms, 0, 1, 0);
+
+auto hv = lag_hvp_fun.eval(x_val, lam_val, v_val);
+```
+
+These products use CasADi's forward-over-reverse AD internally, so the dense Hessian is never
+constructed as an intermediate.
+
+## 8. Full Workflow Example
 
 ```cpp
 // 1. Symbols
