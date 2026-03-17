@@ -10,7 +10,15 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
+#include <janus/math/AutoDiff.hpp>
+#include <janus/math/Logic.hpp>
+#include <janus/math/Spacing.hpp>
+#include <janus/math/Trig.hpp>
+#include <janus/optimization/Opti.hpp>
+#include <janus/optimization/OptiOptions.hpp>
 
 // =============================================================================
 // Rosenbrock Tests (based on AeroSandbox benchmarks)

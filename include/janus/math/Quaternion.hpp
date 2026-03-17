@@ -169,16 +169,18 @@ template <typename Scalar> class Quaternion {
     }
 
     static Quaternion from_rotation_vector(const Vec3<Scalar> &rot_vec) {
+        Scalar half = static_cast<Scalar>(0.5);
+        Scalar eps = static_cast<Scalar>(1e-12);
         Scalar angle = janus::norm(rot_vec);
-        // Avoid division by zero if angle is small -> identity
-        // But symbolic might not like branching.
-        // For now, assume angle > 0 or handle logic outside.
-        // Or if angle is 0, axis is undefined but result should be identity.
-        // axis * angle / angle = axis.
+        Scalar half_angle = angle * half;
+        Scalar safe_angle = angle + eps;
 
-        // Simple safe normalization:
-        Scalar safe_angle = angle + static_cast<Scalar>(1e-16); // Tiny epsilon
-        return from_axis_angle(rot_vec / safe_angle, angle);
+        // sin(angle/2)/angle with small-angle fallback (limit = 0.5)
+        Scalar scale_raw = janus::sin(half_angle) / safe_angle;
+        Scalar scale = janus::where(angle > eps, scale_raw, half);
+
+        return Quaternion(janus::cos(half_angle), rot_vec(0) * scale, rot_vec(1) * scale,
+                          rot_vec(2) * scale);
     }
 
     static Quaternion from_rotation_matrix(const Mat3<Scalar> &mat) {

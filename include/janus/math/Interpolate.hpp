@@ -150,12 +150,19 @@ inline InterpnGridData build_interpn_grid(const std::vector<NumericVector> &poin
     data.grid.resize(n_dims);
 
     for (int d = 0; d < n_dims; ++d) {
+        if (points[d].size() < 2) {
+            throw InterpolationError(std::string(context) + ": points[" + std::to_string(d) +
+                                     "] must have at least 2 points");
+        }
+
         data.grid[d].resize(points[d].size());
         Eigen::VectorXd::Map(data.grid[d].data(), points[d].size()) = points[d];
 
-        if (!std::is_sorted(data.grid[d].begin(), data.grid[d].end())) {
-            throw InterpolationError(std::string(context) + ": points[" + std::to_string(d) +
-                                     "] must be sorted");
+        for (size_t i = 0; i + 1 < data.grid[d].size(); ++i) {
+            if (data.grid[d][i + 1] <= data.grid[d][i]) {
+                throw InterpolationError(std::string(context) + ": points[" + std::to_string(d) +
+                                         "] must be strictly increasing");
+            }
         }
 
         data.expected_size *= static_cast<int>(points[d].size());

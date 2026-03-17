@@ -1,7 +1,9 @@
 #include <cmath>
 #include <gtest/gtest.h>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusError.hpp>
 #include <janus/core/JanusTypes.hpp>
-#include <janus/janus.hpp>
+#include <janus/math/AutoDiff.hpp>
 #include <janus/math/ScatteredInterpolator.hpp>
 
 // ============================================================================

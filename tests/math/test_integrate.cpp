@@ -1,7 +1,10 @@
 #include "../utils/TestUtils.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Integrate.hpp>
 
 // ============================================================================
 // Tests for quad (definite integration)

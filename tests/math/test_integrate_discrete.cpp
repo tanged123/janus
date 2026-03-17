@@ -1,6 +1,8 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/IntegrateDiscrete.hpp>
 
 template <typename Scalar> void test_integrate_core() {
     // x = [0, 1, 2]

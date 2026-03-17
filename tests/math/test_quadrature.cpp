@@ -4,7 +4,9 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/PolynomialChaos.hpp>
+#include <janus/math/Quadrature.hpp>
 
 #include <cmath>
 #include <vector>

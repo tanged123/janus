@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/core/StructuralTransforms.hpp>
+#include <janus/math/Trig.hpp>
 
 #include <algorithm>
 #include <cmath>

@@ -1,5 +1,7 @@
 #include "../utils/TestUtils.hpp" // specific path to TestUtils
-#include "janus/janus.hpp"
+#include "janus/core/Function.hpp"
+#include "janus/core/JanusError.hpp"
+#include "janus/math/AutoDiff.hpp"
 #include "janus/math/SurrogateModel.hpp"
 #include <gtest/gtest.h>
 

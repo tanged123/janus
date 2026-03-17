@@ -1,7 +1,9 @@
 #include "../utils/TestUtils.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/IntegratorStep.hpp>
 
 // ============================================================================
 // Tests for euler_step

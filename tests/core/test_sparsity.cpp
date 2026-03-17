@@ -4,7 +4,9 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/core/Sparsity.hpp>
 #include <stdexcept>
 
 using namespace janus;

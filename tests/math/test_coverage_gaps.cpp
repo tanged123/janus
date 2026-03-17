@@ -1,6 +1,17 @@
 #include "../utils/TestUtils.hpp"
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/FiniteDifference.hpp>
+#include <janus/math/Integrate.hpp>
+#include <janus/math/Linalg.hpp>
+#include <janus/math/Logic.hpp>
+#include <janus/math/OrthogonalPolynomials.hpp>
+#include <janus/math/PolynomialChaos.hpp>
+#include <janus/math/Quadrature.hpp>
+#include <janus/math/RootFinding.hpp>
+#include <janus/math/Spacing.hpp>
 #include <limits>
 
 namespace {

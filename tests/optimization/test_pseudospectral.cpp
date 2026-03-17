@@ -4,7 +4,11 @@
  */
 
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Trig.hpp>
+#include <janus/optimization/Collocation.hpp>
+#include <janus/optimization/Opti.hpp>
+#include <janus/optimization/Pseudospectral.hpp>
 
 #include <array>
 #include <cmath>

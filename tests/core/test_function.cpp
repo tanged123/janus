@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
+#include <janus/math/AutoDiff.hpp>
+#include <janus/math/Trig.hpp>
 #include <vector>
 
 TEST(FunctionTests, BasicEvaluation) {

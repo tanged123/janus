@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/Diagnostics.hpp>
+#include <janus/core/Function.hpp>
+#include <janus/core/JanusError.hpp>
+#include <janus/core/JanusTypes.hpp>
 
 #include <algorithm>
 #include <string>

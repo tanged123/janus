@@ -2,7 +2,9 @@
 #include <cstdio>
 #include <fstream>
 #include <gtest/gtest.h>
-#include <janus/janus.hpp>
+#include <janus/core/JanusTypes.hpp>
+#include <janus/math/Arithmetic.hpp>
+#include <janus/optimization/Opti.hpp>
 #include <janus/optimization/OptiSol.hpp>
 
 class OptiCacheTest : public ::testing::Test {
