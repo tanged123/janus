@@ -76,10 +76,11 @@ struct SensitivityRecommendation {
             opts["nadj"] = output_count;
             if (uses_checkpointing()) {
                 opts["steps_per_checkpoint"] = steps_per_checkpoint;
-                opts["interpolation_type"] =
-                    checkpoint_interpolation == CheckpointInterpolation::Polynomial
-                        ? std::string("polynomial")
-                        : std::string("hermite");
+                if (checkpoint_interpolation == CheckpointInterpolation::Polynomial) {
+                    opts["interpolation_type"] = std::string("polynomial");
+                } else if (checkpoint_interpolation == CheckpointInterpolation::Hermite) {
+                    opts["interpolation_type"] = std::string("hermite");
+                }
             }
         }
         return opts;
@@ -477,7 +478,8 @@ inline SymbolicMatrix hessian_vector_product(const SymbolicArg &expr, const Symb
     detail::validate_same_shape(vars_mx, direction_mx, "hessian_vector_product", "direction");
 
     const casadi::MX gradient_mx = casadi::MX::gradient(expr_mx, vars_mx);
-    return to_eigen(casadi::MX::jtimes(gradient_mx, vars_mx, direction_mx, false));
+    const casadi::MX hvp_mx = casadi::MX::jtimes(gradient_mx, vars_mx, direction_mx, false);
+    return to_eigen(casadi::MX::reshape(hvp_mx, vars_mx.size1(), vars_mx.size2()));
 }
 
 /**

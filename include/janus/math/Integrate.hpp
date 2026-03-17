@@ -643,6 +643,9 @@ OdeResult<double> solve_ivp_mass_matrix(RhsFunc &&rhs, MassFunc &&mass_matrix,
 
     const double t0 = t_span.first;
     const double tf = t_span.second;
+    if (t0 == tf) {
+        throw IntegrationError("solve_ivp_mass_matrix: t_span endpoints must differ");
+    }
     if (y0.size() == 0) {
         throw IntegrationError("solve_ivp_mass_matrix: y0 must be non-empty");
     }
@@ -721,6 +724,9 @@ solve_ivp_mass_matrix_expr(const SymbolicScalar &rhs_expr, const SymbolicScalar 
 
     const double t0 = t_span.first;
     const double tf = t_span.second;
+    if (t0 == tf) {
+        throw IntegrationError("solve_ivp_mass_matrix_expr: t_span endpoints must differ");
+    }
     const int n_state = static_cast<int>(y0.size());
     if (n_state == 0) {
         throw IntegrationError("solve_ivp_mass_matrix_expr: y0 must be non-empty");
@@ -751,13 +757,10 @@ solve_ivp_mass_matrix_expr(const SymbolicScalar &rhs_expr, const SymbolicScalar 
         t_eval_normalized[i] = static_cast<double>(i) / static_cast<double>(n_eval - 1);
     }
 
-    SymbolicScalar mass_probe_expr =
-        SymbolicScalar::substitute(mass_sub, y_var, casadi::MX(y0_dm_full));
-
     std::vector<bool> row_has_structural_nnz(static_cast<std::size_t>(n_state), false);
     for (int row = 0; row < n_state; ++row) {
         for (int col = 0; col < n_state; ++col) {
-            if (!detail::is_constant_zero(mass_probe_expr(row, col))) {
+            if (!detail::is_constant_zero(mass_sub(row, col))) {
                 row_has_structural_nnz[static_cast<std::size_t>(row)] = true;
                 break;
             }

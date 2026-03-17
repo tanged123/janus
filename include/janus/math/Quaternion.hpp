@@ -232,29 +232,40 @@ template <typename Scalar> class Quaternion {
         } else {
             // Symbolic: Full 4-branch using nested janus::where (Shepperd's method)
 
+            // Guard radicands: in symbolic mode all branches are eagerly evaluated,
+            // so untaken branches can have negative radicands. Clamp to eps.
+            Scalar eps = static_cast<Scalar>(1e-12);
+
             // Branch 0: trace > 0
-            Scalar s0 = half / janus::sqrt(trace + one);
+            Scalar r0 = janus::where(trace + one > eps, trace + one, eps);
+            Scalar s0 = half / janus::sqrt(r0);
             Scalar w0 = static_cast<Scalar>(0.25) / s0;
             Scalar x0 = (mat(2, 1) - mat(1, 2)) * s0;
             Scalar y0 = (mat(0, 2) - mat(2, 0)) * s0;
             Scalar z0 = (mat(1, 0) - mat(0, 1)) * s0;
 
             // Branch 1: mat(0,0) is largest diagonal
-            Scalar s1 = two * janus::sqrt(one + mat(0, 0) - mat(1, 1) - mat(2, 2));
+            Scalar r1 = one + mat(0, 0) - mat(1, 1) - mat(2, 2);
+            Scalar safe_r1 = janus::where(r1 > eps, r1, eps);
+            Scalar s1 = two * janus::sqrt(safe_r1);
             Scalar w1 = (mat(2, 1) - mat(1, 2)) / s1;
             Scalar x1 = static_cast<Scalar>(0.25) * s1;
             Scalar y1 = (mat(0, 1) + mat(1, 0)) / s1;
             Scalar z1 = (mat(0, 2) + mat(2, 0)) / s1;
 
             // Branch 2: mat(1,1) is largest diagonal
-            Scalar s2 = two * janus::sqrt(one + mat(1, 1) - mat(0, 0) - mat(2, 2));
+            Scalar r2 = one + mat(1, 1) - mat(0, 0) - mat(2, 2);
+            Scalar safe_r2 = janus::where(r2 > eps, r2, eps);
+            Scalar s2 = two * janus::sqrt(safe_r2);
             Scalar w2 = (mat(0, 2) - mat(2, 0)) / s2;
             Scalar x2 = (mat(0, 1) + mat(1, 0)) / s2;
             Scalar y2 = static_cast<Scalar>(0.25) * s2;
             Scalar z2 = (mat(1, 2) + mat(2, 1)) / s2;
 
             // Branch 3: mat(2,2) is largest diagonal
-            Scalar s3 = two * janus::sqrt(one + mat(2, 2) - mat(0, 0) - mat(1, 1));
+            Scalar r3 = one + mat(2, 2) - mat(0, 0) - mat(1, 1);
+            Scalar safe_r3 = janus::where(r3 > eps, r3, eps);
+            Scalar s3 = two * janus::sqrt(safe_r3);
             Scalar w3 = (mat(1, 0) - mat(0, 1)) / s3;
             Scalar x3 = (mat(0, 2) + mat(2, 0)) / s3;
             Scalar y3 = (mat(1, 2) + mat(2, 1)) / s3;
