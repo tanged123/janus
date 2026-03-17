@@ -1,3 +1,5 @@
+/// @file JsonUtils.hpp
+/// @brief Simple JSON read/write utilities for flat string-to-vector maps
 #pragma once
 
 #include "janus/core/JanusError.hpp"
@@ -13,13 +15,9 @@
 namespace janus::utils {
 
 /**
- * @brief Simple JSON writer for map of vectors
- *
- * Writes strictly formatted JSON:
- * {
- *   "key1": [1.1, 2.2],
- *   "key2": [3.3]
- * }
+ * @brief Write a map of string-to-vector<double> as JSON
+ * @param filename Output file path
+ * @param data Map of key-value pairs to serialize
  */
 inline void write_json(const std::string &filename,
                        const std::map<std::string, std::vector<double>> &data) {
@@ -50,13 +48,9 @@ inline void write_json(const std::string &filename,
 }
 
 /**
- * @brief Tiny JSON parser for flat string->vector<double> maps
- *
- * Very limited parser. Expects:
- * - Top-level object {}
- * - Keys are strings
- * - Values are arrays of numbers
- * - No nested objects or other types
+ * @brief Parse a flat JSON file into a string-to-vector<double> map
+ * @param filename Input file path (must contain a top-level object with array values)
+ * @return Parsed map of key to numeric vector
  */
 inline std::map<std::string, std::vector<double>> read_json(const std::string &filename) {
     std::ifstream file(filename);

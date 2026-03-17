@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file OrthogonalPolynomials.hpp
+ * @brief Orthogonal polynomial evaluation, spectral nodes, weights, and differentiation matrices
+ * @see PolynomialChaos.hpp, Quadrature.hpp
+ */
 
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -55,7 +60,9 @@ inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
 } // namespace detail
 
 /**
- * @brief Gauss-Legendre nodes and weights on [-1, 1].
+ * @brief Gauss-Legendre nodes and weights on [-1, 1]
+ * @param n Number of quadrature points
+ * @return Pair of (nodes, weights)
  */
 inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
     return detail::gauss_legendre_rule(n);
@@ -63,6 +70,9 @@ inline std::pair<NumericVector, NumericVector> gauss_legendre_rule(int n) {
 
 /**
  * @brief Evaluate Legendre polynomial P_n(x) and derivative P'_n(x)
+ * @param n Polynomial degree
+ * @param x Evaluation point
+ * @return Pair of (P_n(x), P'_n(x))
  */
 inline std::pair<double, double> legendre_poly(int n, double x) {
     if (n < 0) {
@@ -108,6 +118,9 @@ inline std::pair<double, double> legendre_poly(int n, double x) {
 
 /**
  * @brief Evaluate P_n(x) at each x in vector
+ * @param n Polynomial degree
+ * @param x Evaluation points
+ * @return Vector of P_n values
  */
 inline NumericVector legendre_poly_vec(int n, const NumericVector &x) {
     NumericVector out(x.size());
@@ -119,6 +132,8 @@ inline NumericVector legendre_poly_vec(int n, const NumericVector &x) {
 
 /**
  * @brief Compute Legendre-Gauss-Lobatto nodes on [-1, 1]
+ * @param N Number of nodes (>= 2)
+ * @return Node vector
  */
 inline NumericVector lgl_nodes(int N) {
     if (N < 2) {
@@ -160,6 +175,8 @@ inline NumericVector lgl_nodes(int N) {
 
 /**
  * @brief Compute Chebyshev-Gauss-Lobatto nodes on [-1, 1]
+ * @param N Number of nodes (>= 2)
+ * @return Node vector
  */
 inline NumericVector cgl_nodes(int N) {
     if (N < 2) {
@@ -176,6 +193,9 @@ inline NumericVector cgl_nodes(int N) {
 
 /**
  * @brief LGL quadrature weights
+ * @param N Number of nodes
+ * @param nodes LGL node vector
+ * @return Weight vector
  */
 inline NumericVector lgl_weights(int N, const NumericVector &nodes) {
     if (N < 2) {
@@ -197,6 +217,9 @@ inline NumericVector lgl_weights(int N, const NumericVector &nodes) {
 
 /**
  * @brief CGL (Clenshaw-Curtis) quadrature weights on [-1, 1]
+ * @param N Number of nodes
+ * @param nodes CGL node vector
+ * @return Weight vector
  */
 inline NumericVector cgl_weights(int N, const NumericVector &nodes) {
     if (N < 2) {
@@ -260,7 +283,9 @@ inline NumericVector cgl_weights(int N, const NumericVector &nodes) {
 }
 
 /**
- * @brief Compute barycentric interpolation weights for the given nodes.
+ * @brief Compute barycentric interpolation weights for the given nodes
+ * @param nodes Interpolation nodes
+ * @return Barycentric weight vector
  */
 inline NumericVector barycentric_weights(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());
@@ -283,7 +308,12 @@ inline NumericVector barycentric_weights(const NumericVector &nodes) {
 }
 
 /**
- * @brief Evaluate the j-th Lagrange basis polynomial at s using barycentric form.
+ * @brief Evaluate the j-th Lagrange basis polynomial at s using barycentric form
+ * @param nodes Interpolation nodes
+ * @param bary_w Barycentric weights
+ * @param j Basis index
+ * @param s Evaluation point
+ * @return Value of L_j(s)
  */
 inline double barycentric_basis_eval(const NumericVector &nodes, const NumericVector &bary_w, int j,
                                      double s) {
@@ -313,10 +343,13 @@ inline double barycentric_basis_eval(const NumericVector &nodes, const NumericVe
 }
 
 /**
- * @brief Compute Birkhoff integration matrix B^a for the node set.
+ * @brief Compute Birkhoff integration matrix B^a for the node set
  *
  * B^a_{ij} = integral_{nodes(0)}^{nodes(i)} ell_j(s) ds
  * where ell_j is the j-th Lagrange basis polynomial.
+ *
+ * @param nodes Interpolation nodes
+ * @return Integration matrix (N x N)
  */
 inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());
@@ -373,6 +406,8 @@ inline NumericMatrix birkhoff_integration_matrix(const NumericVector &nodes) {
 
 /**
  * @brief Spectral differentiation matrix using barycentric weights
+ * @param nodes Interpolation nodes
+ * @return Differentiation matrix (N x N)
  */
 inline NumericMatrix spectral_diff_matrix(const NumericVector &nodes) {
     const int N = static_cast<int>(nodes.size());

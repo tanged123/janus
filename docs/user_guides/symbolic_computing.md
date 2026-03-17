@@ -1,19 +1,46 @@
-# Symbolic Computing Guide
+# Symbolic Computing
 
-Janus provides a powerful symbolic computing layer built on top of CasADi, but abstracted to feel like native C++ with Eigen integration. This allows you to compute derivatives, generate code, and optimize systems using the same code you write for simulation.
+Janus provides a powerful symbolic computing layer built on top of CasADi, abstracted to feel like native C++ with Eigen integration. This allows you to compute derivatives, generate code, and optimize systems using the same code you write for simulation. Symbolic mode works by building a computational graph instead of executing immediately, enabling automatic differentiation, sensitivity analysis, and matrix-free second-order products.
 
-## 1. Concepts
-
-*   **`janus::SymbolicScalar`**: Alias for `casadi::MX`. Represents a symbolic value or expression.
-*   **`janus::SymbolicMatrix`**: Alias for `Eigen::Matrix<casadi::MX, -1, -1>`. Allows you to use familiar Eigen syntax (block operations, coeff access) on symbolic variables.
-
-## 2. Creating Variables
-
-Use the `janus::sym` helper to create symbolic variables cleanly.
+## Quick Start
 
 ```cpp
 #include <janus/janus.hpp>
 
+// Create a symbolic variable
+auto x = janus::sym("x");
+
+// Build an expression (creates a computation graph)
+auto f = x * x;
+
+// Compute the Jacobian symbolically
+auto J = janus::jacobian({f}, {x});
+
+// Compile into a callable function
+janus::Function fn({x}, {f, J});
+
+// Evaluate numerically
+auto res = fn(3.0);
+std::cout << "f(3) = " << res[0] << ", f'(3) = " << res[1] << std::endl;
+```
+
+## Core API
+
+*   **`janus::SymbolicScalar`**: Alias for `casadi::MX`. Represents a symbolic value or expression.
+*   **`janus::SymbolicMatrix`**: Alias for `Eigen::Matrix<casadi::MX, -1, -1>`. Allows you to use familiar Eigen syntax (block operations, coeff access) on symbolic variables.
+*   **`janus::sym(name)`**: Create a scalar symbolic variable.
+*   **`janus::sym(name, n)`**: Create a column vector symbolic variable (`n x 1`).
+*   **`janus::sym(name, r, c)`**: Create a matrix symbolic variable (`r x c`).
+*   **`janus::Function({inputs}, {outputs})`**: Compile symbolic expressions into a callable function.
+*   **`janus::jacobian({outputs}, {inputs})`**: Compute the Jacobian of outputs with respect to inputs.
+
+## Usage Patterns
+
+### Creating Variables
+
+Use the `janus::sym` helper to create symbolic variables cleanly.
+
+```cpp
 // Scalar variable "x"
 auto x = janus::sym("x");
 
@@ -24,7 +51,7 @@ auto v = janus::sym("v", 3);
 auto A = janus::sym("A", 2, 2);
 ```
 
-## 3. Building Expressions
+### Building Expressions
 
 You can use standard arithmetic operators (`+`, `-`, `*`, `/`) and Janus math functions. These build a computational graph instead of executing immediately.
 
@@ -33,7 +60,7 @@ auto y = janus::sin(x) + janus::pow(x, 2.0);
 auto z = A * v; // Matrix multiplication
 ```
 
-## 4. Defining Functions (`janus::Function`)
+### Defining Functions (`janus::Function`)
 
 To evaluate expressions numerically, you must wrap them in a `janus::Function`. This wrapper handles type conversion between Eigen and CasADi.
 
@@ -43,7 +70,7 @@ janus::Function f({x, v}, {y});
 
 // Evaluate with numeric input (doubles/Eigen)
 // Returns std::vector<Eigen::MatrixXd>
-auto result = f(1.5, Eigen::Vector3d::Zero()); 
+auto result = f(1.5, Eigen::Vector3d::Zero());
 std::cout << result[0] << std::endl;
 ```
 
@@ -51,7 +78,7 @@ std::cout << result[0] << std::endl;
 *   **Automatic Naming**: You don't need to provide a string name; one is generated automatically.
 *   **Eigen Integration**: Inputs and outputs are converted to/from Eigen types seamlessly.
 
-## 5. Automatic Differentiation (`janus::jacobian`)
+### Automatic Differentiation (`janus::jacobian`)
 
 Compute derivatives effortlessly. Janus handles the tedious task of concatenating variables for CasADi.
 
@@ -63,9 +90,11 @@ auto J = janus::jacobian({y}, {x});
 auto J_full = janus::jacobian({y}, {x, v});
 ```
 
-## 6. Sensitivity Regime Switching
+## Advanced Usage
 
-For compiled `janus::Function` objects, Janus can now choose between forward and adjoint
+### Sensitivity Regime Switching
+
+For compiled `janus::Function` objects, Janus can choose between forward and adjoint
 Jacobian construction automatically based on parameter count, output count, and optional
 trajectory hints.
 
@@ -87,10 +116,10 @@ auto J = J_fun.eval(x_val);
 Use `rec.integrator_options()` when you want the same recommendation expressed as
 CasADi/SUNDIALS options (`nfwd` or `nadj`, plus checkpoint settings for long-horizon adjoints).
 
-## 7. Matrix-Free Second-Order Products
+### Matrix-Free Second-Order Products
 
 For large optimization problems, you often want `H * v` without ever forming the dense Hessian.
-Janus now exposes matrix-free Hessian-vector products for both plain scalar expressions and
+Janus exposes matrix-free Hessian-vector products for both plain scalar expressions and
 Lagrangians:
 
 ```cpp
@@ -132,22 +161,11 @@ auto hv = lag_hvp_fun.eval(x_val, lam_val, v_val);
 These products use CasADi's forward-over-reverse AD internally, so the dense Hessian is never
 constructed as an intermediate.
 
-## 8. Full Workflow Example
+## See Also
 
-```cpp
-// 1. Symbols
-auto x = janus::sym("x");
-
-// 2. Expression
-auto f = x * x;
-
-// 3. Jacobian
-auto J = janus::jacobian({f}, {x});
-
-// 4. Compile into Function
-janus::Function fn({x}, {f, J});
-
-// 5. Evaluate
-auto res = fn(3.0);
-std::cout << "Values: " << res[0] << ", Gradient: " << res[1] << std::endl;
-```
+- [Numeric Computing Guide](numeric_computing.md) - The numeric counterpart to symbolic mode
+- [Math Functions Guide](math_functions.md) - All available `janus::` math functions
+- [Optimization Guide](optimization.md) - Using symbolic expressions in optimization
+- [`include/janus/core/Function.hpp`](../../include/janus/core/Function.hpp) - `janus::Function` implementation
+- [`include/janus/math/AutoDiff.hpp`](../../include/janus/math/AutoDiff.hpp) - Jacobian and Hessian-vector product API
+- [`examples/intro/energy_intro.cpp`](../../examples/intro/energy_intro.cpp) - Introductory symbolic example

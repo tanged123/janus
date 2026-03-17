@@ -815,7 +815,7 @@ TEST(OptiTest, ExplicitObjectiveAndConstraintScaling) {
     ASSERT_EQ(report.constraints.size(), 1);
     EXPECT_DOUBLE_EQ(report.constraints[0].scale, 1e6);
     EXPECT_DOUBLE_EQ(report.constraints[0].normalized_magnitude, 1.0);
-    EXPECT_FALSE(report.has_warnings());
+    EXPECT_FALSE(report.has_issues());
 
     auto sol = opti.solve({.verbose = false});
     EXPECT_NEAR(sol.value(x), 1e6, 1e-3);
@@ -830,7 +830,7 @@ TEST(OptiTest, ScalingAnalysisWarnsForLargeUnscaledObjectiveAndConstraint) {
 
     auto report = opti.analyze_scaling();
 
-    EXPECT_TRUE(report.has_warnings());
+    EXPECT_TRUE(report.has_issues());
 
     bool saw_constraint_warning = false;
     bool saw_objective_warning = false;
@@ -910,7 +910,8 @@ TEST(OptiTest, ParametricSweep_Basic) {
 
     // Check that x* = k for each solve
     for (size_t i = 0; i < result.size(); ++i) {
-        EXPECT_NEAR(result.solutions[i].value(x), k_values[i], 1e-5);
+        ASSERT_TRUE(result.solutions[i].has_value());
+        EXPECT_NEAR(result.solutions[i]->value(x), k_values[i], 1e-5);
     }
 }
 

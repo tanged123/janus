@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Rotations.hpp
+ * @brief 2D and 3D rotation matrices and Euler angle conversions
+ * @see Quaternion.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -11,8 +17,7 @@ namespace janus {
 // --- 2D Rotation Matrix ---
 /**
  * @brief Creates a 2x2 rotation matrix
- * Returns [cos(theta), -sin(theta); sin(theta), cos(theta)]
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param theta Rotation angle (radians)
  * @return 2x2 Rotation matrix
  */
@@ -29,10 +34,9 @@ template <typename T> Mat2<T> rotation_matrix_2d(const T &theta) {
 }
 
 // --- 3D Rotation Matrix (Principal Axes) ---
-// --- 3D Rotation Matrix (Principal Axes) ---
 /**
  * @brief Creates a 3x3 rotation matrix about a principal axis
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param theta Rotation angle (radians)
  * @param axis Axis index (0=X, 1=Y, 2=Z)
  * @return 3x3 Rotation matrix
@@ -73,11 +77,10 @@ template <typename T> Mat3<T> rotation_matrix_3d(const T &theta, int axis) {
 // --- Euler Angles ---
 /**
  * @brief Creates a 3x3 rotation matrix from Euler angles (Yaw-Pitch-Roll sequence)
- * R = R_z(yaw) * R_y(pitch) * R_x(roll)
- *
- * @param roll Roll angle (X-axis)
- * @param pitch Pitch angle (Y-axis)
- * @param yaw Yaw angle (Z-axis)
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @param roll Roll angle (X-axis, radians)
+ * @param pitch Pitch angle (Y-axis, radians)
+ * @param yaw Yaw angle (Z-axis, radians)
  * @return 3x3 Rotation matrix
  */
 template <typename T>

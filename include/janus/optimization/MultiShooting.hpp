@@ -14,6 +14,8 @@ namespace janus {
 
 /**
  * @brief Options for MultipleShooting
+ *
+ * @see MultipleShooting for usage
  */
 struct MultiShootingOptions {
     int n_intervals = 20;              ///< Number of shooting intervals
@@ -24,19 +26,44 @@ struct MultiShootingOptions {
 
 /**
  * @brief Multiple shooting transcription
+ *
+ * @see TranscriptionBase for shared interface
+ * @see MultiShootingOptions for configuration
  */
 class MultipleShooting : public TranscriptionBase<MultipleShooting> {
     friend class TranscriptionBase<MultipleShooting>;
 
   public:
+    /**
+     * @brief Construct with a reference to the optimization environment
+     * @param opti Opti instance
+     */
     explicit MultipleShooting(Opti &opti) : TranscriptionBase<MultipleShooting>(opti) {}
 
+    /**
+     * @brief Set up the shooting problem with fixed final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf final time
+     * @param opts shooting options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, double tf,
           const MultiShootingOptions &opts = {}) {
         return setup_impl(n_states, n_controls, t0, tf, false, opts);
     }
 
+    /**
+     * @brief Set up the shooting problem with variable final time
+     * @param n_states number of state variables
+     * @param n_controls number of control variables
+     * @param t0 initial time
+     * @param tf symbolic final time (decision variable)
+     * @param opts shooting options
+     * @return tuple of (states, controls, time_grid)
+     */
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup(int n_states, int n_controls, double t0, const SymbolicScalar &tf,
           const MultiShootingOptions &opts = {}) {
@@ -44,6 +71,8 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
         return setup_impl(n_states, n_controls, t0, 1.0, true, opts);
     }
 
+    /** @brief Get the number of shooting intervals
+     *  @return interval count */
     int n_intervals() const { return n_intervals_; }
 
   private:
@@ -54,6 +83,16 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
     std::tuple<SymbolicMatrix, SymbolicMatrix, NumericVector>
     setup_impl(int n_states, int n_controls, double t0, double tf_val, bool variable_tf,
                const MultiShootingOptions &opts) {
+        if (opts.n_intervals < 1) {
+            throw InvalidArgument("MultipleShooting: n_intervals must be >= 1");
+        }
+        if (n_states < 1) {
+            throw InvalidArgument("MultipleShooting: n_states must be >= 1");
+        }
+        if (n_controls < 0) {
+            throw InvalidArgument("MultipleShooting: n_controls must be >= 0");
+        }
+
         n_states_ = n_states;
         n_controls_ = n_controls;
         opts_ = opts;
@@ -85,6 +124,7 @@ class MultipleShooting : public TranscriptionBase<MultipleShooting> {
         tau_ = linspace(0.0, 1.0, n_nodes_);
         setup_complete_ = true;
         dynamics_set_ = false;
+        dynamics_constraints_added_ = false;
         integrator_ = casadi::Function();
 
         return {states_, controls_, tau_};

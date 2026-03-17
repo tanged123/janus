@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file Quadrature.hpp
+ * @brief Stochastic quadrature rules (Gauss, Clenshaw-Curtis, Smolyak sparse grids)
+ * @see PolynomialChaos.hpp, OrthogonalPolynomials.hpp
+ */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
@@ -411,7 +416,11 @@ inline std::string sample_key(const NumericVector &point, double tolerance) {
 } // namespace detail
 
 /**
- * @brief Build a one-dimensional stochastic quadrature rule with a fixed order.
+ * @brief Build a one-dimensional stochastic quadrature rule with a fixed order
+ * @param dimension Stochastic dimension descriptor
+ * @param order Number of quadrature points
+ * @param rule Quadrature rule family
+ * @return Univariate quadrature rule
  */
 inline UnivariateQuadratureRule
 stochastic_quadrature_rule(const PolynomialChaosDimension &dimension, int order,
@@ -437,7 +446,11 @@ stochastic_quadrature_rule(const PolynomialChaosDimension &dimension, int order,
 }
 
 /**
- * @brief Build a one-dimensional stochastic quadrature rule from a refinement level.
+ * @brief Build a one-dimensional stochastic quadrature rule from a refinement level
+ * @param dimension Stochastic dimension descriptor
+ * @param level Refinement level (>= 1)
+ * @param rule Quadrature rule family
+ * @return Univariate quadrature rule
  */
 inline UnivariateQuadratureRule
 stochastic_quadrature_level(const PolynomialChaosDimension &dimension, int level,
@@ -472,7 +485,9 @@ stochastic_quadrature_level(const PolynomialChaosDimension &dimension, int level
 }
 
 /**
- * @brief Build the tensor-product grid from a list of one-dimensional rules.
+ * @brief Build the tensor-product grid from a list of one-dimensional rules
+ * @param rules Vector of univariate quadrature rules
+ * @return Tensor-product grid
  */
 inline StochasticQuadratureGrid
 tensor_product_quadrature(const std::vector<UnivariateQuadratureRule> &rules) {
@@ -525,10 +540,15 @@ tensor_product_quadrature(const std::vector<UnivariateQuadratureRule> &rules) {
 }
 
 /**
- * @brief Build a Smolyak sparse grid on probability measures.
+ * @brief Build a Smolyak sparse grid on probability measures
  *
  * The level follows the standard convention with one-dimensional indices
  * `i_j >= 1` and total-index band `level <= |i| <= level + d - 1`.
+ *
+ * @param dimensions Stochastic dimension descriptors
+ * @param level Sparse grid level (>= 1)
+ * @param options Smolyak construction options
+ * @return Sparse quadrature grid
  */
 inline StochasticQuadratureGrid
 smolyak_sparse_grid(const std::vector<PolynomialChaosDimension> &dimensions, int level,
@@ -613,6 +633,14 @@ smolyak_sparse_grid(const std::vector<PolynomialChaosDimension> &dimensions, int
     return grid;
 }
 
+/**
+ * @brief Compute PCE projection coefficients using a univariate quadrature rule (vector)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param rule Univariate quadrature rule
+ * @param sample_values Function values at quadrature nodes
+ * @return PCE coefficient vector
+ */
 template <JanusScalar Scalar>
 JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const UnivariateQuadratureRule &rule,
@@ -627,6 +655,14 @@ JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
     return pce_projection_coefficients(basis, samples, rule.weights, sample_values);
 }
 
+/**
+ * @brief Compute PCE projection coefficients using a univariate quadrature rule (matrix)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param rule Univariate quadrature rule
+ * @param sample_values Function values at quadrature nodes (matrix)
+ * @return PCE coefficient matrix
+ */
 template <JanusScalar Scalar>
 JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const UnivariateQuadratureRule &rule,
@@ -641,6 +677,14 @@ JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
     return pce_projection_coefficients(basis, samples, rule.weights, sample_values);
 }
 
+/**
+ * @brief Compute PCE projection coefficients using a stochastic quadrature grid (vector)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param grid Stochastic quadrature grid
+ * @param sample_values Function values at grid points
+ * @return PCE coefficient vector
+ */
 template <JanusScalar Scalar>
 JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const StochasticQuadratureGrid &grid,
@@ -648,6 +692,14 @@ JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
     return pce_projection_coefficients(basis, grid.samples, grid.weights, sample_values);
 }
 
+/**
+ * @brief Compute PCE projection coefficients using a stochastic quadrature grid (matrix)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param grid Stochastic quadrature grid
+ * @param sample_values Function values at grid points (matrix)
+ * @return PCE coefficient matrix
+ */
 template <JanusScalar Scalar>
 JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const StochasticQuadratureGrid &grid,

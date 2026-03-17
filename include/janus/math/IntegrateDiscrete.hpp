@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file IntegrateDiscrete.hpp
+ * @brief Discrete integration and squared-curvature computation from sampled data
+ * @see Calculus.hpp, Integrate.hpp
+ */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
@@ -165,11 +170,14 @@ auto integrate_cubic(const Eigen::MatrixBase<DerivedF> &f, const Eigen::MatrixBa
 /**
  * @brief Integrates discrete samples using reconstruction methods
  *
+ * @tparam DerivedF Eigen type for function values
+ * @tparam DerivedX Eigen type for grid points
  * @param f Function values
- * @param x Grid points (optional, defaults to indices)
+ * @param x Grid points
  * @param multiply_by_dx If true, returns interval integrals; if false, returns average values
- * @param method "forward_euler", "backward_euler", "trapezoidal" (simpson/cubic in extensions)
- * @param method_endpoints "lower_order", "ignore", or "periodic"
+ * @param method "forward_euler", "backward_euler", "trapezoidal", "simpson", or "cubic"
+ * @param method_endpoints "lower_order" or "ignore"
+ * @return Vector of interval integrals or averages
  */
 template <typename DerivedF, typename DerivedX>
 JanusVector<typename DerivedF::Scalar>
@@ -335,14 +343,16 @@ integrate_discrete_intervals(const Eigen::MatrixBase<DerivedF> &f,
 }
 
 /**
- * @brief Computes the integral of squared curvature: ∫(f''(x))² dx
+ * @brief Computes the integral of squared curvature over each interval
  *
  * Useful for regularization of smooth curves in optimization (penalizes high curvature).
  *
+ * @tparam DerivedF Eigen type for function values
+ * @tparam DerivedX Eigen type for grid points
  * @param f Function values
  * @param x Grid points
- * @param method "simpson" (default, recommended) or "hybrid_simpson_cubic"
- * @return Vector of ∫(f'')² over each interval
+ * @param method "simpson" (default) or "hybrid_simpson_cubic"
+ * @return Vector of squared-curvature integrals per interval
  */
 template <typename DerivedF, typename DerivedX>
 JanusVector<typename DerivedF::Scalar>

@@ -1,24 +1,53 @@
-# Graph Visualization Guide
+# Graph Visualization
 
-This guide explains how Janus uses **computational graphs** for symbolic computation and how to visualize them for debugging and understanding.
+Janus uses **computational graphs** (directed acyclic graphs built by CasADi) to represent symbolic expressions. This guide explains how to export and visualize those graphs for debugging, optimization analysis, teaching, and documentation. Graph visualization works in **symbolic mode** only, since numeric-mode expressions do not build a traceable graph.
 
----
+## Quick Start
 
-## What is a Computational Graph?
+```cpp
+#include <janus/janus.hpp>
 
-A **computational graph** is a directed acyclic graph (DAG) that represents mathematical expressions. Each node is either:
+auto x = janus::sym("x");
+auto expr = janus::sin(x) * x;
+
+// One-step: export DOT and render PDF (requires Graphviz)
+janus::visualize_graph(expr, "my_graph");
+
+// Or interactive HTML (no dependencies, recommended for exploration)
+janus::export_graph_html(expr, "my_graph", "SinExpression");
+```
+
+## Core API
+
+All functions live in `<janus/core/JanusIO.hpp>`.
+
+| Function | Description |
+|----------|-------------|
+| `janus::export_graph_dot(expr, filename, title)` | Export a symbolic expression to DOT format |
+| `janus::render_graph(dot_file, output_file)` | Render a DOT file to PDF, PNG, or SVG |
+| `janus::visualize_graph(expr, base)` | Convenience wrapper: export DOT then render to PDF |
+| `janus::export_graph_html(expr, filename, title)` | Export an interactive HTML graph with pan/zoom and node details |
+
+> [!NOTE]
+> `render_graph` and `visualize_graph` require **Graphviz** installed. In NixOS, it is included in the dev shell. The HTML export has no external dependencies.
+
+## Usage Patterns
+
+### What is a Computational Graph?
+
+A **computational graph** is a DAG where each node is either:
 
 - **Input nodes** (leaves): Symbolic variables or constants
 - **Operation nodes** (internal): Mathematical operations (+, *, sin, etc.)
 - **Output node** (root): The final result
 
-When you write symbolic expressions in Janus, CasADi builds a computational graph internally. This graph enables:
+When you write symbolic expressions in Janus, CasADi builds this graph internally. It enables:
 
-1. **Automatic differentiation** — Traverse the graph to compute gradients
-2. **Code generation** — Compile the graph to efficient C code
-3. **Optimization** — Symbolic solvers operate on the graph structure
+1. **Automatic differentiation** -- Traverse the graph to compute gradients
+2. **Code generation** -- Compile the graph to efficient C code
+3. **Optimization** -- Symbolic solvers operate on the graph structure
 
-### Example: Simple Expression
+### Simple Expression Graph
 
 ```cpp
 auto x = janus::sym("x");
@@ -37,67 +66,53 @@ This creates a tree structure:
  x   x  2   x
 ```
 
----
-
-## Visualizing Graphs in Janus
-
-Janus provides three functions for graph visualization in `<janus/core/JanusIO.hpp>`:
-
-| Function | Description |
-|----------|-------------|
-| `export_graph_dot(expr, filename)` | Export to DOT format |
-| `render_graph(dot_file, output_file)` | Render DOT to PDF/PNG/SVG |
-| `visualize_graph(expr, base)` | Convenience (export + render to PDF) |
-| `export_graph_html(expr, filename)` | **Interactive HTML** with pan/zoom and node details |
-
-### Basic Usage
+### Two-Step Export (DOT then Render)
 
 ```cpp
-#include <janus/janus.hpp>
-
-auto x = janus::sym("x");
-auto expr = janus::sin(x) * x;
-
-// Option 1: Two-step (export then render to PDF)
 janus::export_graph_dot(expr, "my_graph", "SinExpression");
 janus::render_graph("my_graph.dot", "my_graph.pdf");
-
-// Option 2: One-step convenience (PDF)
-janus::visualize_graph(expr, "my_graph");  // Creates .dot and .pdf
-
-// Option 3: Interactive HTML (recommended for exploration)
-janus::export_graph_html(expr, "my_graph", "SinExpression");  // Creates .html
 ```
+
+### Interactive HTML Export
 
 The **HTML output** is recommended for exploring complex graphs:
 - **Click nodes** to see the full expression in the sidebar
 - **Pan/zoom** with mouse drag and scroll
 - **Connection highlighting** when a node is selected
 
-> [!NOTE]
-> Rendering requires **Graphviz** installed. In NixOS, it's included in the dev shell.
-
----
-
-## Real Example: Electric Motor Power
-
-The [graph_visualization.cpp](file:///home/tanged/sources/janus/examples/graph_visualization.cpp) example models a **Permanent Magnet Synchronous Motor (PMSM)**.
-
-### The Model
-
 ```cpp
-template <typename Scalar>
-struct MotorModel {
-    Scalar Rs, Ld, Lq, lambda, p, J, B;
-
-    // Electrical power: P = 1.5 * (Vd*id + Vq*iq)
-    Scalar electrical_power(Scalar Vd, Scalar Vq, Scalar id, Scalar iq) const {
-        return 1.5 * (Vd * id + Vq * iq);
-    }
-};
+janus::export_graph_html(expr, "my_graph", "SinExpression");
 ```
 
-### Building the Graph
+### Understanding Graph Layout
+
+The graph uses **bottom-to-top** layout (`rankdir=BT`):
+- Inputs (variables and constants) are at the bottom
+- Operations build upward
+- The final output is at the top
+
+**Node colors:**
+- Green ellipses: Input variables (id, iq, Rs, Ld, etc.)
+- Yellow ellipses: Constants (1.5, etc.)
+- Blue boxes: Operations (multiply, add, subtract)
+- Gold circle: Output node
+
+### Shared Subexpressions
+
+CasADi automatically detects **common subexpressions**. If `iq` appears in multiple places, the graph reuses the same node -- this is a key optimization for automatic differentiation.
+
+### Deep vs. Shallow Graphs
+
+| Expression | Depth | Use Case |
+|------------|-------|----------|
+| `x + y` | 1 | Simple operations |
+| `sin(x) * cos(y)` | 2 | Transcendental functions |
+| `motor.voltage_d(...)` | 3-4 | Engineering models |
+| `P_elec` (full motor) | 6+ | Nested function calls |
+
+### Real Example: Electric Motor Power
+
+The `graph_visualization.cpp` example models a **Permanent Magnet Synchronous Motor (PMSM)**.
 
 ```cpp
 // Create symbolic motor parameters
@@ -119,48 +134,13 @@ janus::visualize_graph(P_elec, "graph_power");      // PDF
 janus::export_graph_html(P_elec, "graph_power");   // Interactive HTML
 ```
 
-### The Generated Graph
-
 The power expression `P = 1.5 * (Vd*id + Vq*iq)` expands to include all the intermediate terms from the voltage equations, creating a deep graph.
 
-> [!TIP]
-> [🔍 Explore the power expression graph interactively](examples/graph_power.html) - click nodes to see full expressions! (open locally or via GitHub Pages)
+## Advanced Usage
 
-**Node colors:**
-- 🟢 **Green ellipses**: Input variables (id, iq, Rs, Ld, etc.)
-- 🟡 **Yellow ellipses**: Constants (1.5, etc.)
-- 🔵 **Blue boxes**: Operations (multiply, add, subtract)
-- 🟠 **Gold circle**: Output node
+### Jacobian Graphs
 
----
-
-## Understanding the Graph Structure
-
-### Inputs Flow Upward
-
-The graph uses **bottom-to-top** layout (`rankdir=BT`):
-- Inputs (variables and constants) are at the bottom
-- Operations build upward
-- The final output is at the top
-
-### Shared Subexpressions
-
-CasADi automatically detects **common subexpressions**. If `iq` appears in multiple places, the graph reuses the same node — this is a key optimization for automatic differentiation.
-
-### Deep vs. Shallow Graphs
-
-| Expression | Depth | Use Case |
-|------------|-------|----------|
-| `x + y` | 1 | Simple operations |
-| `sin(x) * cos(y)` | 2 | Transcendental functions |
-| `motor.voltage_d(...)` | 3-4 | Engineering models |
-| `P_elec` (full motor) | 6+ | Nested function calls |
-
----
-
-## Advanced: Jacobian Graphs
-
-You can also visualize the graph of **derivatives**:
+You can visualize the graph of **derivatives**:
 
 ```cpp
 auto T_e = motor.electromagnetic_torque(id, iq);
@@ -174,18 +154,14 @@ janus::visualize_graph(dT_dq, "jacobian_graph");
 
 The Jacobian graph shows how CasADi computes gradients by applying the chain rule symbolically.
 
----
+### Practical Applications
 
-## Practical Applications
+1. **Debugging** -- Verify your expression has the expected structure
+2. **Optimization analysis** -- See which variables affect the output
+3. **Teaching** -- Demonstrate automatic differentiation concepts
+4. **Documentation** -- Generate figures for papers and reports
 
-1. **Debugging** — Verify your expression has the expected structure
-2. **Optimization analysis** — See which variables affect the output
-3. **Teaching** — Demonstrate automatic differentiation concepts
-4. **Documentation** — Generate figures for papers and reports
-
----
-
-## Running the Example
+### Running the Example
 
 ```bash
 cd /path/to/janus
@@ -201,10 +177,9 @@ xdg-open graph_power.html     # Or: explorer.exe graph_power.html (WSL)
 xdg-open graph_dynamics.html
 ```
 
----
-
 ## See Also
 
-- [Symbolic Computing Guide](symbolic_computing.md) — Symbolic mode fundamentals
-- [graph_visualization.cpp](file:///home/tanged/sources/janus/examples/graph_visualization.cpp) — Full example source
-- [JanusIO.hpp](file:///home/tanged/sources/janus/include/janus/core/JanusIO.hpp) — API reference
+- [Symbolic Computing Guide](symbolic_computing.md) -- Symbolic mode fundamentals
+- [Sparsity Guide](sparsity.md) -- Visualize sparsity patterns of Jacobians and Hessians
+- [graph_visualization.cpp](../../examples/math/graph_visualization.cpp) -- Full example source
+- [JanusIO.hpp](../../include/janus/core/JanusIO.hpp) -- API reference

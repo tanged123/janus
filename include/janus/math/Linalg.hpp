@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Linalg.hpp
+ * @brief Linear algebra operations (solve, inverse, determinant, eigendecomposition, norms)
+ * @see Arithmetic.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -27,27 +33,56 @@ namespace janus {
 // --- Conversion Helpers ---
 // (Moved to JanusTypes.hpp: to_mx, to_eigen, as_vector)
 
-enum class LinearSolveBackend { Dense, SparseDirect, IterativeKrylov };
+/**
+ * @brief Backend selection for linear system solves
+ */
+enum class LinearSolveBackend {
+    Dense,          ///< Dense matrix factorization
+    SparseDirect,   ///< Sparse direct factorization
+    IterativeKrylov ///< Iterative Krylov subspace method
+};
 
+/**
+ * @brief Dense linear solver algorithm
+ */
 enum class DenseLinearSolver {
-    ColPivHouseholderQR,
-    PartialPivLU,
-    FullPivLU,
-    LLT,
-    LDLT,
+    ColPivHouseholderQR, ///< Column-pivoted Householder QR (default, general)
+    PartialPivLU,        ///< Partial-pivot LU (square only)
+    FullPivLU,           ///< Full-pivot LU (square only)
+    LLT,                 ///< Cholesky (SPD only)
+    LDLT,                ///< LDLT (symmetric only)
 };
 
+/**
+ * @brief Sparse direct solver algorithm
+ */
 enum class SparseDirectLinearSolver {
-    SparseLU,
-    SparseQR,
-    SimplicialLLT,
-    SimplicialLDLT,
+    SparseLU,       ///< Sparse LU factorization
+    SparseQR,       ///< Sparse QR factorization
+    SimplicialLLT,  ///< Simplicial Cholesky (SPD only)
+    SimplicialLDLT, ///< Simplicial LDLT (symmetric only)
 };
 
-enum class IterativeKrylovSolver { BiCGSTAB, GMRES };
+/**
+ * @brief Iterative Krylov solver algorithm
+ */
+enum class IterativeKrylovSolver {
+    BiCGSTAB, ///< Biconjugate gradient stabilized
+    GMRES     ///< Generalized minimal residual
+};
 
-enum class IterativePreconditioner { None, Diagonal };
+/**
+ * @brief Preconditioner for iterative solvers
+ */
+enum class IterativePreconditioner {
+    None,    ///< No preconditioning
+    Diagonal ///< Jacobi (diagonal) preconditioner
+};
 
+/**
+ * @brief Configuration for linear system solve backend and algorithm
+ * @see solve
+ */
 struct LinearSolvePolicy {
     LinearSolveBackend backend = LinearSolveBackend::Dense;
     DenseLinearSolver dense_solver = DenseLinearSolver::ColPivHouseholderQR;
@@ -455,6 +490,12 @@ auto outer(const Eigen::MatrixBase<DerivedX> &x, const Eigen::MatrixBase<Derived
 }
 
 // --- Dot Product ---
+/**
+ * @brief Computes dot product of two vectors
+ * @param a First vector
+ * @param b Second vector
+ * @return Dot product
+ */
 template <typename DerivedA, typename DerivedB>
 auto dot(const Eigen::MatrixBase<DerivedA> &a, const Eigen::MatrixBase<DerivedB> &b) {
     return a.dot(b);
@@ -546,7 +587,15 @@ template <typename Derived> auto pinv(const Eigen::MatrixBase<Derived> &A) {
 
 // --- Norm Extensions ---
 
-enum class NormType { L1, L2, Inf, Frobenius };
+/**
+ * @brief Norm type selection
+ */
+enum class NormType {
+    L1,       ///< L1 (Manhattan) norm
+    L2,       ///< L2 (Euclidean) norm
+    Inf,      ///< Infinity (max absolute) norm
+    Frobenius ///< Frobenius norm
+};
 
 /**
  * @brief Computes vector/matrix norm
@@ -591,9 +640,13 @@ auto norm(const Eigen::MatrixBase<Derived> &x, NormType type = NormType::L2) {
 // Backwards compatibility overload for just L2 norm (default handled above really, but if called
 // without args, it works)
 
+/**
+ * @brief Result of eigendecomposition: eigenvalues and eigenvectors
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ */
 template <typename Scalar> struct EigenDecomposition {
-    JanusVector<Scalar> eigenvalues;
-    JanusMatrix<Scalar> eigenvectors;
+    JanusVector<Scalar> eigenvalues;  ///< Eigenvalues in ascending order
+    JanusMatrix<Scalar> eigenvectors; ///< Eigenvectors as columns
 };
 
 namespace detail {

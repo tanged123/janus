@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file RootFinding.hpp
+ * @brief Nonlinear root finding and implicit function solvers
+ * @see AutoDiff.hpp
+ */
 
 #include "janus/core/Function.hpp"
 #include "janus/core/JanusConcepts.hpp"
@@ -31,11 +36,11 @@ enum class RootSolveStrategy {
  * @brief Numeric nonlinear solver method actually used.
  */
 enum class RootSolveMethod {
-    None,
-    TrustRegionNewton,
-    LineSearchNewton,
-    QuasiNewtonBroyden,
-    PseudoTransientContinuation,
+    None,                        ///< No method selected yet
+    TrustRegionNewton,           ///< Levenberg-Marquardt style trust-region Newton
+    LineSearchNewton,            ///< Exact-Jacobian Newton with backtracking line search
+    QuasiNewtonBroyden,          ///< Broyden updates after one exact Jacobian evaluation
+    PseudoTransientContinuation, ///< Backward-Euler pseudo-transient continuation
 };
 
 /**

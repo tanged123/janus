@@ -1,9 +1,14 @@
 #pragma once
+/**
+ * @file Spacing.hpp
+ * @brief Point distribution generators (linspace, cosine, sine, log, geometric)
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/core/JanusTypes.hpp"
-#include "janus/math/Arithmetic.hpp" // for pow, log10
-#include "janus/math/Trig.hpp"       // for cos, pi
+#include "janus/math/Arithmetic.hpp"
+#include "janus/math/Trig.hpp"
 #include <Eigen/Dense>
 #include <numbers>
 
@@ -12,11 +17,11 @@ namespace janus {
 // --- linspace ---
 /**
  * @brief Generates linearly spaced vector
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param start Start value
  * @param end End value
  * @param n Number of points
- * @return Vector of n points
+ * @return Vector of n linearly spaced points
  */
 template <typename T> JanusVector<T> linspace(const T &start, const T &end, int n) {
     if (n < 1) {
@@ -43,12 +48,11 @@ template <typename T> JanusVector<T> linspace(const T &start, const T &end, int 
 // --- cosine_spacing ---
 /**
  * @brief Generates cosine spaced vector (denser at ends)
- * x_i = 0.5 * (start + end) - 0.5 * (end - start) * cos(pi * i / (n - 1))
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param start Start value
  * @param end End value
  * @param n Number of points
- * @return Vector of n points
+ * @return Vector of n cosine-spaced points
  */
 template <typename T> JanusVector<T> cosine_spacing(const T &start, const T &end, int n) {
     if (n < 1) {
@@ -75,14 +79,12 @@ template <typename T> JanusVector<T> cosine_spacing(const T &start, const T &end
 // --- sinspace ---
 /**
  * @brief Generates sine spaced vector (denser at start by default)
- * Standard: start + (end - start) * (1 - cos(linspace(0, pi/2, n)))
- * Reverse: bunches at end (computed as reverse of sinspace(end, start))
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param start Start value
  * @param end End value
  * @param n Number of points
  * @param reverse_spacing If true, bunches points at the end instead of start
- * @return Vector of n points
+ * @return Vector of n sine-spaced points
  */
 template <typename T>
 JanusVector<T> sinspace(const T &start, const T &end, int n, bool reverse_spacing = false) {
@@ -118,12 +120,11 @@ JanusVector<T> sinspace(const T &start, const T &end, int n, bool reverse_spacin
 // --- logspace ---
 /**
  * @brief Generates logarithmically spaced vector (base 10)
- * Values are 10^x where x is linearly spaced from start to end.
- *
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param start Start exponent (10^start)
  * @param end End exponent (10^end)
  * @param n Number of points
- * @return Vector of n points
+ * @return Vector of n log-spaced points
  */
 template <typename T> JanusVector<T> logspace(const T &start, const T &end, int n) {
     if (n < 1) {
@@ -148,13 +149,12 @@ template <typename T> JanusVector<T> logspace(const T &start, const T &end, int 
 
 // --- geomspace ---
 /**
- * @brief Generates geometrically spaced vector (log spacing with limits)
- * Equivalent to logspace(log10(start), log10(end), n)
- *
+ * @brief Generates geometrically spaced vector
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param start Start value
  * @param end End value
  * @param n Number of points
- * @return Vector of n points
+ * @return Vector of n geometrically spaced points
  */
 template <typename T> JanusVector<T> geomspace(const T &start, const T &end, int n) {
     if (n < 1) {

@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Arithmetic.hpp
+ * @brief Scalar and element-wise arithmetic functions (abs, sqrt, pow, exp, log, etc.)
+ * @see Trig.hpp, Logic.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include <Eigen/Dense>
 #include <cmath>
@@ -8,7 +14,7 @@ namespace janus {
 // --- Absolute Value ---
 /**
  * @brief Computes the absolute value of a scalar
- * @tparam T Scalar type (numeric or symbolic)
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Absolute value of x
  */
@@ -33,7 +39,7 @@ template <typename Derived> auto abs(const Eigen::MatrixBase<Derived> &x) {
 // --- Square Root ---
 /**
  * @brief Computes the square root of a scalar
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Square root of x
  */
@@ -58,7 +64,7 @@ template <typename Derived> auto sqrt(const Eigen::MatrixBase<Derived> &x) {
 // --- Power ---
 /**
  * @brief Computes the power function: base^exponent
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param base Base value
  * @param exponent Exponent value
  * @return base raised to the power of exponent
@@ -73,7 +79,7 @@ template <JanusScalar T> T pow(const T &base, const T &exponent) {
 
 /**
  * @brief Computes power function base^exponent for scalars (mixed types)
- * @tparam T Scalar type
+ * @tparam T Non-double Janus scalar (e.g., SymbolicScalar)
  * @param base Base value
  * @param exponent Exponent value
  * @return base raised to exponent
@@ -90,7 +96,7 @@ T pow(const T &base, double exponent) {
 
 /**
  * @brief Computes power function base^exponent for scalars (mixed types: double base)
- * @tparam T Scalar type
+ * @tparam T Non-double Janus scalar (e.g., SymbolicScalar)
  * @param base Base value
  * @param exponent Exponent value
  * @return base raised to exponent
@@ -118,7 +124,7 @@ auto pow(const Eigen::MatrixBase<Derived> &base, const Scalar &exponent) {
 // --- Exp ---
 /**
  * @brief Computes the exponential function e^x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return e raised to the power of x
  */
@@ -143,7 +149,7 @@ template <typename Derived> auto exp(const Eigen::MatrixBase<Derived> &x) {
 // --- Log ---
 /**
  * @brief Computes the natural logarithm of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Natural logarithm of x
  */
@@ -167,7 +173,7 @@ template <typename Derived> auto log(const Eigen::MatrixBase<Derived> &x) {
 
 /**
  * @brief Computes the base-10 logarithm of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Base-10 logarithm of x
  */
@@ -192,7 +198,7 @@ template <typename Derived> auto log10(const Eigen::MatrixBase<Derived> &x) {
 // --- Hyperbolic Functions ---
 /**
  * @brief Computes hyperbolic sine
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Hyperbolic sine of x
  */
@@ -216,7 +222,7 @@ template <typename Derived> auto sinh(const Eigen::MatrixBase<Derived> &x) {
 
 /**
  * @brief Computes hyperbolic cosine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Hyperbolic cosine of x
  */
@@ -240,7 +246,7 @@ template <typename Derived> auto cosh(const Eigen::MatrixBase<Derived> &x) {
 
 /**
  * @brief Computes hyperbolic tangent of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Hyperbolic tangent of x
  */
@@ -265,7 +271,7 @@ template <typename Derived> auto tanh(const Eigen::MatrixBase<Derived> &x) {
 // --- Rounding and Sign ---
 /**
  * @brief Computes floor of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Floor of x
  */
@@ -289,7 +295,7 @@ template <typename Derived> auto floor(const Eigen::MatrixBase<Derived> &x) {
 
 /**
  * @brief Computes ceiling of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Ceiling of x
  */
@@ -313,7 +319,7 @@ template <typename Derived> auto ceil(const Eigen::MatrixBase<Derived> &x) {
 
 /**
  * @brief Computes sign of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return 1.0 if x > 0, -1.0 if x < 0, 0.0 otherwise
  */
@@ -339,7 +345,7 @@ template <typename Derived> auto sign(const Eigen::MatrixBase<Derived> &x) {
 // --- Modulo ---
 /**
  * @brief Computes floating-point remainder of x/y
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Numerator
  * @param y Denominator
  * @return Remainder of x/y
@@ -386,7 +392,7 @@ auto fmod(const Eigen::MatrixBase<Derived> &x, const Scalar &y) {
 // --- Log2 ---
 /**
  * @brief Computes base-2 logarithm of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Base-2 logarithm of x
  */
@@ -417,7 +423,7 @@ template <typename Derived> auto log2(const Eigen::MatrixBase<Derived> &x) {
 // --- Exp2 ---
 /**
  * @brief Computes 2^x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return 2 raised to the power x
  */
@@ -448,7 +454,7 @@ template <typename Derived> auto exp2(const Eigen::MatrixBase<Derived> &x) {
 // --- Cbrt ---
 /**
  * @brief Computes cube root of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Cube root of x
  */
@@ -480,7 +486,7 @@ template <typename Derived> auto cbrt(const Eigen::MatrixBase<Derived> &x) {
 // --- Round ---
 /**
  * @brief Rounds x to the nearest integer
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Nearest integer to x
  */
@@ -512,7 +518,7 @@ template <typename Derived> auto round(const Eigen::MatrixBase<Derived> &x) {
 // --- Trunc ---
 /**
  * @brief Truncates x toward zero
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return x truncated toward zero
  */
@@ -543,7 +549,7 @@ template <typename Derived> auto trunc(const Eigen::MatrixBase<Derived> &x) {
 // --- Hypot ---
 /**
  * @brief Computes sqrt(x^2 + y^2) without undue overflow/underflow
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x First value
  * @param y Second value
  * @return Hypotenuse length
@@ -559,6 +565,10 @@ template <JanusScalar T> T hypot(const T &x, const T &y) {
 
 /**
  * @brief Computes hypot(x, y) with mixed types
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @param x First value
+ * @param y Second value (double)
+ * @return Hypotenuse length
  */
 template <JanusScalar T>
     requires(!std::is_same_v<T, double>)
@@ -566,6 +576,13 @@ T hypot(const T &x, double y) {
     return janus::hypot(x, T(y));
 }
 
+/**
+ * @brief Computes hypot(x, y) with mixed types (double first)
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @param x First value (double)
+ * @param y Second value
+ * @return Hypotenuse length
+ */
 template <JanusScalar T>
     requires(!std::is_same_v<T, double>)
 T hypot(double x, const T &y) {
@@ -592,7 +609,7 @@ auto hypot(const Eigen::MatrixBase<Derived> &x, const Eigen::MatrixBase<Derived>
 // --- Expm1 ---
 /**
  * @brief Computes exp(x) - 1, accurate for small x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return exp(x) - 1
  */
@@ -623,7 +640,7 @@ template <typename Derived> auto expm1(const Eigen::MatrixBase<Derived> &x) {
 // --- Log1p ---
 /**
  * @brief Computes log(1 + x), accurate for small x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return log(1 + x)
  */
@@ -654,7 +671,7 @@ template <typename Derived> auto log1p(const Eigen::MatrixBase<Derived> &x) {
 // --- Copysign ---
 /**
  * @brief Returns magnitude of x with sign of y
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Magnitude source
  * @param y Sign source
  * @return |x| with sign of y
@@ -670,6 +687,10 @@ template <JanusScalar T> T copysign(const T &x, const T &y) {
 
 /**
  * @brief Copysign with mixed types
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @param x Magnitude source
+ * @param y Sign source (double)
+ * @return |x| with sign of y
  */
 template <JanusScalar T>
     requires(!std::is_same_v<T, double>)
@@ -677,6 +698,13 @@ T copysign(const T &x, double y) {
     return janus::copysign(x, T(y));
 }
 
+/**
+ * @brief Copysign with mixed types (double magnitude)
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
+ * @param x Magnitude source (double)
+ * @param y Sign source
+ * @return |x| with sign of y
+ */
 template <JanusScalar T>
     requires(!std::is_same_v<T, double>)
 T copysign(double x, const T &y) {
@@ -704,7 +732,7 @@ auto copysign(const Eigen::MatrixBase<Derived> &x, const Eigen::MatrixBase<Deriv
 // --- Square ---
 /**
  * @brief Computes x^2 (more efficient than pow(x, 2))
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return x squared
  */

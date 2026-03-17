@@ -1,3 +1,8 @@
+/**
+ * @file OptiOptions.hpp
+ * @brief Solver selection and configuration for Opti
+ */
+
 #pragma once
 
 #include <casadi/casadi.hpp>
@@ -10,6 +15,8 @@ namespace janus {
  *
  * Solvers are provided via CasADi's nlpsol interface.
  * IPOPT is always available. Others require separate installation.
+ *
+ * @see OptiOptions for solver configuration
  */
 enum class Solver {
     Ipopt,  ///< Interior Point OPTimizer (default, always available)
@@ -17,7 +24,9 @@ enum class Solver {
     QpOases ///< QP solver for QP subproblems
 };
 
-// Forward declaration (implemented after solver_name)
+/** @brief Check if a solver is available in the current CasADi build
+ *  @param solver Solver to check
+ *  @return true if solver plugin is loaded and usable */
 inline bool solver_available(Solver solver);
 
 /**
@@ -61,23 +70,37 @@ struct SNOPTOptions {
     double major_feasibility_tolerance = 1e-6; ///< Constraint feasibility tolerance
     int print_level = 0;                       ///< 0=silent, 1=summary, 2+=detailed
 
-    // Builder pattern setters
+    /** @brief Set maximum major iterations
+     *  @param v iteration limit
+     *  @return reference to this for chaining */
     SNOPTOptions &set_major_iterations_limit(int v) {
         major_iterations_limit = v;
         return *this;
     }
+    /** @brief Set maximum minor iterations per major
+     *  @param v iteration limit
+     *  @return reference to this for chaining */
     SNOPTOptions &set_minor_iterations_limit(int v) {
         minor_iterations_limit = v;
         return *this;
     }
+    /** @brief Set major optimality tolerance
+     *  @param v tolerance value
+     *  @return reference to this for chaining */
     SNOPTOptions &set_major_optimality_tolerance(double v) {
         major_optimality_tolerance = v;
         return *this;
     }
+    /** @brief Set major feasibility tolerance
+     *  @param v tolerance value
+     *  @return reference to this for chaining */
     SNOPTOptions &set_major_feasibility_tolerance(double v) {
         major_feasibility_tolerance = v;
         return *this;
     }
+    /** @brief Set print verbosity level
+     *  @param v print level (0=silent, 1=summary, 2+=detailed)
+     *  @return reference to this for chaining */
     SNOPTOptions &set_print_level(int v) {
         print_level = v;
         return *this;
@@ -97,6 +120,8 @@ struct SNOPTOptions {
  *
  * Usage (alternative solver):
  *   opti.solve({.solver = janus::Solver::Snopt});
+ *
+ * @see Opti::solve for usage
  */
 struct OptiOptions {
     // Solver selection
@@ -112,39 +137,65 @@ struct OptiOptions {
     bool detect_simple_bounds = false;    ///< Detect simple variable bounds
     std::string mu_strategy = "adaptive"; ///< Barrier parameter strategy (IPOPT)
 
-    // Builder-style setters (any order, chainable) - prefixed with set_
+    /** @brief Set maximum iterations
+     *  @param v iteration limit
+     *  @return reference to this for chaining */
     OptiOptions &set_max_iter(int v) {
         max_iter = v;
         return *this;
     }
+    /** @brief Set maximum CPU time
+     *  @param v time limit in seconds
+     *  @return reference to this for chaining */
     OptiOptions &set_max_cpu_time(double v) {
         max_cpu_time = v;
         return *this;
     }
+    /** @brief Set convergence tolerance
+     *  @param v tolerance value
+     *  @return reference to this for chaining */
     OptiOptions &set_tol(double v) {
         tol = v;
         return *this;
     }
+    /** @brief Set verbosity
+     *  @param v true to print solver progress
+     *  @return reference to this for chaining */
     OptiOptions &set_verbose(bool v) {
         verbose = v;
         return *this;
     }
+    /** @brief Enable or disable JIT compilation
+     *  @param v true to enable JIT (experimental)
+     *  @return reference to this for chaining */
     OptiOptions &set_jit(bool v) {
         jit = v;
         return *this;
     }
+    /** @brief Enable simple bound detection
+     *  @param v true to enable
+     *  @return reference to this for chaining */
     OptiOptions &set_detect_simple_bounds(bool v) {
         detect_simple_bounds = v;
         return *this;
     }
+    /** @brief Set IPOPT barrier parameter strategy
+     *  @param v strategy name (e.g. "adaptive", "monotone")
+     *  @return reference to this for chaining */
     OptiOptions &set_mu_strategy(const std::string &v) {
         mu_strategy = v;
         return *this;
     }
+    /** @brief Set the NLP solver
+     *  @param v solver enum value
+     *  @return reference to this for chaining */
     OptiOptions &set_solver(Solver v) {
         solver = v;
         return *this;
     }
+    /** @brief Set SNOPT-specific options
+     *  @param v SNOPT options struct
+     *  @return reference to this for chaining */
     OptiOptions &set_snopt_opts(const SNOPTOptions &v) {
         snopt_opts = v;
         return *this;

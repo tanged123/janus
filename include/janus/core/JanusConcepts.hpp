@@ -1,12 +1,13 @@
+/// @file JanusConcepts.hpp
+/// @brief C++20 concepts constraining valid Janus scalar types
 #pragma once
 #include <casadi/casadi.hpp>
 #include <concepts>
 
 namespace janus {
 /**
- * @brief Concenpt for valid Janus scalars
- *
- * Satisfied by floating point types (double, float) or CasADi symbolic types (casadi::MX).
+ * @brief Concept for valid Janus scalars
+ * @tparam T Type to check (must be floating-point or casadi::MX)
  */
 template <typename T>
 concept JanusScalar = std::floating_point<T> || std::same_as<T, casadi::MX>;

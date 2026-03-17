@@ -1,28 +1,75 @@
-# Sparsity in Janus
+# Sparsity
 
-Understanding the sparsity pattern of your Jacobian and Hessian matrices is crucial for high-performance optimization. Dense solvers scale poorly ($O(N^3)$), while sparse solvers (like MUMPS, MA57) scale much better, provided the problem structure is exploited.
+Understanding the sparsity pattern of your Jacobian and Hessian matrices is crucial for high-performance optimization. Janus provides tools to inspect sparsity patterns from symbolic graphs, visualize them as ASCII/PDF/HTML spy plots, compile sparse derivative evaluators that return only structural nonzeros, and surface CasADi graph coloring metadata. Sparsity analysis works in **symbolic mode**; the NaN-propagation fallback also supports **numeric mode** for black-box functions.
 
-Janus provides tools to:
-- inspect sparsity patterns directly from symbolic graphs
-- visualize those patterns as ASCII, PDF, or HTML spy plots
-- compile sparse Jacobian and Hessian value evaluators that return only structural nonzeros
-- surface CasADi graph coloring so you can see how many directional sweeps the sparse derivative pipeline needs
+## Quick Start
 
-## The `SparsityPattern` Class
+```cpp
+#include <janus/janus.hpp>
 
-The core of this feature is `janus::SparsityPattern` (in `<janus/core/Sparsity.hpp>`). It wraps CasADi's sparsity logic but integrates seamlessly with Janus native types.
+auto x = janus::sym("x", 10);
+auto f = janus::SymbolicScalar::vertcat({
+    x(1) - x(0),
+    x(2) - janus::sin(x(1)),
+    x(3) - x(2)
+});
 
-### Key Features
-- **Query**: Check `nnz()` (number of non-zeros), `density()`, dimensions, etc.
-- **Visualize**: Generate ASCII "spy plots" for console or high-quality PDFs for reports.
-- **Analyze**: Extract patterns from symbolic expressions or Janus Functions.
+// Extract Jacobian sparsity pattern
+janus::SparsityPattern sp = janus::sparsity_of_jacobian(f, x);
 
-## Extracting Sparsity
+// Print ASCII spy plot
+std::cout << sp.to_string() << std::endl;
 
-You can extract sparsity in three main ways:
+// Build a sparse Jacobian evaluator (returns only nonzeros)
+auto J = janus::sparse_jacobian(f, x);
+std::cout << "nnz = " << J.nnz() << "\n";
+```
 
-### 1. From Symbolic Expressions
-If you have a symbolic expression $f(x)$, you can ask for the sparsity of its derivatives:
+## Core API
+
+The core class is `janus::SparsityPattern` in `<janus/core/Sparsity.hpp>`.
+
+### Extracting Sparsity
+
+| Function | Description |
+|----------|-------------|
+| `janus::sparsity_of_jacobian(f, x)` | Jacobian sparsity from symbolic expressions |
+| `janus::sparsity_of_hessian(f, x)` | Hessian sparsity from symbolic expressions |
+| `janus::get_jacobian_sparsity(func, out_idx, in_idx)` | Jacobian sparsity from a compiled `janus::Function` |
+| `janus::get_hessian_sparsity(func, out_idx, in_idx)` | Hessian sparsity from a compiled `janus::Function` |
+| `janus::nan_propagation_sparsity(callable, n_in, n_out)` | Black-box sparsity via NaN propagation |
+| `janus::nan_propagation_sparsity(func)` | NaN-propagation sparsity from `janus::Function` |
+
+### Querying a SparsityPattern
+
+| Method | Description |
+|--------|-------------|
+| `sp.nnz()` | Number of structural nonzeros |
+| `sp.density()` | Fraction of nonzeros |
+| `sp.n_rows()` / `sp.n_cols()` | Dimensions |
+| `sp.get_triplet()` | Row/column index vectors |
+| `sp.get_ccs()` | Compressed column storage |
+
+### Sparse Derivative Evaluators
+
+| Function | Description |
+|----------|-------------|
+| `janus::sparse_jacobian(f, x)` | Build a sparse Jacobian evaluator from expressions |
+| `janus::sparse_hessian(phi, x)` | Build a sparse Hessian evaluator from a scalar expression |
+| `janus::sparse_jacobian(func, out_idx, in_idx)` | Build from a `janus::Function` block |
+| `janus::sparse_hessian(func, out_idx, in_idx)` | Build from a `janus::Function` block |
+
+### Visualization
+
+| Method | Description |
+|--------|-------------|
+| `sp.to_string()` | ASCII spy plot for terminal output |
+| `sp.visualize_spy(filename)` | Render spy plot to PDF (requires Graphviz) |
+| `sp.export_spy_html(filename, title)` | Interactive HTML spy plot with pan/zoom |
+
+## Usage Patterns
+
+### From Symbolic Expressions
 
 ```cpp
 auto x = janus::sym("x", 10);
@@ -31,12 +78,12 @@ auto f = ...; // some expression depending on x
 // Jacobian sparsity (df/dx)
 janus::SparsityPattern J_sp = janus::sparsity_of_jacobian(f, x);
 
-// Hessian sparsity (d²f/dx²)
+// Hessian sparsity (d^2 f/dx^2)
 janus::SparsityPattern H_sp = janus::sparsity_of_hessian(f, x);
 ```
 
-### 2. From `janus::Function`
-If you have already compiled a function:
+### From a Compiled Function
+
 ```cpp
 janus::Function func(inputs, outputs);
 auto sp = janus::get_jacobian_sparsity(func);
@@ -45,13 +92,12 @@ auto sp = janus::get_jacobian_sparsity(func);
 For multi-input or multi-output functions, use explicit block selection:
 
 ```cpp
-janus::Function func(inputs, outputs);
-
 auto J_sp = janus::get_jacobian_sparsity(func, output_idx, input_idx);
 auto H_sp = janus::get_hessian_sparsity(func, scalar_output_idx, input_idx);
 ```
 
-### 3. From CasADi Types directly
+### From CasADi Types Directly
+
 ```cpp
 casadi::Sparsity raw = ...;
 janus::SparsityPattern sp(raw);
@@ -60,27 +106,7 @@ janus::SymbolicScalar expr = ...;
 janus::SparsityPattern expr_sp(expr); // Extract from MX sparsity
 ```
 
-## Sparse Derivative Value Kernels
-
-Pattern inspection is useful, but high-performance workflows usually need more: a reusable derivative evaluator that only returns structural nonzeros.
-
-Janus now exposes that pipeline directly:
-
-```cpp
-auto x = janus::sym("x", 10);
-auto f = ...; // vector expression
-auto phi = ...; // scalar expression
-
-auto J = janus::sparse_jacobian(f, x);
-auto H = janus::sparse_hessian(phi, x);
-```
-
-Both evaluators cache:
-- the fixed sparsity pattern
-- graph coloring metadata
-- a compiled `janus::Function` that emits only structural nonzero values
-
-### Jacobian Pipeline
+### Sparse Jacobian Pipeline
 
 ```cpp
 auto x = janus::sym("x", 6);
@@ -105,17 +131,13 @@ x_val << 0.0, 0.2, 0.5, 0.9, 0.0, 0.0;
 janus::NumericMatrix jac_nz = J.values(x_val);
 ```
 
-`jac_nz` is a column vector of derivative values in the same CCS ordering reported by:
-- `J.sparsity().get_triplet()`
-- `J.sparsity().get_ccs()`
+`jac_nz` is a column vector of derivative values in the same CCS ordering reported by `J.sparsity().get_triplet()` and `J.sparsity().get_ccs()`. That ordering is fixed, so the sparsity structure can be reused across many evaluations.
 
-That ordering is fixed, so the sparsity structure can be reused across many evaluations.
-
-### Hessian Pipeline
+### Sparse Hessian Pipeline
 
 ```cpp
 auto x = janus::sym("x", 5);
-auto phi = 0;
+janus::SymbolicScalar phi = 0;
 for (int k = 0; k < 4; ++k) {
     auto diff = x(k + 1) - x(k);
     phi = phi + diff * diff;
@@ -134,7 +156,7 @@ janus::NumericMatrix hess_nz = H.values(x_val);
 
 For Hessians, Janus exposes CasADi's star coloring through `H.coloring()`.
 
-### From `janus::Function` Blocks
+### From Function Blocks
 
 Sparse derivative evaluators can also be built from an already-compiled `janus::Function`, selecting a specific output block and input block:
 
@@ -166,6 +188,38 @@ for (Eigen::Index k = 0; k < nz.size(); ++k) {
 
 In production you usually keep the structural ordering and pass the nonzero vector straight into a sparse solver or downstream callback.
 
+### Visualization Workflows
+
+**ASCII spy plot** for quick terminal debugging:
+```cpp
+std::cout << sp.to_string() << std::endl;
+```
+
+Output:
+```
+Sparsity: 10x10, nnz=28 (density=28.000%)
++----------+
+|**........|
+|***.......
+|.***......|
+...
++----------+
+```
+
+**PDF rendering** for reports:
+```cpp
+sp.visualize_spy("my_pattern"); // Creates my_pattern.pdf
+```
+
+**Interactive HTML** for exploring large matrices:
+```cpp
+sp.export_spy_html("my_pattern", "My Jacobian"); // Creates my_pattern.html
+```
+
+The HTML output includes pan/zoom, clickable cells with row/col details, axis labels, and a stats panel.
+
+## Advanced Usage
+
 ### Reading Coloring Metadata
 
 `janus::GraphColoring` exposes:
@@ -176,132 +230,20 @@ In production you usually keep the structural ordering and pass the nonzero vect
 
 This is useful when comparing derivative blocks and deciding whether sparse directional sweeps are worth it.
 
-## Visualization
+### NaN-Propagation Sparsity Detection
 
-### ASCII Spy Plot
-For quick debugging in the terminal, use `to_string()`:
-```cpp
-std::cout << sp.to_string() << std::endl;
-```
+Sometimes you have **black-box functions** where symbolic sparsity analysis is not possible (external library calls, non-traceable operations, functions with runtime branching). Janus provides `nan_propagation_sparsity()` for these cases.
 
-Output:
-```
-Sparsity: 10x10, nnz=28 (density=28.000%)
-┌──────────┐
-│**........│
-│***.......│
-│.***......│
-...
-└──────────┘
-```
-Dots `.` represent zeros, asterisks `*` represent non-zeros.
-
-### PDF Rendering (Graphviz)
-For complex patterns or reports, generate a PDF grid visualization:
-```cpp
-sp.visualize_spy("my_pattern"); // Creates my_pattern.pdf
-```
-This renders a true "spy plot" where non-zeros are black squares.
-
-### Interactive HTML
-For exploring large matrices with pan/zoom and cell inspection:
-```cpp
-sp.export_spy_html("my_pattern", "My Jacobian"); // Creates my_pattern.html
-```
-
-The HTML output includes:
-- **Pan/zoom** with mouse scroll and drag
-- **Click cells** to see row/col in sidebar
-- **Axis labels** with automatic tick marks
-- **Stats panel** showing matrix size, nnz, density
-
-## Example Walkthrough: `sparsity_intro.cpp`
-
-The example `examples/intro/sparsity_intro.cpp` demonstrates four common structures found in optimization.
-
-### 1. Simple Jacobian
-Shows explicitly how dependencies map to non-zeros.
-$f_0 = x_0^2$ depends only on $x_0$, so row 0 has non-zero at col 0.
-
-### 2. Chain Structure (Tridiagonal)
-```cpp
-f = sum((x[i] - x[i+1])^2)
-```
-This optimization objective creates a tridiagonal Hessian. This "arrowhead" or band structure is typical in trajectory optimization (e.g., Direct Collocation) where each state depends only on its neighbors.
-
-### 3. Independent Systems (Block Diagonal)
-Two completely separate systems stacked together form a block-diagonal matrix. Solvers love this structure because it can be parallelized trivially. The example explicitly constructs this to show how Janus detects it.
-
-### 4. 2D Laplacian (5-Point Stencil)
-Typical in PDE constraints or grid-based problems. Each node $(i,j)$ depends on itself and its 4 neighbors (Up, Down, Left, Right).
-The example uses `janus::sym_vec_pair` to easily handle 2D indexing while maintaining a valid symbolic input for the function:
-
-```cpp
-// 1. Create vector of symbols for easy indexing
-auto [x_vec, x_mx] = janus::sym_vec_pair("x", n_vars);
-
-// 2. Build equations using x_vec(k)
-...
-
-// 3. Create Function using raw x_mx
-janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
-```
-
-This structure produces a banded matrix with off-diagonal bands at distance $\pm 1$ and $\pm N$.
-
-> [!TIP]
-> [🔍 Explore the 2D Laplacian sparsity pattern interactively](examples/laplacian_2d.html) (open locally or via GitHub Pages)
-
----
-
-## Sparse Pipeline Example Walkthrough: `sparse_derivative_pipeline.cpp`
-
-The example `examples/math/sparse_derivative_pipeline.cpp` shows the full J-13 workflow:
-
-1. Build a trajectory-style residual with local coupling.
-2. Compile sparse Jacobian blocks and a sparse Hessian block.
-3. Print `nnz` versus dense size.
-4. Inspect forward, reverse, and star coloring counts.
-5. Reuse the same sparse kernels at two different evaluation points.
-
-This example is useful when you want to answer practical questions like:
-- "How sparse is this block really?"
-- "Should I expect forward or reverse directional sweeps to win?"
-- "Can I evaluate only nonzero derivative entries and reuse the structure across solves?"
-
-Build and run it with:
-
-```bash
-ninja -C build sparse_derivative_pipeline
-./build/examples/sparse_derivative_pipeline
-```
-
-The output prints both the sparse nonzero vectors and reconstructed dense blocks so you can verify the ordering and the structure reuse story.
-
----
-
-## NaN-Propagation Sparsity Detection
-
-Sometimes you have **black-box functions** where symbolic sparsity analysis isn't possible:
-- External library calls
-- Non-traceable operations
-- Functions with runtime branching
-
-Janus provides `nan_propagation_sparsity()` for these cases.
-
-### How It Works
-
+**How it works:**
 1. Evaluate f(x) at a reference point
 2. For each input i: set x[i] = NaN, evaluate f(x)
-3. If output[j] becomes NaN → depends on input i → Jacobian(j, i) ≠ 0
-
-### API
+3. If output[j] becomes NaN, then it depends on input i, so Jacobian(j, i) is nonzero
 
 ```cpp
 // For lambda/callable functions
 auto sp = janus::nan_propagation_sparsity(
-    [](const NumericVector& x) {
-        NumericVector y(x.size());
+    [](const janus::NumericVector& x) {
+        janus::NumericVector y(x.size());
         for (int i = 0; i < x.size(); ++i) y(i) = x(i) * x(i);
         return y;
     },
@@ -312,15 +254,14 @@ janus::Function fn(...);
 auto sp = janus::nan_propagation_sparsity(fn);
 
 // With custom options (reference point)
-NaNSparsityOptions opts;
-opts.reference_point = NumericVector{{1.0, 2.0, 3.0}};
-auto sp = nan_propagation_sparsity(fn, opts);
+janus::NaNSparsityOptions opts;
+opts.reference_point = janus::NumericVector{{1.0, 2.0, 3.0}};
+auto sp = janus::nan_propagation_sparsity(fn, opts);
 ```
 
-### Example: Verifying Symbolic Sparsity
+**Verifying symbolic sparsity:**
 
 ```cpp
-// Create symbolic function
 auto x = janus::sym("x", 4);
 auto f = x * x;  // Element-wise square
 
@@ -337,3 +278,46 @@ assert(sp_symbolic == sp_nan);
 
 > [!TIP]
 > Use NaN-propagation to validate that your symbolic expressions have the expected structure, or when interfacing with external numerical code.
+
+### Example Walkthrough: `sparsity_intro.cpp`
+
+The example `examples/intro/sparsity_intro.cpp` demonstrates four common structures found in optimization:
+
+1. **Simple Jacobian** -- Shows how dependencies map to nonzeros. `f_0 = x_0^2` depends only on `x_0`, so row 0 has a nonzero at column 0.
+
+2. **Chain Structure (Tridiagonal)** -- `f = sum((x[i] - x[i+1])^2)` creates a tridiagonal Hessian. This band structure is typical in trajectory optimization where each state depends only on its neighbors.
+
+3. **Independent Systems (Block Diagonal)** -- Two completely separate systems stacked together form a block-diagonal matrix. Solvers can parallelize this trivially.
+
+4. **2D Laplacian (5-Point Stencil)** -- Typical in PDE constraints. Each node depends on itself and its 4 neighbors. Uses `janus::sym_vec_pair` for 2D indexing:
+
+```cpp
+auto [x_vec, x_mx] = janus::sym_vec_pair("x", n_vars);
+// Build equations using x_vec(k), create Function using raw x_mx
+janus::Function f_pde({x_mx}, {janus::SymbolicScalar::vertcat(eqs)});
+```
+
+### Example Walkthrough: `sparse_derivative_pipeline.cpp`
+
+The example `examples/math/sparse_derivative_pipeline.cpp` shows the full workflow:
+
+1. Build a trajectory-style residual with local coupling
+2. Compile sparse Jacobian blocks and a sparse Hessian block
+3. Print `nnz` versus dense size
+4. Inspect forward, reverse, and star coloring counts
+5. Reuse the same sparse kernels at two different evaluation points
+
+Build and run:
+
+```bash
+ninja -C build sparse_derivative_pipeline
+./build/examples/sparse_derivative_pipeline
+```
+
+## See Also
+
+- [Graph Visualization Guide](graph_visualization.md) -- Visualize the computational graph itself
+- [Structural Diagnostics Guide](structural_diagnostics.md) -- Use sparsity for observability and identifiability analysis
+- [sparsity_intro.cpp](../../examples/intro/sparsity_intro.cpp) -- Introductory sparsity patterns example
+- [sparse_derivative_pipeline.cpp](../../examples/math/sparse_derivative_pipeline.cpp) -- Full sparse derivative pipeline example
+- [Sparsity.hpp](../../include/janus/core/Sparsity.hpp) -- API reference

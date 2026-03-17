@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file PolynomialChaos.hpp
+ * @brief Polynomial chaos expansion (PCE) basis, projection, and regression
+ * @see Quadrature.hpp, OrthogonalPolynomials.hpp
+ */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
@@ -45,18 +50,37 @@ struct PolynomialChaosDimension {
     double beta = 0.0;
 };
 
+/**
+ * @brief Create a standard normal (Hermite) dimension
+ * @return Hermite dimension descriptor
+ */
 inline PolynomialChaosDimension hermite_dimension() {
     return PolynomialChaosDimension{PolynomialChaosFamily::Hermite, 0.0, 0.0};
 }
 
+/**
+ * @brief Create a uniform (Legendre) dimension on [-1, 1]
+ * @return Legendre dimension descriptor
+ */
 inline PolynomialChaosDimension legendre_dimension() {
     return PolynomialChaosDimension{PolynomialChaosFamily::Legendre, 0.0, 0.0};
 }
 
+/**
+ * @brief Create a Beta-family (Jacobi) dimension on [-1, 1]
+ * @param alpha Jacobi alpha parameter (> -1)
+ * @param beta Jacobi beta parameter (> -1)
+ * @return Jacobi dimension descriptor
+ */
 inline PolynomialChaosDimension jacobi_dimension(double alpha, double beta) {
     return PolynomialChaosDimension{PolynomialChaosFamily::Jacobi, alpha, beta};
 }
 
+/**
+ * @brief Create a Gamma-family (Laguerre) dimension on [0, inf)
+ * @param alpha Laguerre alpha parameter (> -1)
+ * @return Laguerre dimension descriptor
+ */
 inline PolynomialChaosDimension laguerre_dimension(double alpha = 0.0) {
     return PolynomialChaosDimension{PolynomialChaosFamily::Laguerre, alpha, 0.0};
 }
@@ -169,7 +193,7 @@ Scalar raw_jacobi_polynomial(int degree, const Scalar &x, double alpha, double b
         const double nn = static_cast<double>(n);
         const double two_n_ab = 2.0 * nn + alpha + beta;
         const double a_n = 2.0 * (nn + 1.0) * (nn + alpha + beta + 1.0) * two_n_ab;
-        const double b_n =
+        const Scalar b_n =
             (two_n_ab + 1.0) * (two_n_ab * (two_n_ab + 2.0) * x + alpha * alpha - beta * beta);
         const double c_n = 2.0 * (nn + alpha) * (nn + beta) * (two_n_ab + 2.0);
         Scalar p_np1 = (b_n * p_n - c_n * p_nm1) / a_n;
@@ -517,6 +541,15 @@ class PolynomialChaosBasis {
     NumericVector squared_norms_;
 };
 
+/**
+ * @brief Compute PCE projection coefficients from weighted samples (vector)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param samples Sample matrix (rows = samples, cols = dimensions)
+ * @param weights Quadrature weights
+ * @param sample_values Function values at sample points
+ * @return PCE coefficient vector
+ */
 template <JanusScalar Scalar>
 JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const NumericMatrix &samples,
@@ -544,6 +577,15 @@ JanusVector<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
     return coeffs;
 }
 
+/**
+ * @brief Compute PCE projection coefficients from weighted samples (matrix)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param samples Sample matrix (rows = samples, cols = dimensions)
+ * @param weights Quadrature weights
+ * @param sample_values Function values at sample points (matrix)
+ * @return PCE coefficient matrix
+ */
 template <JanusScalar Scalar>
 JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basis,
                                                 const NumericMatrix &samples,
@@ -574,6 +616,15 @@ JanusMatrix<Scalar> pce_projection_coefficients(const PolynomialChaosBasis &basi
     return coeffs;
 }
 
+/**
+ * @brief Compute PCE coefficients via least-squares regression (vector)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param samples Sample matrix
+ * @param sample_values Function values at sample points
+ * @param ridge Ridge regularization parameter
+ * @return PCE coefficient vector
+ */
 template <JanusScalar Scalar>
 JanusVector<Scalar>
 pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatrix &samples,
@@ -585,6 +636,15 @@ pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatr
     return detail::apply_operator(op, sample_values, "pce_regression_coefficients");
 }
 
+/**
+ * @brief Compute PCE coefficients via least-squares regression (matrix)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param samples Sample matrix
+ * @param sample_values Function values at sample points (matrix)
+ * @param ridge Ridge regularization parameter
+ * @return PCE coefficient matrix
+ */
 template <JanusScalar Scalar>
 JanusMatrix<Scalar>
 pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatrix &samples,
@@ -596,6 +656,12 @@ pce_regression_coefficients(const PolynomialChaosBasis &basis, const NumericMatr
     return detail::apply_operator(op, sample_values, "pce_regression_coefficients");
 }
 
+/**
+ * @brief Extract PCE mean (zeroth coefficient)
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param coefficients PCE coefficient vector
+ * @return Mean value
+ */
 template <JanusScalar Scalar> Scalar pce_mean(const JanusVector<Scalar> &coefficients) {
     if (coefficients.size() == 0) {
         throw InvalidArgument("pce_mean: coefficient vector must be non-empty");
@@ -603,6 +669,13 @@ template <JanusScalar Scalar> Scalar pce_mean(const JanusVector<Scalar> &coeffic
     return coefficients(0);
 }
 
+/**
+ * @brief Compute PCE variance from coefficients
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param basis Polynomial chaos basis
+ * @param coefficients PCE coefficient vector
+ * @return Variance
+ */
 template <JanusScalar Scalar>
 Scalar pce_variance(const PolynomialChaosBasis &basis, const JanusVector<Scalar> &coefficients) {
     if (coefficients.size() != basis.size()) {

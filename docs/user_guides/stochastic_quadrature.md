@@ -1,16 +1,35 @@
-# Stochastic Quadrature in Janus
+# Stochastic Quadrature
 
-Janus now includes a dedicated `Quadrature.hpp` layer for probability-measure quadrature rules that feed directly into polynomial-chaos workflows.
+Janus includes a dedicated `Quadrature.hpp` layer for probability-measure quadrature rules that feed directly into polynomial-chaos workflows. One-dimensional rules return nodes and weights on the probability measure, tensor-product grids preserve the standard Janus sample layout, and Smolyak sparse grids reduce point count for higher-dimensional problems. This is separate from `quad(...)` in `Integrate.hpp`, which is a definite-integral API; `Quadrature.hpp` is a structured collocation/projection API. Works in numeric mode.
 
-The core idea is simple:
+## Quick Start
 
-- one-dimensional rules return nodes and weights on the **probability measure**
-- tensor-product grids preserve the standard Janus sample layout
-- Smolyak sparse grids reduce point count for higher-dimensional problems
+```cpp
+#include <janus/janus.hpp>
 
-This is separate from `quad(...)` in `Integrate.hpp`. `quad(...)` is a definite-integral API. `Quadrature.hpp` is a structured collocation / projection API.
+// Build a 3rd-order Gauss rule for a uniform variable
+auto rule = janus::stochastic_quadrature_rule(janus::legendre_dimension(), 3);
 
-## Rule Types
+// Integrate f(x) = x^2 against the uniform measure on [-1, 1]
+double integral = 0.0;
+for (Eigen::Index i = 0; i < rule.nodes.size(); ++i) {
+    integral += rule.weights(i) * rule.nodes(i) * rule.nodes(i);
+}
+// integral ~ 1/3 (second moment of uniform on [-1,1])
+```
+
+## Core API
+
+*   **`janus::stochastic_quadrature_rule(dim, order)`**: Build a fixed-order quadrature rule for a given polynomial family.
+*   **`janus::stochastic_quadrature_level(dim, level, rule_type)`**: Build a refinement-level rule (supports nesting for bounded-support families).
+*   **`janus::tensor_product_quadrature(rules)`**: Combine 1D rules into an N-D tensor-product grid.
+*   **`janus::smolyak_sparse_grid(dims, level, opts)`**: Build a Smolyak sparse grid for multi-dimensional integration.
+*   **`janus::StochasticQuadratureRule`**: Rule type selector (`Gauss`, `ClenshawCurtis`, `GaussKronrod15`, `AutoNested`).
+*   **`janus::SmolyakQuadratureOptions`**: Options for merge tolerance and zero-weight tolerance.
+
+## Usage Patterns
+
+### Rule Types
 
 The public selector is `janus::StochasticQuadratureRule`:
 
@@ -21,9 +40,9 @@ The public selector is `janus::StochasticQuadratureRule`:
 
 All returned weights sum to `1` because they integrate against the underlying probability measure rather than against raw `dx`.
 
-## One-Dimensional Rules
+### One-Dimensional Rules
 
-Build a fixed-order rule with:
+Build a fixed-order rule:
 
 ```cpp
 auto uniform_rule =
@@ -33,7 +52,7 @@ auto gaussian_rule =
     janus::stochastic_quadrature_rule(janus::hermite_dimension(), 4);
 ```
 
-Build a refinement-level rule with:
+Build a refinement-level rule:
 
 ```cpp
 auto coarse =
@@ -51,9 +70,9 @@ auto fine =
 
 `fine.nodes` contains every node from `coarse.nodes`, which makes incremental refinement practical for bounded-support dimensions.
 
-## Tensor-Product Grids
+### Tensor-Product Grids
 
-Combine one-dimensional rules with:
+Combine one-dimensional rules:
 
 ```cpp
 auto x_rule = janus::stochastic_quadrature_rule(janus::legendre_dimension(), 3);
@@ -67,7 +86,7 @@ The resulting grid uses:
 - `grid.samples`: `N x d` sample matrix
 - `grid.weights`: `N` probability weights
 
-That means it plugs straight into Janus PCE projection:
+It plugs straight into Janus PCE projection:
 
 ```cpp
 janus::PolynomialChaosBasis basis(
@@ -80,9 +99,9 @@ janus::NumericVector coeffs =
 
 No manual `samples.col(0) = nodes` reshaping is required.
 
-## Smolyak Sparse Grids
+### Smolyak Sparse Grids
 
-For higher-dimensional problems, use:
+For higher-dimensional problems:
 
 ```cpp
 auto grid = janus::smolyak_sparse_grid(
@@ -110,7 +129,7 @@ auto grid = janus::smolyak_sparse_grid(
     });
 ```
 
-## Legendre Embedded 7/15 Rule
+### Legendre Embedded 7/15 Rule
 
 `StochasticQuadratureRule::GaussKronrod15` exposes the same embedded Legendre 7/15-point rule that `quad(...)` uses internally for adaptive definite integration.
 
@@ -132,10 +151,9 @@ auto fine =
 
 This is intentionally a small embedded rule, not a full Gauss-Patterson ladder.
 
-## Example
+## See Also
 
-See `examples/math/polynomial_chaos_demo.cpp` for:
-
-- one-dimensional Legendre projection through `stochastic_quadrature_rule(...)`
-- a mixed Legendre/Hermite Smolyak sparse-grid expectation
-- symbolic moment propagation through fitted PCE coefficients
+- [Polynomial Chaos Guide](polynomial_chaos.md) - PCE basis construction and coefficient recovery
+- [Integration Guide](integration.md) - Definite-integral `quad(...)` API
+- [`examples/math/polynomial_chaos_demo.cpp`](../../examples/math/polynomial_chaos_demo.cpp) - Sparse-grid and projection demo
+- [`include/janus/math/Quadrature.hpp`](../../include/janus/math/Quadrature.hpp) - Quadrature rule API implementation

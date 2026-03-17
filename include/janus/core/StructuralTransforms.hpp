@@ -1,3 +1,5 @@
+/// @file StructuralTransforms.hpp
+/// @brief Alias elimination, BLT decomposition, and structural analysis passes
 #pragma once
 
 #include "Function.hpp"
@@ -19,19 +21,20 @@ namespace janus {
  * @brief Options for structural simplification and analysis passes.
  */
 struct StructuralTransformOptions {
-    int input_idx = 0;
-    int output_idx = 0;
-    int max_alias_row_nnz = 2;
-    bool require_constant_alias_coefficients = true;
+    int input_idx = 0;         ///< Index of the input block to analyze
+    int output_idx = 0;        ///< Index of the output block to analyze
+    int max_alias_row_nnz = 2; ///< Max non-zeros in an alias candidate row
+    bool require_constant_alias_coefficients =
+        true; ///< Require constant (symbol-free) coefficients
 };
 
 /**
  * @brief A single eliminated alias or trivial affine variable relation.
  */
 struct AliasSubstitution {
-    int residual_index = -1;
-    int eliminated_variable_index = -1;
-    SymbolicScalar replacement;
+    int residual_index = -1;            ///< Row that was eliminated
+    int eliminated_variable_index = -1; ///< Variable solved for
+    SymbolicScalar replacement;         ///< Expression replacing the eliminated variable
 };
 
 /**
@@ -43,23 +46,25 @@ struct AliasSubstitution {
  * any untouched original inputs back to the full original selected input block.
  */
 struct AliasEliminationResult {
-    Function reduced_function;
-    Function reconstruct_full_input;
-    std::vector<int> kept_variable_indices;
-    std::vector<int> eliminated_variable_indices;
-    std::vector<int> kept_residual_indices;
-    std::vector<int> eliminated_residual_indices;
-    std::vector<AliasSubstitution> substitutions;
+    Function reduced_function;                    ///< Function with aliases removed
+    Function reconstruct_full_input;              ///< Maps reduced inputs back to original ordering
+    std::vector<int> kept_variable_indices;       ///< Original indices of kept variables
+    std::vector<int> eliminated_variable_indices; ///< Original indices of eliminated variables
+    std::vector<int> kept_residual_indices;       ///< Original indices of kept residuals
+    std::vector<int> eliminated_residual_indices; ///< Original indices of eliminated residuals
+    std::vector<AliasSubstitution> substitutions; ///< Applied substitution records
 };
 
 /**
  * @brief One diagonal block in a block-triangular decomposition.
  */
 struct StructuralBlock {
-    std::vector<int> residual_indices;
-    std::vector<int> variable_indices;
-    std::vector<int> tear_variable_indices;
+    std::vector<int> residual_indices;      ///< Residual rows in this block
+    std::vector<int> variable_indices;      ///< Variable columns in this block
+    std::vector<int> tear_variable_indices; ///< Recommended tearing variables
 
+    /// @brief Check if the block involves multiple coupled equations
+    /// @return true if more than one residual or variable
     bool is_coupled() const { return residual_indices.size() > 1 || variable_indices.size() > 1; }
 };
 
@@ -67,14 +72,14 @@ struct StructuralBlock {
  * @brief Block-triangular decomposition and tearing metadata for a selected block.
  */
 struct BLTDecomposition {
-    SparsityPattern incidence;
-    std::vector<int> row_permutation;
-    std::vector<int> column_permutation;
-    std::vector<int> row_block_offsets;
-    std::vector<int> column_block_offsets;
-    std::vector<int> coarse_row_block_offsets;
-    std::vector<int> coarse_column_block_offsets;
-    std::vector<StructuralBlock> blocks;
+    SparsityPattern incidence;                    ///< Incidence (Jacobian sparsity) of the block
+    std::vector<int> row_permutation;             ///< BTF row permutation
+    std::vector<int> column_permutation;          ///< BTF column permutation
+    std::vector<int> row_block_offsets;           ///< Fine row block boundaries
+    std::vector<int> column_block_offsets;        ///< Fine column block boundaries
+    std::vector<int> coarse_row_block_offsets;    ///< Coarse row block boundaries
+    std::vector<int> coarse_column_block_offsets; ///< Coarse column block boundaries
+    std::vector<StructuralBlock> blocks;          ///< Diagonal blocks with tearing info
 };
 
 /**
@@ -84,8 +89,8 @@ struct BLTDecomposition {
  * The block indices therefore refer to the reduced variable/residual ordering.
  */
 struct StructuralAnalysis {
-    AliasEliminationResult alias_elimination;
-    BLTDecomposition blt;
+    AliasEliminationResult alias_elimination; ///< Alias elimination pass result
+    BLTDecomposition blt;                     ///< BLT decomposition of the reduced system
 };
 
 namespace detail {
@@ -388,12 +393,11 @@ inline std::vector<int> tearing_recommendation(const casadi::Sparsity &incidence
 } // namespace detail
 
 /**
- * @brief Eliminate trivial affine alias rows from a selected residual block.
- *
- * This pass is intentionally conservative. A residual equation is only removed
- * when it is affine in the selected variables and has at most
- * `max_alias_row_nnz` structural coefficients. The eliminated variable is
- * replaced everywhere by the solved affine expression.
+ * @brief Eliminate trivial affine alias rows from a selected residual block
+ * @param fn Function containing the residual system
+ * @param opts Transform options (input/output indices, alias thresholds)
+ * @return Reduced function, reconstruction map, and substitution records
+ * @see block_triangularize, structural_analyze
  */
 inline AliasEliminationResult alias_eliminate(const Function &fn,
                                               const StructuralTransformOptions &opts = {}) {
@@ -537,11 +541,11 @@ inline AliasEliminationResult alias_eliminate(const Function &fn,
 }
 
 /**
- * @brief Compute a block-triangular decomposition of a selected residual block.
- *
- * The selected input/output pair must describe a square dense column-vector
- * residual system. The resulting block indices refer to the selected block's
- * local variable and residual numbering.
+ * @brief Compute a block-triangular decomposition of a selected residual block
+ * @param fn Function with a square residual system
+ * @param opts Transform options (input/output indices)
+ * @return BLT decomposition with permutations and block structure
+ * @see alias_eliminate, structural_analyze
  */
 inline BLTDecomposition block_triangularize(const Function &fn,
                                             const StructuralTransformOptions &opts = {}) {
@@ -583,14 +587,11 @@ inline BLTDecomposition block_triangularize(const Function &fn,
 }
 
 /**
- * @brief Run the current structural simplification pipeline.
- *
- * This currently performs:
- * 1. Alias elimination on trivial affine rows
- * 2. BLT decomposition on the reduced residual system
- * 3. Tearing recommendations for each coupled BLT block
- *
- * Code generation of simplified kernels is intentionally deferred.
+ * @brief Run alias elimination followed by BLT decomposition
+ * @param fn Function containing the residual system
+ * @param opts Transform options
+ * @return Combined alias-elimination and BLT analysis
+ * @see alias_eliminate, block_triangularize
  */
 inline StructuralAnalysis structural_analyze(const Function &fn,
                                              const StructuralTransformOptions &opts = {}) {

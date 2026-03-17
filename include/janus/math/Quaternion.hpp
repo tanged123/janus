@@ -1,4 +1,9 @@
 #pragma once
+/**
+ * @file Quaternion.hpp
+ * @brief Quaternion algebra, rotation, and SLERP interpolation
+ * @see Rotations.hpp
+ */
 
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusTypes.hpp"
@@ -14,6 +19,8 @@ namespace janus {
  *
  * Stores quaternion in (w, x, y, z) convention where w is the scalar part.
  * All operations support both numeric and symbolic types.
+ *
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
  */
 template <typename Scalar> class Quaternion {
   public:
@@ -34,7 +41,9 @@ template <typename Scalar> class Quaternion {
 
     // --- Algebraic Operations ---
 
-    /// Hamilton product
+    /// @brief Hamilton product
+    /// @param other Right-hand quaternion
+    /// @return Product quaternion
     Quaternion operator*(const Quaternion &other) const {
         return Quaternion(w * other.w - x * other.x - y * other.y - z * other.z,
                           w * other.x + x * other.w + y * other.z - z * other.y,
@@ -42,29 +51,36 @@ template <typename Scalar> class Quaternion {
                           w * other.z + x * other.y - y * other.x + z * other.w);
     }
 
-    /// Scalar multiplication
+    /// @brief Scalar multiplication
+    /// @param s Scalar factor
+    /// @return Scaled quaternion
     Quaternion operator*(const Scalar &s) const { return Quaternion(w * s, x * s, y * s, z * s); }
 
-    /// Quaternion addition
+    /// @brief Quaternion addition
+    /// @param other Right-hand quaternion
+    /// @return Sum quaternion
     Quaternion operator+(const Quaternion &other) const {
         return Quaternion(w + other.w, x + other.x, y + other.y, z + other.z);
     }
 
-    /// Conjugate (w, -x, -y, -z)
+    /// @brief Conjugate (w, -x, -y, -z)
+    /// @return Conjugate quaternion
     Quaternion conjugate() const { return Quaternion(w, -x, -y, -z); }
 
-    /// Inverse (conjugate / norm_sq)
+    /// @brief Inverse (conjugate / norm_sq)
+    /// @return Inverse quaternion
     Quaternion inverse() const { return conjugate() * (static_cast<Scalar>(1.0) / squared_norm()); }
 
-    /// Squared Norm
-    Scalar squared_norm() const { // Changed name to avoid conflict with standard library norm
-        return w * w + x * x + y * y + z * z;
-    }
+    /// @brief Squared norm (w^2 + x^2 + y^2 + z^2)
+    /// @return Squared norm
+    Scalar squared_norm() const { return w * w + x * x + y * y + z * z; }
 
-    /// Norm
+    /// @brief Quaternion norm
+    /// @return Euclidean norm
     Scalar norm() const { return janus::sqrt(squared_norm()); }
 
-    /// Normalized version
+    /// @brief Return unit quaternion
+    /// @return Normalized copy
     Quaternion normalized() const {
         Scalar n = norm();
         // Avoid division by zero check for symbolic if possible,
@@ -73,7 +89,9 @@ template <typename Scalar> class Quaternion {
         return Quaternion(w / n, x / n, y / n, z / n);
     }
 
-    /// Vector rotation: v_rot = q * v * q_conj
+    /// @brief Rotate a 3D vector: v_rot = q * v * q_conj
+    /// @param v Input vector
+    /// @return Rotated vector
     Vec3<Scalar> rotate(const Vec3<Scalar> &v) const {
         // Optimization: q * (0, v) * q_conj
         // Or specific formula: v + 2 * cross(q_vec, cross(q_vec, v) + q_w * v)
@@ -93,7 +111,8 @@ template <typename Scalar> class Quaternion {
 
     // --- Conversions ---
 
-    /// Convert to 3x3 Rotation Matrix
+    /// @brief Convert to 3x3 rotation matrix
+    /// @return Rotation matrix
     Mat3<Scalar> to_rotation_matrix() const {
         Mat3<Scalar> R;
         Scalar one = static_cast<Scalar>(1.0);
@@ -124,7 +143,8 @@ template <typename Scalar> class Quaternion {
         return R;
     }
 
-    /// Export as vector [w, x, y, z]
+    /// @brief Export as vector [w, x, y, z]
+    /// @return 4-element coefficient vector
     Vec4<Scalar> coeffs() const {
         Vec4<Scalar> res;
         res << w, x, y, z;
@@ -135,7 +155,11 @@ template <typename Scalar> class Quaternion {
 
     /**
      * @brief Create from Euler Angles (Yaw-Pitch-Roll / Z-Y-X sequence)
-     * Matches rotation_matrix_from_euler_angles
+     * @param roll Roll angle (radians)
+     * @param pitch Pitch angle (radians)
+     * @param yaw Yaw angle (radians)
+     * @return Quaternion
+     * @see rotation_matrix_from_euler_angles
      */
     static Quaternion from_euler(Scalar roll, Scalar pitch, Scalar yaw) {
         Scalar half = static_cast<Scalar>(0.5);
@@ -153,6 +177,12 @@ template <typename Scalar> class Quaternion {
         );
     }
 
+    /**
+     * @brief Create from axis-angle representation
+     * @param axis Rotation axis (will be normalized)
+     * @param angle Rotation angle (radians)
+     * @return Quaternion
+     */
     static Quaternion from_axis_angle(const Vec3<Scalar> &axis, Scalar angle) {
         Scalar half = static_cast<Scalar>(0.5);
         Scalar s = janus::sin(angle * half);
@@ -168,6 +198,11 @@ template <typename Scalar> class Quaternion {
         return Quaternion(c, n_axis(0) * s, n_axis(1) * s, n_axis(2) * s);
     }
 
+    /**
+     * @brief Create from rotation vector (axis * angle)
+     * @param rot_vec Rotation vector
+     * @return Quaternion
+     */
     static Quaternion from_rotation_vector(const Vec3<Scalar> &rot_vec) {
         Scalar half = static_cast<Scalar>(0.5);
         Scalar eps = static_cast<Scalar>(1e-12);
@@ -183,6 +218,11 @@ template <typename Scalar> class Quaternion {
                           rot_vec(2) * scale);
     }
 
+    /**
+     * @brief Create from 3x3 rotation matrix
+     * @param mat Rotation matrix
+     * @return Quaternion
+     */
     static Quaternion from_rotation_matrix(const Mat3<Scalar> &mat) {
         // Implementation based on standard robust algorithms (e.g., Eigen's or Shepperd's)
         // Here we use a simplified version for brevity but covering standard cases.
@@ -297,7 +337,8 @@ template <typename Scalar> class Quaternion {
         return Quaternion(q_w, q_x, q_y, q_z);
     }
 
-    // Euler angles (Roll-Pitch-Yaw / XYZ) extraction
+    /// @brief Extract Euler angles (Roll-Pitch-Yaw / XYZ)
+    /// @return Vec3 of (roll, pitch, yaw)
     Vec3<Scalar> to_euler() const {
         // Roll (x-axis rotation)
         Scalar sinr_cosp = static_cast<Scalar>(2.0) * (w * x + y * z);
@@ -334,11 +375,13 @@ template <typename Scalar> class Quaternion {
 /**
  * @brief Spherical Linear Interpolation (full fidelity)
  *
- * Features:
- * - Shortest path: If dot < 0, negates q1 to interpolate via the shorter arc
- * - Numerical stability: Falls back to normalized linear interpolation for small angles
+ * Shortest-path aware with nlerp fallback for near-identity angles.
  *
- * Works for both numeric and symbolic (CasADi) types via janus::where.
+ * @tparam Scalar Scalar type (NumericScalar or SymbolicScalar)
+ * @param q0 Start quaternion
+ * @param q1 End quaternion
+ * @param t Interpolation parameter in [0, 1]
+ * @return Interpolated unit quaternion
  */
 template <typename Scalar>
 Quaternion<Scalar> slerp(const Quaternion<Scalar> &q0, const Quaternion<Scalar> &q1, Scalar t) {

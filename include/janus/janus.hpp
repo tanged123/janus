@@ -1,3 +1,5 @@
+/// @file janus.hpp
+/// @brief Umbrella header that includes the entire Janus public API
 #pragma once
 
 #include "core/Diagnostics.hpp"

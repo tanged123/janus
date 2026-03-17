@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file SurrogateModel.hpp
+ * @brief Smooth surrogate functions (softmax, softmin, softplus, sigmoid, blend, KS aggregation)
+ * @see Logic.hpp, Arithmetic.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusError.hpp"
 #include "janus/math/Arithmetic.hpp"
@@ -276,7 +282,15 @@ auto ks_max(const Eigen::MatrixBase<Derived> &values, double rho = 1.0) {
 // Sigmoid
 // ======================================================================
 
-enum class SigmoidType { Tanh, Logistic, Arctan, Polynomial };
+/**
+ * @brief Sigmoid shape selection
+ */
+enum class SigmoidType {
+    Tanh,      ///< Hyperbolic tangent
+    Logistic,  ///< Logistic / standard sigmoid
+    Arctan,    ///< Arc tangent based
+    Polynomial ///< Polynomial: x / sqrt(1 + x^2)
+};
 
 /**
  * @brief Sigmoid function with normalization capability.

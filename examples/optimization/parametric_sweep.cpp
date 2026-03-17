@@ -70,7 +70,11 @@ int main() {
     std::cout << std::string(46, '-') << "\n";
 
     for (size_t i = 0; i < result.size(); ++i) {
-        double V_opt = result.solutions[i].value(V);
+        if (!result.converged[i]) {
+            std::cout << std::setw(12) << result.param_values[i] << "  (failed)\n";
+            continue;
+        }
+        double V_opt = result.solutions[i]->value(V);
         double time_min = (distance / V_opt) / 60.0;
 
         std::cout << std::setw(12) << result.param_values[i] << std::setw(12) << V_opt

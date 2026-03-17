@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file AutoDiff.hpp
+ * @brief Symbolic automatic differentiation (Jacobian, gradient, Hessian, sensitivity analysis)
+ * @see Calculus.hpp, FiniteDifference.hpp
+ */
+
 #include "janus/core/Function.hpp"
 #include "janus/core/JanusConcepts.hpp"
 #include "janus/core/JanusTypes.hpp"

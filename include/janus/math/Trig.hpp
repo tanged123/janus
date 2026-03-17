@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file Trig.hpp
+ * @brief Trigonometric and inverse trigonometric functions
+ * @see Arithmetic.hpp
+ */
+
 #include "janus/core/JanusConcepts.hpp"
 #include <Eigen/Dense>
 #include <cmath>
@@ -8,7 +14,7 @@ namespace janus {
 // --- Sin ---
 /**
  * @brief Computes sine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value (radians)
  * @return Sine of x
  */
@@ -33,7 +39,7 @@ template <typename Derived> auto sin(const Eigen::MatrixBase<Derived> &x) {
 // --- Cos ---
 /**
  * @brief Computes cosine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value (radians)
  * @return Cosine of x
  */
@@ -58,7 +64,7 @@ template <typename Derived> auto cos(const Eigen::MatrixBase<Derived> &x) {
 // --- Tan ---
 /**
  * @brief Computes tangent of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value (radians)
  * @return Tangent of x
  */
@@ -83,7 +89,7 @@ template <typename Derived> auto tan(const Eigen::MatrixBase<Derived> &x) {
 // --- Arcsin ---
 /**
  * @brief Computes arc sine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Arc sine of x (radians)
  */
@@ -108,7 +114,7 @@ template <typename Derived> auto asin(const Eigen::MatrixBase<Derived> &x) {
 // --- Arccos ---
 /**
  * @brief Computes arc cosine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Arc cosine of x (radians)
  */
@@ -133,7 +139,7 @@ template <typename Derived> auto acos(const Eigen::MatrixBase<Derived> &x) {
 // --- Arctan ---
 /**
  * @brief Computes arc tangent of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Arc tangent of x (radians)
  */
@@ -158,7 +164,7 @@ template <typename Derived> auto atan(const Eigen::MatrixBase<Derived> &x) {
 // --- Atan2 ---
 /**
  * @brief Computes arc tangent of y/x using signs of both arguments
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param y Numerator
  * @param x Denominator
  * @return Arc tangent of y/x (radians, included in [-pi, pi])
@@ -174,7 +180,7 @@ template <JanusScalar T> T atan2(const T &y, const T &x) {
 // --- Arcsinh ---
 /**
  * @brief Computes inverse hyperbolic sine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value
  * @return Inverse hyperbolic sine of x
  */
@@ -204,7 +210,7 @@ template <typename Derived> auto asinh(const Eigen::MatrixBase<Derived> &x) {
 // --- Arccosh ---
 /**
  * @brief Computes inverse hyperbolic cosine of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value (must be >= 1)
  * @return Inverse hyperbolic cosine of x
  */
@@ -234,7 +240,7 @@ template <typename Derived> auto acosh(const Eigen::MatrixBase<Derived> &x) {
 // --- Arctanh ---
 /**
  * @brief Computes inverse hyperbolic tangent of x
- * @tparam T Scalar type
+ * @tparam T Scalar type (NumericScalar or SymbolicScalar)
  * @param x Input value (must be in (-1, 1))
  * @return Inverse hyperbolic tangent of x
  */

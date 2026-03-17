@@ -1,3 +1,5 @@
+/// @file Diagnostics.hpp
+/// @brief Structural observability and identifiability analysis
 #pragma once
 
 #include "Function.hpp"
@@ -20,8 +22,8 @@ namespace janus {
  * @brief Structural property being analyzed from a symbolic sensitivity pattern.
  */
 enum class StructuralProperty {
-    Observability,
-    Identifiability,
+    Observability,   ///< State observability from outputs
+    Identifiability, ///< Parameter identifiability from outputs
 };
 
 /**
@@ -30,68 +32,70 @@ enum class StructuralProperty {
  * If `output_indices` is empty, all function outputs are flattened and analyzed.
  */
 struct StructuralSensitivityOptions {
-    std::vector<int> output_indices;
+    std::vector<int> output_indices; ///< Indices of outputs to analyze (empty = all)
 };
 
 /**
  * @brief One scalarized element of the selected input block.
  */
 struct DiagnosticInputRef {
-    int local_index = -1;
-    std::string label;
+    int local_index = -1; ///< Scalar index within the input block
+    std::string label;    ///< Human-readable label (e.g. "x[0]")
 };
 
 /**
  * @brief One scalarized row in the selected output stack.
  */
 struct DiagnosticOutputRef {
-    int flat_row = -1;
-    int output_idx = -1;
-    int local_row = -1;
-    int local_col = -1;
-    std::string label;
+    int flat_row = -1;   ///< Row in the flattened output stack
+    int output_idx = -1; ///< Index of the output block
+    int local_row = -1;  ///< Row within the output block
+    int local_col = -1;  ///< Column within the output block
+    std::string label;   ///< Human-readable label
 };
 
 /**
  * @brief One structurally deficient connected component in the sensitivity graph.
  */
 struct StructuralDeficiencyGroup {
-    std::vector<int> input_local_indices;
-    std::vector<int> output_rows;
-    int structural_rank = 0;
-    int rank_deficiency = 0;
+    std::vector<int> input_local_indices; ///< Inputs in this connected component
+    std::vector<int> output_rows;         ///< Outputs in this connected component
+    int structural_rank = 0;              ///< Rank of this sub-block
+    int rank_deficiency = 0;              ///< Number of structurally deficient inputs
 };
 
 /**
  * @brief One user-facing structural diagnostic with an attached remediation hint.
  */
 struct StructuralDiagnosticIssue {
-    std::string message;
-    std::vector<int> input_local_indices;
-    std::vector<int> output_rows;
+    std::string message;                  ///< Human-readable diagnostic message
+    std::vector<int> input_local_indices; ///< Affected input indices
+    std::vector<int> output_rows;         ///< Affected output rows
 };
 
 /**
  * @brief Structural rank analysis of selected outputs with respect to one input block.
  */
 struct StructuralSensitivityReport {
-    StructuralProperty property = StructuralProperty::Observability;
-    int input_idx = -1;
-    std::string input_name;
-    std::vector<int> output_indices;
-    std::vector<std::string> output_names;
-    int variable_dimension = 0;
-    int output_dimension = 0;
-    int structural_rank = 0;
-    int rank_deficiency = 0;
-    SparsityPattern sensitivity_sparsity;
-    std::vector<DiagnosticInputRef> inputs;
-    std::vector<DiagnosticOutputRef> outputs;
-    std::vector<int> deficient_local_indices;
-    std::vector<int> zero_sensitivity_local_indices;
-    std::vector<StructuralDeficiencyGroup> deficiency_groups;
-    std::vector<StructuralDiagnosticIssue> issues;
+    StructuralProperty property = StructuralProperty::Observability; ///< Analysis type
+    int input_idx = -1;                                              ///< Analyzed input block index
+    std::string input_name;                                          ///< Name of the input block
+    std::vector<int> output_indices;                                 ///< Selected output indices
+    std::vector<std::string> output_names;                           ///< Names of selected outputs
+    int variable_dimension = 0;                                      ///< Number of scalar variables
+    int output_dimension = 0;                                        ///< Number of scalar outputs
+    int structural_rank = 0;                         ///< Structural rank of Jacobian
+    int rank_deficiency = 0;                         ///< variable_dimension - structural_rank
+    SparsityPattern sensitivity_sparsity;            ///< Jacobian sparsity pattern
+    std::vector<DiagnosticInputRef> inputs;          ///< Per-element input metadata
+    std::vector<DiagnosticOutputRef> outputs;        ///< Per-element output metadata
+    std::vector<int> deficient_local_indices;        ///< All structurally deficient inputs
+    std::vector<int> zero_sensitivity_local_indices; ///< Inputs with zero Jacobian columns
+    std::vector<StructuralDeficiencyGroup> deficiency_groups; ///< Connected deficient components
+    std::vector<StructuralDiagnosticIssue> issues;            ///< User-facing diagnostic messages
 
+    /// @brief Check if the Jacobian has full structural rank
+    /// @return true if rank_deficiency == 0
     bool full_rank() const { return rank_deficiency == 0; }
 };
 
@@ -102,18 +106,22 @@ struct StructuralSensitivityReport {
  * `state_input_idx` or `parameter_input_idx` must be non-negative.
  */
 struct StructuralDiagnosticsOptions {
-    std::vector<int> output_indices;
-    int state_input_idx = -1;
-    int parameter_input_idx = -1;
+    std::vector<int> output_indices; ///< Output indices to analyze (empty = all)
+    int state_input_idx = -1;        ///< State input block index (-1 to skip observability)
+    int parameter_input_idx = -1;    ///< Parameter input block index (-1 to skip identifiability)
 };
 
 /**
  * @brief Combined structural diagnostics report.
  */
 struct StructuralDiagnosticsReport {
-    std::optional<StructuralSensitivityReport> observability;
-    std::optional<StructuralSensitivityReport> identifiability;
+    std::optional<StructuralSensitivityReport>
+        observability; ///< Observability result (if requested)
+    std::optional<StructuralSensitivityReport>
+        identifiability; ///< Identifiability result (if requested)
 
+    /// @brief Check if any analysis found a rank deficiency
+    /// @return true if observability or identifiability is deficient
     bool has_deficiency() const {
         return (observability.has_value() && !observability->full_rank()) ||
                (identifiability.has_value() && !identifiability->full_rank());
@@ -528,12 +536,12 @@ inline StructuralSensitivityReport analyze_property(const Function &fn, int inpu
 } // namespace detail
 
 /**
- * @brief Analyze which states are structurally observable from selected outputs.
- *
- * The report is based on the Jacobian sparsity of the selected outputs with
- * respect to the chosen state input block. It therefore answers a structural
- * question: can the measurement layout distinguish the states locally, based on
- * symbolic dependence alone.
+ * @brief Analyze which states are structurally observable from selected outputs
+ * @param fn Function whose Jacobian sparsity is analyzed
+ * @param state_input_idx Index of the state input block
+ * @param opts Output selection options
+ * @return Structural sensitivity report
+ * @see analyze_structural_identifiability, analyze_structural_diagnostics
  */
 inline StructuralSensitivityReport
 analyze_structural_observability(const Function &fn, int state_input_idx = 0,
@@ -542,11 +550,12 @@ analyze_structural_observability(const Function &fn, int state_input_idx = 0,
 }
 
 /**
- * @brief Analyze which parameters are structurally identifiable from selected outputs.
- *
- * This performs the same structural-rank analysis as
- * `analyze_structural_observability()`, but interprets the chosen input block as
- * parameters rather than dynamic state coordinates.
+ * @brief Analyze which parameters are structurally identifiable from selected outputs
+ * @param fn Function whose Jacobian sparsity is analyzed
+ * @param parameter_input_idx Index of the parameter input block
+ * @param opts Output selection options
+ * @return Structural sensitivity report
+ * @see analyze_structural_observability
  */
 inline StructuralSensitivityReport
 analyze_structural_identifiability(const Function &fn, int parameter_input_idx,
@@ -556,7 +565,11 @@ analyze_structural_identifiability(const Function &fn, int parameter_input_idx,
 }
 
 /**
- * @brief Run structural observability and identifiability checks together.
+ * @brief Run structural observability and identifiability checks together
+ * @param fn Function to analyze
+ * @param opts Combined analysis options (at least one input index must be non-negative)
+ * @return Combined diagnostics report
+ * @see analyze_structural_observability, analyze_structural_identifiability
  */
 inline StructuralDiagnosticsReport
 analyze_structural_diagnostics(const Function &fn, const StructuralDiagnosticsOptions &opts) {
