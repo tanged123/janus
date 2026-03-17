@@ -21,19 +21,20 @@ namespace janus {
  * @brief Options for structural simplification and analysis passes.
  */
 struct StructuralTransformOptions {
-    int input_idx = 0;                            ///< Index of the input block to analyze
-    int output_idx = 0;                           ///< Index of the output block to analyze
-    int max_alias_row_nnz = 2;                    ///< Max non-zeros in an alias candidate row
-    bool require_constant_alias_coefficients = true; ///< Require constant (symbol-free) coefficients
+    int input_idx = 0;         ///< Index of the input block to analyze
+    int output_idx = 0;        ///< Index of the output block to analyze
+    int max_alias_row_nnz = 2; ///< Max non-zeros in an alias candidate row
+    bool require_constant_alias_coefficients =
+        true; ///< Require constant (symbol-free) coefficients
 };
 
 /**
  * @brief A single eliminated alias or trivial affine variable relation.
  */
 struct AliasSubstitution {
-    int residual_index = -1;             ///< Row that was eliminated
-    int eliminated_variable_index = -1;  ///< Variable solved for
-    SymbolicScalar replacement;          ///< Expression replacing the eliminated variable
+    int residual_index = -1;            ///< Row that was eliminated
+    int eliminated_variable_index = -1; ///< Variable solved for
+    SymbolicScalar replacement;         ///< Expression replacing the eliminated variable
 };
 
 /**
@@ -45,13 +46,13 @@ struct AliasSubstitution {
  * any untouched original inputs back to the full original selected input block.
  */
 struct AliasEliminationResult {
-    Function reduced_function;                     ///< Function with aliases removed
-    Function reconstruct_full_input;               ///< Maps reduced inputs back to original ordering
-    std::vector<int> kept_variable_indices;        ///< Original indices of kept variables
-    std::vector<int> eliminated_variable_indices;  ///< Original indices of eliminated variables
-    std::vector<int> kept_residual_indices;        ///< Original indices of kept residuals
-    std::vector<int> eliminated_residual_indices;  ///< Original indices of eliminated residuals
-    std::vector<AliasSubstitution> substitutions;  ///< Applied substitution records
+    Function reduced_function;                    ///< Function with aliases removed
+    Function reconstruct_full_input;              ///< Maps reduced inputs back to original ordering
+    std::vector<int> kept_variable_indices;       ///< Original indices of kept variables
+    std::vector<int> eliminated_variable_indices; ///< Original indices of eliminated variables
+    std::vector<int> kept_residual_indices;       ///< Original indices of kept residuals
+    std::vector<int> eliminated_residual_indices; ///< Original indices of eliminated residuals
+    std::vector<AliasSubstitution> substitutions; ///< Applied substitution records
 };
 
 /**
@@ -71,14 +72,14 @@ struct StructuralBlock {
  * @brief Block-triangular decomposition and tearing metadata for a selected block.
  */
 struct BLTDecomposition {
-    SparsityPattern incidence;                      ///< Incidence (Jacobian sparsity) of the block
-    std::vector<int> row_permutation;               ///< BTF row permutation
-    std::vector<int> column_permutation;            ///< BTF column permutation
-    std::vector<int> row_block_offsets;              ///< Fine row block boundaries
-    std::vector<int> column_block_offsets;           ///< Fine column block boundaries
-    std::vector<int> coarse_row_block_offsets;       ///< Coarse row block boundaries
-    std::vector<int> coarse_column_block_offsets;    ///< Coarse column block boundaries
-    std::vector<StructuralBlock> blocks;             ///< Diagonal blocks with tearing info
+    SparsityPattern incidence;                    ///< Incidence (Jacobian sparsity) of the block
+    std::vector<int> row_permutation;             ///< BTF row permutation
+    std::vector<int> column_permutation;          ///< BTF column permutation
+    std::vector<int> row_block_offsets;           ///< Fine row block boundaries
+    std::vector<int> column_block_offsets;        ///< Fine column block boundaries
+    std::vector<int> coarse_row_block_offsets;    ///< Coarse row block boundaries
+    std::vector<int> coarse_column_block_offsets; ///< Coarse column block boundaries
+    std::vector<StructuralBlock> blocks;          ///< Diagonal blocks with tearing info
 };
 
 /**

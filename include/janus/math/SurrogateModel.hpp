@@ -286,10 +286,10 @@ auto ks_max(const Eigen::MatrixBase<Derived> &values, double rho = 1.0) {
  * @brief Sigmoid shape selection
  */
 enum class SigmoidType {
-    Tanh,       ///< Hyperbolic tangent
-    Logistic,   ///< Logistic / standard sigmoid
-    Arctan,     ///< Arc tangent based
-    Polynomial  ///< Polynomial: x / sqrt(1 + x^2)
+    Tanh,      ///< Hyperbolic tangent
+    Logistic,  ///< Logistic / standard sigmoid
+    Arctan,    ///< Arc tangent based
+    Polynomial ///< Polynomial: x / sqrt(1 + x^2)
 };
 
 /**

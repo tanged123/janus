@@ -84,15 +84,15 @@ struct StructuralSensitivityReport {
     std::vector<std::string> output_names;                           ///< Names of selected outputs
     int variable_dimension = 0;                                      ///< Number of scalar variables
     int output_dimension = 0;                                        ///< Number of scalar outputs
-    int structural_rank = 0;                                         ///< Structural rank of Jacobian
-    int rank_deficiency = 0;                                         ///< variable_dimension - structural_rank
-    SparsityPattern sensitivity_sparsity;                             ///< Jacobian sparsity pattern
-    std::vector<DiagnosticInputRef> inputs;                          ///< Per-element input metadata
-    std::vector<DiagnosticOutputRef> outputs;                        ///< Per-element output metadata
-    std::vector<int> deficient_local_indices;                        ///< All structurally deficient inputs
-    std::vector<int> zero_sensitivity_local_indices;                 ///< Inputs with zero Jacobian columns
-    std::vector<StructuralDeficiencyGroup> deficiency_groups;        ///< Connected deficient components
-    std::vector<StructuralDiagnosticIssue> issues;                   ///< User-facing diagnostic messages
+    int structural_rank = 0;                         ///< Structural rank of Jacobian
+    int rank_deficiency = 0;                         ///< variable_dimension - structural_rank
+    SparsityPattern sensitivity_sparsity;            ///< Jacobian sparsity pattern
+    std::vector<DiagnosticInputRef> inputs;          ///< Per-element input metadata
+    std::vector<DiagnosticOutputRef> outputs;        ///< Per-element output metadata
+    std::vector<int> deficient_local_indices;        ///< All structurally deficient inputs
+    std::vector<int> zero_sensitivity_local_indices; ///< Inputs with zero Jacobian columns
+    std::vector<StructuralDeficiencyGroup> deficiency_groups; ///< Connected deficient components
+    std::vector<StructuralDiagnosticIssue> issues;            ///< User-facing diagnostic messages
 
     /// @brief Check if the Jacobian has full structural rank
     /// @return true if rank_deficiency == 0
@@ -115,8 +115,10 @@ struct StructuralDiagnosticsOptions {
  * @brief Combined structural diagnostics report.
  */
 struct StructuralDiagnosticsReport {
-    std::optional<StructuralSensitivityReport> observability;    ///< Observability result (if requested)
-    std::optional<StructuralSensitivityReport> identifiability;  ///< Identifiability result (if requested)
+    std::optional<StructuralSensitivityReport>
+        observability; ///< Observability result (if requested)
+    std::optional<StructuralSensitivityReport>
+        identifiability; ///< Identifiability result (if requested)
 
     /// @brief Check if any analysis found a rank deficiency
     /// @return true if observability or identifiability is deficient

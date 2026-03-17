@@ -37,9 +37,9 @@ namespace janus {
  * @brief Backend selection for linear system solves
  */
 enum class LinearSolveBackend {
-    Dense,           ///< Dense matrix factorization
-    SparseDirect,    ///< Sparse direct factorization
-    IterativeKrylov  ///< Iterative Krylov subspace method
+    Dense,          ///< Dense matrix factorization
+    SparseDirect,   ///< Sparse direct factorization
+    IterativeKrylov ///< Iterative Krylov subspace method
 };
 
 /**
@@ -75,8 +75,8 @@ enum class IterativeKrylovSolver {
  * @brief Preconditioner for iterative solvers
  */
 enum class IterativePreconditioner {
-    None,     ///< No preconditioning
-    Diagonal  ///< Jacobi (diagonal) preconditioner
+    None,    ///< No preconditioning
+    Diagonal ///< Jacobi (diagonal) preconditioner
 };
 
 /**
@@ -591,10 +591,10 @@ template <typename Derived> auto pinv(const Eigen::MatrixBase<Derived> &A) {
  * @brief Norm type selection
  */
 enum class NormType {
-    L1,        ///< L1 (Manhattan) norm
-    L2,        ///< L2 (Euclidean) norm
-    Inf,       ///< Infinity (max absolute) norm
-    Frobenius  ///< Frobenius norm
+    L1,       ///< L1 (Manhattan) norm
+    L2,       ///< L2 (Euclidean) norm
+    Inf,      ///< Infinity (max absolute) norm
+    Frobenius ///< Frobenius norm
 };
 
 /**

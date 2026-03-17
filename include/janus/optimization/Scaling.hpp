@@ -18,8 +18,8 @@ namespace janus {
  * @see Opti::analyze_scaling for generating diagnostics
  */
 enum class ScalingIssueLevel {
-    Warning,  ///< Potential scaling concern
-    Critical  ///< Severe scaling issue likely to cause solver failure
+    Warning, ///< Potential scaling concern
+    Critical ///< Severe scaling issue likely to cause solver failure
 };
 
 /**
@@ -127,11 +127,11 @@ struct ScalingSummary {
  * @see Opti::analyze_scaling for generating this report
  */
 struct ScalingReport {
-    ScalingSummary summary;                          ///< Top-level numeric summary
-    ObjectiveScalingInfo objective;                   ///< Objective scaling metadata
-    std::vector<VariableScalingInfo> variables;       ///< Per-variable-block metadata
-    std::vector<ConstraintScalingInfo> constraints;   ///< Per-constraint-row metadata
-    std::vector<ScalingIssue> issues;                 ///< Detected scaling issues
+    ScalingSummary summary;                         ///< Top-level numeric summary
+    ObjectiveScalingInfo objective;                 ///< Objective scaling metadata
+    std::vector<VariableScalingInfo> variables;     ///< Per-variable-block metadata
+    std::vector<ConstraintScalingInfo> constraints; ///< Per-constraint-row metadata
+    std::vector<ScalingIssue> issues;               ///< Detected scaling issues
 
     /// @brief Check if any scaling issues were detected
     /// @return true if the issues list is non-empty

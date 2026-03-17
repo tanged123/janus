@@ -67,7 +67,7 @@ using NumericMatrix = JanusMatrix<NumericScalar>; ///< Eigen::MatrixXd equivalen
 using NumericVector = JanusVector<NumericScalar>; ///< Eigen::VectorXd equivalent
 
 // Symbolic Backend
-using SymbolicScalar = casadi::MX;                 ///< CasADi MX symbolic scalar
+using SymbolicScalar = casadi::MX;                  ///< CasADi MX symbolic scalar
 using SymbolicMatrix = JanusMatrix<SymbolicScalar>; ///< Eigen matrix of MX elements
 using SymbolicVector = JanusVector<SymbolicScalar>; ///< Eigen vector of MX elements
 
@@ -77,8 +77,8 @@ using SymbolicVector = JanusVector<SymbolicScalar>; ///< Eigen vector of MX elem
  * @note For symbolic sparsity analysis, use janus::SparsityPattern.
  * @see SparsityPattern
  */
-using SparseMatrix = Eigen::SparseMatrix<double>;  ///< Sparse numeric matrix (CSC)
-using SparseTriplet = Eigen::Triplet<double>;       ///< (row, col, value) triplet
+using SparseMatrix = Eigen::SparseMatrix<double>; ///< Sparse numeric matrix (CSC)
+using SparseTriplet = Eigen::Triplet<double>;     ///< (row, col, value) triplet
 
 // --- Symbolic Variable Creation ---
 

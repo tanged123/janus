@@ -97,7 +97,8 @@ template <typename Derived> class TranscriptionBase {
 
     /**
      * @brief Register the dynamics function xdot = f(x, u, t)
-     * @tparam Func callable with signature SymbolicVector(const SymbolicVector&, const SymbolicVector&, const SymbolicScalar&)
+     * @tparam Func callable with signature SymbolicVector(const SymbolicVector&, const
+     * SymbolicVector&, const SymbolicScalar&)
      * @param dynamics dynamics function
      */
     template <typename Func> void set_dynamics(Func &&dynamics) {

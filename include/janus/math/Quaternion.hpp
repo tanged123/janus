@@ -73,9 +73,7 @@ template <typename Scalar> class Quaternion {
 
     /// @brief Squared norm (w^2 + x^2 + y^2 + z^2)
     /// @return Squared norm
-    Scalar squared_norm() const {
-        return w * w + x * x + y * y + z * z;
-    }
+    Scalar squared_norm() const { return w * w + x * x + y * y + z * z; }
 
     /// @brief Quaternion norm
     /// @return Euclidean norm
