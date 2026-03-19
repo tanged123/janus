@@ -6,7 +6,7 @@ set -e
 echo "🔧 Running treefmt to format staged files..."
 
 # Run nix fmt (treefmt)
-if ! nix fmt -- --no-cache; then
+if ! nix fmt -- --fail-on-change; then
     echo "❌ Formatting failed!"
     exit 1
 fi
