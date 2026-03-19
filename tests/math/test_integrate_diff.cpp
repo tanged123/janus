@@ -101,8 +101,8 @@ TEST(IntegrateDiffTests, RK4StepVelocity) {
 // stormer_verlet_step — actual IntegratorStep.hpp:167 API
 // ============================================================================
 
-TEST(IntegrateDiffTests, StormerVerletStep) {
-    // Stormer-Verlet for q'' = -q (harmonic oscillator)
+TEST(IntegrateDiffTests, StormerVerletStepQ) {
+    // Stormer-Verlet for q'' = -q (harmonic oscillator), position output
     janus::diff_test::expect_differentiable(
         [](auto q0, auto v0) {
             using S = std::decay_t<decltype(q0)>;
@@ -118,12 +118,29 @@ TEST(IntegrateDiffTests, StormerVerletStep) {
         {{1.0, 0.0}, {0.0, 1.0}, {0.5, -0.3}});
 }
 
+TEST(IntegrateDiffTests, StormerVerletStepV) {
+    // Stormer-Verlet velocity output
+    janus::diff_test::expect_differentiable(
+        [](auto q0, auto v0) {
+            using S = std::decay_t<decltype(q0)>;
+            janus::JanusVector<S> q(1), v(1);
+            q(0) = q0;
+            v(0) = v0;
+            S t = 0.0;
+            S dt = 0.01;
+            auto result = janus::stormer_verlet_step(
+                [](S t_, const janus::JanusVector<S> &pos) { return (-pos).eval(); }, q, v, t, dt);
+            return result.v(0);
+        },
+        {{1.0, 0.0}, {0.0, 1.0}});
+}
+
 // ============================================================================
 // rk45_step — actual IntegratorStep.hpp:250 API
 // ============================================================================
 
-TEST(IntegrateDiffTests, RK45Step) {
-    // RK45 step for dy/dt = -y, test y5 output
+TEST(IntegrateDiffTests, RK45StepY5) {
+    // RK45 step for dy/dt = -y, test 5th-order output
     janus::diff_test::expect_differentiable(
         [](auto y0) {
             using S = std::decay_t<decltype(y0)>;
@@ -138,12 +155,44 @@ TEST(IntegrateDiffTests, RK45Step) {
         {{1.0}, {2.0}, {-0.5}});
 }
 
+TEST(IntegrateDiffTests, RK45StepY4) {
+    // RK45 step, 4th-order output (used for error estimation)
+    janus::diff_test::expect_differentiable(
+        [](auto y0) {
+            using S = std::decay_t<decltype(y0)>;
+            janus::JanusVector<S> state(1);
+            state(0) = y0;
+            S t = 0.0;
+            S dt = 0.1;
+            auto result = janus::rk45_step(
+                [](S t_, const janus::JanusVector<S> &y) { return (-y).eval(); }, state, t, dt);
+            return result.y4(0);
+        },
+        {{1.0}, {2.0}, {-0.5}});
+}
+
+TEST(IntegrateDiffTests, RK45StepError) {
+    // RK45 step, error estimate
+    janus::diff_test::expect_differentiable(
+        [](auto y0) {
+            using S = std::decay_t<decltype(y0)>;
+            janus::JanusVector<S> state(1);
+            state(0) = y0;
+            S t = 0.0;
+            S dt = 0.1;
+            auto result = janus::rk45_step(
+                [](S t_, const janus::JanusVector<S> &y) { return (-y).eval(); }, state, t, dt);
+            return result.error;
+        },
+        {{1.0}, {2.0}, {-0.5}});
+}
+
 // ============================================================================
 // rkn4_step — actual IntegratorStep.hpp:193 API
 // ============================================================================
 
-TEST(IntegrateDiffTests, RKN4Step) {
-    // RKN4 step for q'' = -q
+TEST(IntegrateDiffTests, RKN4StepQ) {
+    // RKN4 step for q'' = -q, position output
     janus::diff_test::expect_differentiable(
         [](auto q0, auto v0) {
             using S = std::decay_t<decltype(q0)>;
@@ -155,6 +204,23 @@ TEST(IntegrateDiffTests, RKN4Step) {
             auto result = janus::rkn4_step(
                 [](S t_, const janus::JanusVector<S> &pos) { return (-pos).eval(); }, q, v, t, dt);
             return result.q(0);
+        },
+        {{1.0, 0.0}, {0.0, 1.0}});
+}
+
+TEST(IntegrateDiffTests, RKN4StepV) {
+    // RKN4 step velocity output
+    janus::diff_test::expect_differentiable(
+        [](auto q0, auto v0) {
+            using S = std::decay_t<decltype(q0)>;
+            janus::JanusVector<S> q(1), v(1);
+            q(0) = q0;
+            v(0) = v0;
+            S t = 0.0;
+            S dt = 0.01;
+            auto result = janus::rkn4_step(
+                [](S t_, const janus::JanusVector<S> &pos) { return (-pos).eval(); }, q, v, t, dt);
+            return result.v(0);
         },
         {{1.0, 0.0}, {0.0, 1.0}});
 }

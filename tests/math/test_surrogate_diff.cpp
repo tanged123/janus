@@ -30,10 +30,28 @@ TEST(SurrogateDiffTests, SmoothClamp) {
         {{-2.0}, {-0.5}, {0.0}, {0.5}, {2.0}});
 }
 
-TEST(SurrogateDiffTests, Sigmoid) {
-    // sigmoid(x) — S-shaped activation
+TEST(SurrogateDiffTests, SigmoidTanh) {
+    // sigmoid(x) — default Tanh mode
     janus::diff_test::expect_differentiable([](auto x) { return janus::sigmoid(x); },
                                             {{-3.0}, {-1.0}, {0.0}, {1.0}, {3.0}});
+}
+
+TEST(SurrogateDiffTests, SigmoidLogistic) {
+    janus::diff_test::expect_differentiable(
+        [](auto x) { return janus::sigmoid(x, janus::SigmoidType::Logistic); },
+        {{-3.0}, {-1.0}, {0.0}, {1.0}, {3.0}});
+}
+
+TEST(SurrogateDiffTests, SigmoidArctan) {
+    janus::diff_test::expect_differentiable(
+        [](auto x) { return janus::sigmoid(x, janus::SigmoidType::Arctan); },
+        {{-3.0}, {-1.0}, {0.0}, {1.0}, {3.0}});
+}
+
+TEST(SurrogateDiffTests, SigmoidPolynomial) {
+    janus::diff_test::expect_differentiable(
+        [](auto x) { return janus::sigmoid(x, janus::SigmoidType::Polynomial); },
+        {{-3.0}, {-1.0}, {0.0}, {1.0}, {3.0}});
 }
 
 TEST(SurrogateDiffTests, Swish) {
