@@ -51,6 +51,8 @@ add_executable(test_diff
     math/test_linalg_diff.cpp
     math/test_integrate_diff.cpp
     math/test_surrogate_diff.cpp
+    math/test_calculus_diff.cpp
+    math/test_interpolate_diff.cpp
 )
 target_link_libraries(test_diff PRIVATE janus GTest::gtest_main)
 gtest_discover_tests(test_diff)
