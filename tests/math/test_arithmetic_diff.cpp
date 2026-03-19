@@ -83,6 +83,11 @@ TEST(ArithmeticDiffTests, Tanh) {
                                             {{-2.0}, {0.0}, {0.5}, {2.0}});
 }
 
+TEST(ArithmeticDiffTests, Log10) {
+    janus::diff_test::expect_differentiable([](auto x) { return janus::log10(x); },
+                                            {{0.1}, {1.0}, {5.0}, {10.0}});
+}
+
 // ============================================================================
 // Dual-Mode Only (non-differentiable or piecewise)
 // ============================================================================
@@ -137,11 +142,6 @@ TEST(ArithmeticDiffTests, TruncDualMode) {
 TEST(ArithmeticDiffTests, CopysignDualMode) {
     janus::diff_test::expect_dual_mode([](auto x, auto y) { return janus::copysign(x, y); },
                                        {{5.0, 1.0}, {5.0, -1.0}, {-5.0, 1.0}});
-}
-
-TEST(ArithmeticDiffTests, Log10) {
-    janus::diff_test::expect_differentiable([](auto x) { return janus::log10(x); },
-                                            {{0.1}, {1.0}, {5.0}, {10.0}});
 }
 
 // ============================================================================

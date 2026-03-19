@@ -31,10 +31,8 @@ template <typename Func>
 void expect_dual_mode(Func &&f, const std::vector<std::vector<double>> &test_points,
                       const DiffTestOptions &opts = {}) {
     auto result = verify_dual_mode(std::forward<Func>(f), test_points, opts);
-    EXPECT_TRUE(result.symbolic_compiles) << result.failure_detail;
-    if (result.symbolic_compiles) {
-        EXPECT_TRUE(result.values_match) << result.failure_detail;
-    }
+    ASSERT_TRUE(result.symbolic_compiles) << result.failure_detail;
+    EXPECT_TRUE(result.values_match) << result.failure_detail;
 }
 
 /**
@@ -54,13 +52,9 @@ template <typename Func>
 void expect_differentiable(Func &&f, const std::vector<std::vector<double>> &test_points,
                            const DiffTestOptions &opts = {}) {
     auto result = verify_differentiable(std::forward<Func>(f), test_points, opts);
-    EXPECT_TRUE(result.symbolic_compiles) << result.failure_detail;
-    if (result.symbolic_compiles) {
-        EXPECT_TRUE(result.values_match) << result.failure_detail;
-    }
-    if (result.symbolic_compiles && result.values_match) {
-        EXPECT_TRUE(result.jacobian_matches) << result.failure_detail;
-    }
+    ASSERT_TRUE(result.symbolic_compiles) << result.failure_detail;
+    ASSERT_TRUE(result.values_match) << result.failure_detail;
+    EXPECT_TRUE(result.jacobian_matches) << result.failure_detail;
 }
 
 } // namespace janus::diff_test

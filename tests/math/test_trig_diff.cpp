@@ -2,7 +2,6 @@
 #include <janus/math/Arithmetic.hpp>
 #include <janus/math/Trig.hpp>
 #include <janus/utils/GTestDiffTest.hpp>
-#include <numbers>
 
 // ============================================================================
 // Basic Trigonometric Functions

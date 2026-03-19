@@ -14,11 +14,14 @@
  */
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <janus/core/Function.hpp>
 #include <janus/core/JanusIO.hpp>
 #include <janus/core/JanusTypes.hpp>
 #include <janus/math/AutoDiff.hpp>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -103,11 +106,28 @@ template <typename F, typename T> constexpr int detect_arity() {
 }
 
 /**
+ * @brief Get the detected arity of a callable for a given scalar type.
+ */
+template <typename Func, typename Scalar> constexpr int arity_of() {
+    return detect_arity<std::decay_t<Func>, Scalar>();
+}
+
+/**
  * @brief Invoke a callable with N arguments unpacked from a vector.
+ *
+ * Validates that args.size() matches the callable's detected arity.
+ * Mismatched sizes indicate a bug in the test (wrong number of values in a test point).
  */
 template <typename Func, typename Scalar> auto invoke(Func &&f, const std::vector<Scalar> &args) {
     using F = std::decay_t<Func>;
     constexpr int N = detect_arity<F, Scalar>();
+
+    if (static_cast<int>(args.size()) != N) {
+        throw std::invalid_argument("DiffTestHarness: test point has " +
+                                    std::to_string(args.size()) + " values but lambda accepts " +
+                                    std::to_string(N) +
+                                    " arguments. Check your test_points dimensions.");
+    }
 
     if constexpr (N == 1)
         return f(args[0]);
@@ -214,10 +234,19 @@ template <typename Func>
 DualModeResult verify_dual_mode_at_point(Func &&f, const std::vector<double> &point,
                                          const DiffTestOptions &opts = {}) {
     DualModeResult result;
-    const int n = static_cast<int>(point.size());
+    // Derive n from the lambda's arity, not from point.size().
+    // invoke() validates the two match and throws if they disagree.
+    constexpr int n = detail::arity_of<Func, double>();
 
     // Step 1: Numeric evaluation
-    Eigen::VectorXd numeric_output = detail::to_numeric_vector(detail::invoke(f, point));
+    Eigen::VectorXd numeric_output;
+    try {
+        numeric_output = detail::to_numeric_vector(detail::invoke(f, point));
+    } catch (const std::exception &e) {
+        result.failure_detail =
+            "Numeric evaluation failed at point " + detail::format_point(point) + ": " + e.what();
+        return result;
+    }
 
     // Step 2: Symbolic evaluation
     std::vector<SymbolicScalar> sym_vars;
@@ -285,6 +314,12 @@ template <typename Func>
 DualModeResult verify_dual_mode(Func &&f, const std::vector<std::vector<double>> &test_points,
                                 const DiffTestOptions &opts = {}) {
     DualModeResult overall;
+
+    if (test_points.empty()) {
+        overall.failure_detail = "No test points supplied";
+        return overall;
+    }
+
     overall.symbolic_compiles = true;
     overall.values_match = true;
     overall.max_value_error = 0.0;
@@ -316,7 +351,7 @@ template <typename Func>
 DiffTestResult verify_differentiable_at_point(Func &&f, const std::vector<double> &point,
                                               const DiffTestOptions &opts = {}) {
     DiffTestResult result;
-    const int n = static_cast<int>(point.size());
+    constexpr int n = detail::arity_of<Func, double>();
 
     // Step 1: Run dual-mode checks
     auto dm = verify_dual_mode_at_point(f, point, opts);
@@ -330,7 +365,15 @@ DiffTestResult verify_differentiable_at_point(Func &&f, const std::vector<double
     }
 
     // Step 2: Compute FD Jacobian (central differences)
-    Eigen::VectorXd f0 = detail::to_numeric_vector(detail::invoke(f, point));
+    Eigen::VectorXd f0;
+    try {
+        f0 = detail::to_numeric_vector(detail::invoke(f, point));
+    } catch (const std::exception &e) {
+        result.jacobian_matches = false;
+        result.failure_detail =
+            "Numeric evaluation failed at point " + detail::format_point(point) + ": " + e.what();
+        return result;
+    }
     const int m = static_cast<int>(f0.size());
 
     Eigen::MatrixXd fd_jac(m, n);
@@ -340,9 +383,16 @@ DiffTestResult verify_differentiable_at_point(Func &&f, const std::vector<double
         point_plus[static_cast<size_t>(j)] += opts.fd_step;
         point_minus[static_cast<size_t>(j)] -= opts.fd_step;
 
-        Eigen::VectorXd f_plus = detail::to_numeric_vector(detail::invoke(f, point_plus));
-        Eigen::VectorXd f_minus = detail::to_numeric_vector(detail::invoke(f, point_minus));
-        fd_jac.col(j) = (f_plus - f_minus) / (2.0 * opts.fd_step);
+        try {
+            Eigen::VectorXd f_plus = detail::to_numeric_vector(detail::invoke(f, point_plus));
+            Eigen::VectorXd f_minus = detail::to_numeric_vector(detail::invoke(f, point_minus));
+            fd_jac.col(j) = (f_plus - f_minus) / (2.0 * opts.fd_step);
+        } catch (const std::exception &e) {
+            result.jacobian_matches = false;
+            result.failure_detail = "FD probe failed at point " + detail::format_point(point) +
+                                    " perturbing input " + std::to_string(j) + ": " + e.what();
+            return result;
+        }
     }
     result.fd_jacobian = fd_jac;
 
@@ -385,36 +435,34 @@ DiffTestResult verify_differentiable_at_point(Func &&f, const std::vector<double
     }
 
     result.max_jacobian_error = 0.0;
+    result.jacobian_matches = true;
     int worst_row = 0, worst_col = 0;
-    for (int i = 0; i < result.ad_jacobian.rows(); ++i) {
+    for (int i = 0; i < result.ad_jacobian.rows() && result.jacobian_matches; ++i) {
         for (int j = 0; j < result.ad_jacobian.cols(); ++j) {
             double ad_val = result.ad_jacobian(i, j);
             double fd_val = fd_jac(i, j);
+
+            if (!std::isfinite(ad_val) || !std::isfinite(fd_val)) {
+                result.jacobian_matches = false;
+                result.max_jacobian_error = std::numeric_limits<double>::infinity();
+                worst_row = i;
+                worst_col = j;
+                break;
+            }
+
             double error = std::abs(ad_val - fd_val);
-            double tol = opts.jac_atol + opts.jac_rtol * std::abs(ad_val);
             if (error > result.max_jacobian_error) {
                 result.max_jacobian_error = error;
                 worst_row = i;
                 worst_col = j;
             }
-        }
-    }
 
-    // Check if all elements pass
-    result.jacobian_matches = true;
-    for (int i = 0; i < result.ad_jacobian.rows(); ++i) {
-        for (int j = 0; j < result.ad_jacobian.cols(); ++j) {
-            double ad_val = result.ad_jacobian(i, j);
-            double fd_val = fd_jac(i, j);
-            double error = std::abs(ad_val - fd_val);
             double tol = opts.jac_atol + opts.jac_rtol * std::abs(ad_val);
             if (error > tol) {
                 result.jacobian_matches = false;
                 break;
             }
         }
-        if (!result.jacobian_matches)
-            break;
     }
 
     if (!result.jacobian_matches) {
@@ -451,6 +499,12 @@ template <typename Func>
 DiffTestResult verify_differentiable(Func &&f, const std::vector<std::vector<double>> &test_points,
                                      const DiffTestOptions &opts = {}) {
     DiffTestResult overall;
+
+    if (test_points.empty()) {
+        overall.failure_detail = "No test points supplied";
+        return overall;
+    }
+
     overall.symbolic_compiles = true;
     overall.values_match = true;
     overall.jacobian_matches = true;
