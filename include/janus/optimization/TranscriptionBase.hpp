@@ -106,9 +106,8 @@ template <typename Derived> class TranscriptionBase {
             throw RuntimeError("TranscriptionBase: call setup() before set_dynamics()");
         }
         if (dynamics_constraints_added_) {
-            throw RuntimeError(
-                "TranscriptionBase: set_dynamics() cannot be called after "
-                "add_dynamics_constraints(); call setup() again to start fresh");
+            throw RuntimeError("TranscriptionBase: set_dynamics() cannot be called after "
+                               "add_dynamics_constraints(); call setup() again to start fresh");
         }
 
         dynamics_ = [fn = std::forward<Func>(dynamics)](
