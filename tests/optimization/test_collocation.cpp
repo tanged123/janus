@@ -200,7 +200,7 @@ TEST(CollocationTests, HarmonicOscillatorEnergy) {
     EXPECT_NEAR(x_sol(dc.n_nodes() - 1, 1), 0.0, 0.1);
 }
 
-TEST(CollocationTests, SetDynamicsTwiceThrows) {
+TEST(CollocationTests, SetDynamicsAfterConstraintsThrows) {
     Opti opti;
     DirectCollocation dc(opti);
 
@@ -210,10 +210,11 @@ TEST(CollocationTests, SetDynamicsTwiceThrows) {
 
     dc.setup(2, 1, 0.0, 1.0, opts);
     dc.set_dynamics(double_integrator_ode);
+    dc.add_dynamics_constraints();
 
     try {
         dc.set_dynamics(double_integrator_ode);
-        FAIL() << "Expected set_dynamics() to throw when called twice";
+        FAIL() << "Expected set_dynamics() to throw after add_dynamics_constraints()";
     } catch (const janus::RuntimeError &e) {
         const std::string msg = e.what();
         EXPECT_NE(msg.find("set_dynamics"), std::string::npos);
